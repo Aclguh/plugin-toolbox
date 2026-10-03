@@ -11,6 +11,8 @@ analyzer:
     - linux/**
     # 独立验证与自动化脚本, 依赖 print 与终端交互
     - tool/**
+    # 第三方本地维护分支 (lua_dardo fork), 保持上游代码原貌, 不纳入本仓库 lint 门禁
+    - packages/third_party/**
 
 linter:
   rules:
