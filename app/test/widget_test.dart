@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox/src/app.dart';
 import 'package:plugin_toolbox/src/home/home_page.dart';
 import 'package:plugin_toolbox/src/plugin_manager/plugin_manager_page.dart';
+import 'package:plugin_toolbox/src/settings/settings_page.dart';
 import 'package:plugin_toolbox/src/providers/app_providers.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
@@ -144,5 +145,25 @@ void main() {
     await notifier.reorderEnabled(2, 0);
     expect(registry.allPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
     expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
+  });
+
+  testWidgets('SettingsPage allows changing theme mode and toggling dynamic color',
+      (WidgetTester tester) async {
+    final container = ProviderContainer();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('外观与显示'), findsOneWidget);
+    expect(find.text('主题模式'), findsOneWidget);
+    expect(find.text('动态取色 (Material You)'), findsOneWidget);
+    expect(find.text('品牌深色（默认）'), findsOneWidget);
   });
 }

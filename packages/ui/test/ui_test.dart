@@ -13,6 +13,9 @@ void main() {
       expect(light.useMaterial3, isTrue);
       expect(dark.useMaterial3, isTrue);
       expect(dark.brightness, Brightness.dark);
+      expect(dark.scaffoldBackgroundColor, const Color(0xFF26366A));
+      expect(dark.colorScheme.surface, const Color(0xFF26366A));
+      expect(dark.colorScheme.onSurface, const Color(0xFFB4C9FF));
     });
 
     testWidgets('SectionHeader displays title and trailing widget', (tester) async {

@@ -38,7 +38,11 @@ class HomePage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.dashboard_customize_outlined, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.dashboard_customize_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
                   const SizedBox(height: 16),
                   const Text('暂无已启用的插件'),
                   const SizedBox(height: 12),

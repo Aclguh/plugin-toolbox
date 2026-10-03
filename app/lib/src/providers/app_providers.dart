@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -100,10 +101,78 @@ final autoRotateProvider = StateNotifierProvider<OrientationNotifier, bool>((ref
   return notifier;
 });
 
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.dark);
+
+  static const _key = 'app_theme_mode';
+
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final modeStr = prefs.getString(_key);
+      if (modeStr == 'light') {
+        state = ThemeMode.light;
+      } else if (modeStr == 'system') {
+        state = ThemeMode.system;
+      } else {
+        state = ThemeMode.dark;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setMode(ThemeMode mode) async {
+    state = mode;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final modeStr = switch (mode) {
+        ThemeMode.light => 'light',
+        ThemeMode.system => 'system',
+        ThemeMode.dark => 'dark',
+      };
+      await prefs.setString(_key, modeStr);
+    } catch (_) {}
+  }
+}
+
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+  final notifier = ThemeModeNotifier();
+  notifier.init();
+  return notifier;
+});
+
+class DynamicColorNotifier extends StateNotifier<bool> {
+  DynamicColorNotifier() : super(false);
+
+  static const _key = 'use_dynamic_color';
+
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_key) ?? false;
+    } catch (_) {}
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_key, enabled);
+    } catch (_) {}
+  }
+}
+
+final dynamicColorEnabledProvider = StateNotifierProvider<DynamicColorNotifier, bool>((ref) {
+  final notifier = DynamicColorNotifier();
+  notifier.init();
+  return notifier;
+});
+
 /// 应用启动时载入已安装的动态插件并进行初始化
 final appInitFutureProvider = FutureProvider<void>((ref) async {
-  // 1. 初始化屏幕旋转偏好
+  // 1. 初始化屏幕旋转偏好及主题偏好
   await ref.read(autoRotateProvider.notifier).init();
+  await ref.read(themeModeProvider.notifier).init();
+  await ref.read(dynamicColorEnabledProvider.notifier).init();
 
   final registry = ref.read(pluginRegistryProvider);
   

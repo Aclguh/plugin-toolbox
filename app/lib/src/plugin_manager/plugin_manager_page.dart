@@ -185,7 +185,11 @@ class PluginManagerPage extends ConsumerWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.drag_indicator, color: Colors.grey, size: 22),
+                              Icon(
+                                Icons.drag_indicator,
+                                color: Theme.of(context).colorScheme.outline,
+                                size: 22,
+                              ),
                               const SizedBox(width: 8),
                               _buildPluginIcon(context, plugin),
                             ],
