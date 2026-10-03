@@ -411,28 +411,28 @@ packages:
   plugin_toolbox_core:
     dependency: "direct main"
     description:
-      path: "../../core/plugin_toolbox_core"
+      path: "../packages/core"
       relative: true
     source: path
     version: "0.1.0"
   plugin_toolbox_dui:
     dependency: "direct main"
     description:
-      path: "../../core/plugin_toolbox_dui"
+      path: "../packages/dui"
       relative: true
     source: path
     version: "0.1.0"
   plugin_toolbox_lua:
     dependency: "direct main"
     description:
-      path: "../../core/plugin_toolbox_lua"
+      path: "../packages/lua"
       relative: true
     source: path
     version: "0.1.0"
   plugin_toolbox_ui:
     dependency: "direct main"
     description:
-      path: "../../core/plugin_toolbox_ui"
+      path: "../packages/ui"
       relative: true
     source: path
     version: "0.1.0"

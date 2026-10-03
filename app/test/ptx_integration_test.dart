@@ -33,7 +33,9 @@ void main() {
 
   testWidgets('E2E: Installs base64_tool.ptx and executes encode in DynamicPluginHostPage', (tester) async {
     // 1. Install base64_tool.ptx
-    final ptxFile = File('../../../sample_plugins/base64_tool.ptx');
+    final ptxFile = File('../sample_plugins/base64_tool.ptx').existsSync()
+        ? File('../sample_plugins/base64_tool.ptx')
+        : File('sample_plugins/base64_tool.ptx');
     expect(ptxFile.existsSync(), isTrue, reason: 'sample_plugins/base64_tool.ptx must exist');
 
     final dynamicPlugin = await tester.runAsync(() => PluginInstaller.installFromPtx(ptxFile));

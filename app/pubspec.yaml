@@ -13,13 +13,13 @@ dependencies:
 
   # 内部包
   plugin_toolbox_core:
-    path: ../../core/plugin_toolbox_core
+    path: ../packages/core
   plugin_toolbox_lua:
-    path: ../../core/plugin_toolbox_lua
+    path: ../packages/lua
   plugin_toolbox_dui:
-    path: ../../core/plugin_toolbox_dui
+    path: ../packages/dui
   plugin_toolbox_ui:
-    path: ../../core/plugin_toolbox_ui
+    path: ../packages/ui
 
   # 状态管理 & 路由
   flutter_riverpod: ^2.6.0

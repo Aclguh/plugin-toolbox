@@ -1,5 +1,5 @@
-name: plugin_toolbox_dui
-description: PluginToolbox 声明式 UI (JSON -> Flutter Widget) 渲染引擎。
+name: plugin_toolbox_ui
+description: PluginToolbox 共享 UI 组件和 Material Design 3 主题系统。
 version: 0.1.0
 publish_to: 'none'
 
@@ -11,9 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_toolbox_core:
-    path: ../plugin_toolbox_core
-  plugin_toolbox_lua:
-    path: ../plugin_toolbox_lua
+    path: ../core
+  dynamic_color: ^1.7.0
 
 dev_dependencies:
   flutter_test:

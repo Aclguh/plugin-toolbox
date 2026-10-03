@@ -2,7 +2,8 @@ name: plugin_toolbox_workspace
 repository: https://github.com/user/plugin-toolbox
 
 packages:
-  - packages/**
+  - app
+  - packages/*
 
 command:
   bootstrap:
