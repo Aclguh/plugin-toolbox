@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import '../model/plugin_manifest.dart';
 import '../plugin/dynamic_plugin.dart';
+import '../event/event_bus.dart';
+import '../event/app_event.dart';
+import '../sandbox/sandbox_path.dart';
 
 class PluginInstaller {
   static const int maxPackageSizeBytes = 10 * 1024 * 1024; // 10MB
@@ -17,7 +21,14 @@ class PluginInstaller {
     }
 
     final bytes = await ptxFile.readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes);
+    final Archive archive;
+    try {
+      archive = ZipDecoder().decodeBytes(bytes);
+    } on FormatException {
+      rethrow;
+    } catch (_) {
+      throw const FormatException('安装包不是有效的 ZIP/PTX 格式');
+    }
 
     // 1. 查找并解析 plugin.json
     final manifestEntry = archive.findFile('plugin.json');
@@ -52,8 +63,9 @@ class PluginInstaller {
     // 5. 解压所有文件到沙箱目录
     for (final file in archive) {
       final filename = file.name;
-      // 防御 Zip Slip 路径穿越攻击
-      if (filename.contains('..') || filename.startsWith('/') || filename.startsWith('\\')) {
+      // 防御 Zip Slip 路径穿越攻击：由生产沙箱校验器统一拦截
+      // `..` 穿越、POSIX/Windows 绝对路径与 UNC 路径等所有逃逸向量。
+      if (!SandboxPath.isSafeRelativeEntry(filename)) {
         throw FormatException('检测到非法的包内相对路径: $filename');
       }
       if (file.isFile) {
@@ -79,5 +91,20 @@ class PluginInstaller {
     if (await targetDir.exists()) {
       await targetDir.delete(recursive: true);
     }
+  }
+
+  /// 监听卸载请求事件并执行沙箱目录清理。
+  ///
+  /// 注册中心只通过事件总线发出卸载请求（保持自身无文件系统职责），
+  /// 由宿主在组装层调用本方法建立"请求 -> 清理"的桥接。
+  static StreamSubscription<PluginUninstallRequestedEvent>
+      listenUninstallRequests(EventBus eventBus) {
+    return eventBus.on<PluginUninstallRequestedEvent>().listen((event) async {
+      try {
+        await uninstall(event.pluginId);
+      } on FileSystemException {
+        // 沙箱目录可能已被外部移除，卸载流程不因此中断
+      }
+    });
   }
 }

@@ -17,6 +17,11 @@ abstract class ToolPlugin {
   /// 图标（原生 IconData 或自定义）
   IconData get icon;
 
+  /// 可选的图片图标源：动态插件可提供沙箱内图标文件，
+  /// UI 层据此前缀渲染而无需对具体插件类型做硬检查（保持多态）。
+  /// 返回 null 时 UI 层回退到 [icon] 矢量图标。
+  ImageProvider? get iconProvider => null;
+
   /// 插件路由标识
   String get routePath => id;
 

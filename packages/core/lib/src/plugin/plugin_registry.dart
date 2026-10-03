@@ -6,7 +6,7 @@ import '../model/plugin_category.dart';
 import 'tool_plugin.dart';
 import 'dynamic_plugin.dart';
 import 'plugin_context.dart';
-import '../installer/plugin_installer.dart';
+import 'plugin_list_controller.dart';
 
 class PluginRegistry {
   PluginRegistry({
@@ -22,57 +22,45 @@ class PluginRegistry {
   final Map<String, ToolPlugin> _plugins = {};
   final Set<String> _disabledPlugins = {};
   final Set<String> _initializedPlugins = {};
-  final List<String> _order = [];
 
-  List<String> get pluginOrder => List.unmodifiable(_order);
+  /// 排序与排列细节委托给独立控制器，注册中心只保留生命周期职责
+  final PluginListController _orderController = PluginListController();
+
+  /// 启禁用状态变动频繁而读取高频（每次 UI 重建都会访问），
+  /// 缓存列表并在任何注册/注销/排序/启禁用变更后失效，避免重复重算与 GC 压力
+  List<ToolPlugin>? _cachedAll;
+  List<ToolPlugin>? _cachedEnabled;
+
+  void _invalidateCaches() {
+    _cachedAll = null;
+    _cachedEnabled = null;
+  }
+
+  List<String> get pluginOrder => _orderController.order;
 
   void loadOrder(List<String> savedOrder) {
-    _order.clear();
-    for (final id in savedOrder) {
-      if (_plugins.containsKey(id) && !_order.contains(id)) {
-        _order.add(id);
-      }
-    }
-    for (final id in _plugins.keys) {
-      if (!_order.contains(id)) {
-        _order.add(id);
-      }
-    }
+    _orderController.loadOrder(_plugins.keys.toSet(), savedOrder);
+    _invalidateCaches();
   }
 
   void reorder(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _order.length) return;
-    if (newIndex < 0 || newIndex >= _order.length) return;
-    if (oldIndex == newIndex) return;
-    final item = _order.removeAt(oldIndex);
-    _order.insert(newIndex, item);
+    _orderController.reorder(oldIndex, newIndex);
+    _invalidateCaches();
   }
 
   void reorderEnabled(int oldIndex, int newIndex) {
-    final enabled = enabledPlugins;
-    if (oldIndex < 0 || oldIndex >= enabled.length) return;
-    if (newIndex < 0 || newIndex >= enabled.length) return;
-    if (oldIndex == newIndex) return;
-
-    final movingId = enabled[oldIndex].id;
-    final targetId = enabled[newIndex].id;
-
-    _order.remove(movingId);
-    final targetPos = _order.indexOf(targetId);
-    if (targetPos == -1) {
-      _order.add(movingId);
-    } else if (oldIndex < newIndex) {
-      _order.insert(targetPos + 1, movingId);
-    } else {
-      _order.insert(targetPos, movingId);
-    }
+    _orderController.reorderEnabled(
+      enabledPlugins.map((p) => p.id).toList(),
+      oldIndex,
+      newIndex,
+    );
+    _invalidateCaches();
   }
 
   void register(ToolPlugin plugin) {
     _plugins[plugin.id] = plugin;
-    if (!_order.contains(plugin.id)) {
-      _order.add(plugin.id);
-    }
+    _orderController.add(plugin.id);
+    _invalidateCaches();
     _logger.i('Registered plugin: ${plugin.id} (dynamic: ${plugin.isDynamic})');
   }
 
@@ -83,7 +71,7 @@ class PluginRegistry {
   }
 
   Future<void> unregister(String pluginId) async {
-    _order.remove(pluginId);
+    _orderController.remove(pluginId);
     final plugin = _plugins.remove(pluginId);
     if (plugin != null) {
       if (_initializedPlugins.contains(pluginId)) {
@@ -91,8 +79,10 @@ class PluginRegistry {
         _initializedPlugins.remove(pluginId);
       }
       _disabledPlugins.remove(pluginId);
+      _invalidateCaches();
       if (plugin is DynamicPlugin) {
-        await PluginInstaller.uninstall(pluginId);
+        // 注册中心不直接触碰文件系统：发出卸载请求，由安装器监听执行沙箱清理
+        eventBus.fire(PluginUninstallRequestedEvent(pluginId));
       }
       eventBus.fire(PluginUninstalledEvent(pluginId));
       _logger.i('Unregistered & uninstalled plugin: $pluginId');
@@ -100,11 +90,14 @@ class PluginRegistry {
   }
 
   Future<void> initializeAll() async {
-    for (final plugin in _plugins.values) {
-      if (!_disabledPlugins.contains(plugin.id) && !_initializedPlugins.contains(plugin.id)) {
-        await _initPlugin(plugin);
-      }
-    }
+    // 并发初始化：单个慢插件不再拖慢整体启动耗时
+    final pending = _plugins.values
+        .where((p) =>
+            !_disabledPlugins.contains(p.id) &&
+            !_initializedPlugins.contains(p.id))
+        .map(_initPlugin)
+        .toList();
+    await Future.wait(pending);
   }
 
   Future<void> _initPlugin(ToolPlugin plugin) async {
@@ -126,21 +119,30 @@ class PluginRegistry {
   }
 
   List<ToolPlugin> get allPlugins {
+    final cached = _cachedAll;
+    if (cached != null) return cached;
+
     final list = <ToolPlugin>[];
-    for (final id in _order) {
+    for (final id in _orderController.order) {
       final p = _plugins[id];
       if (p != null) list.add(p);
     }
     for (final entry in _plugins.entries) {
-      if (!_order.contains(entry.key)) {
+      if (!_orderController.order.contains(entry.key)) {
         list.add(entry.value);
       }
     }
-    return List.unmodifiable(list);
+    _cachedAll = List.unmodifiable(list);
+    return _cachedAll!;
   }
 
-  List<ToolPlugin> get enabledPlugins =>
-      allPlugins.where((p) => !_disabledPlugins.contains(p.id)).toList();
+  List<ToolPlugin> get enabledPlugins {
+    final cached = _cachedEnabled;
+    if (cached != null) return cached;
+    _cachedEnabled =
+        List.unmodifiable(allPlugins.where((p) => !_disabledPlugins.contains(p.id)));
+    return _cachedEnabled!;
+  }
 
   Map<PluginCategory, List<ToolPlugin>> get pluginsByCategory {
     final map = <PluginCategory, List<ToolPlugin>>{};
@@ -168,6 +170,7 @@ class PluginRegistry {
         _initializedPlugins.remove(id);
       }
     }
+    _invalidateCaches();
     eventBus.fire(PluginStateChangedEvent(id, enabled));
   }
 }

@@ -22,6 +22,14 @@ class PluginUninstalledEvent extends AppEvent {
   List<Object?> get props => [pluginId, ...super.props];
 }
 
+/// 卸载请求事件：注册中心发出，由安装器监听并执行沙箱目录清理
+class PluginUninstallRequestedEvent extends AppEvent {
+  final String pluginId;
+  PluginUninstallRequestedEvent(this.pluginId);
+  @override
+  List<Object?> get props => [pluginId, ...super.props];
+}
+
 class PluginStateChangedEvent extends AppEvent {
   final String pluginId;
   final bool isEnabled;

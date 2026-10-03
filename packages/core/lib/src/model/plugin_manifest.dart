@@ -34,30 +34,47 @@ class PluginManifest {
     this.settings = const [],
   });
 
+  /// 安全解析清单。
+  ///
+  /// 恶意或损坏的 plugin.json 不允许引发 TypeError 崩溃：可降级字段统一走
+  /// 容错转换，必填字段（id/name）缺失或类型错误时抛出明确的 FormatException。
   factory PluginManifest.fromJson(Map<String, dynamic> json) {
-    final permissionsRaw = json['permissions'] as List<dynamic>? ?? [];
+    String requiredField(String key) {
+      final value = json[key];
+      if (value == null || value.toString().isEmpty) {
+        throw FormatException('插件清单缺少必填字段: $key');
+      }
+      return value.toString();
+    }
+
+    final permissionsRaw = json['permissions'] is List
+        ? json['permissions'] as List<dynamic>
+        : const <dynamic>[];
+    final settingsRaw = json['settings'] is List
+        ? json['settings'] as List<dynamic>
+        : const <dynamic>[];
     final permissions = permissionsRaw
         .map((p) => PluginPermission.fromString(p.toString()))
         .whereType<PluginPermission>()
         .toList();
 
     return PluginManifest(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      version: json['version'] as String? ?? '1.0.0',
-      description: json['description'] as String? ?? '',
-      author: json['author'] as String? ?? 'Unknown',
-      minAppVersion: json['minAppVersion'] as String?,
-      type: (json['type'] as String? ?? 'lua').toLowerCase(),
-      category: PluginCategory.fromString(json['category'] as String?),
-      icon: json['icon'] as String?,
+      id: requiredField('id'),
+      name: requiredField('name'),
+      version: json['version']?.toString() ?? '1.0.0',
+      description: json['description']?.toString() ?? '',
+      author: json['author']?.toString() ?? 'Unknown',
+      minAppVersion: json['minAppVersion']?.toString(),
+      type: (json['type']?.toString() ?? 'lua').toLowerCase(),
+      category: PluginCategory.fromString(json['category']?.toString()),
+      icon: json['icon']?.toString(),
       permissions: permissions,
-      entry: json['entry'] as String? ?? 'main.lua',
-      ui: json['ui'] as String? ?? 'ui/main.ui.json',
-      settings: (json['settings'] as List<dynamic>?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          const [],
+      entry: json['entry']?.toString() ?? 'main.lua',
+      ui: json['ui']?.toString() ?? 'ui/main.ui.json',
+      settings: settingsRaw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
     );
   }
 
@@ -77,6 +94,16 @@ class PluginManifest {
         'settings': settings,
       };
 
-  static PluginManifest fromJsonString(String source) =>
-      PluginManifest.fromJson(json.decode(source) as Map<String, dynamic>);
+  static PluginManifest fromJsonString(String source) {
+    final Object? decoded;
+    try {
+      decoded = json.decode(source);
+    } on FormatException {
+      rethrow;
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('插件清单必须是 JSON 对象');
+    }
+    return PluginManifest.fromJson(decoded);
+  }
 }

@@ -40,6 +40,12 @@ class DynamicPlugin extends ToolPlugin {
   @override
   IconData get icon => defaultIcon; // 动态插件通用图标，若有本地图标由 UI 渲染
 
+  @override
+  ImageProvider? get iconProvider {
+    final file = iconFile;
+    return file != null ? FileImage(file) : null;
+  }
+
   File get entryScriptFile => File('${rootDir.path}/${manifest.entry}');
   File get uiDefinitionFile => File('${rootDir.path}/${manifest.ui}');
   File? get iconFile => manifest.icon != null ? File('${rootDir.path}/${manifest.icon}') : null;
