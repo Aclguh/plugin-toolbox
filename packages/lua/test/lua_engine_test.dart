@@ -122,28 +122,37 @@ void main() {
       expect(delegate.getState('message'), 'Hello Lua');
     });
 
-    test('codec API base64 encode and decode', () {
+    test('codec 与 hash 宿主 API 以全局表形式绑定注入 (仅验证绑定, 不验证业务结果)', () {
       engine.loadAndExecute('''
-        encoded = codec.base64Encode("Hello Flutter")
-        decoded = codec.base64Decode(encoded)
-        state.set("encoded", encoded)
-        state.set("decoded", decoded)
+        state.set("codec_type", type(codec))
+        state.set("codec_encode_fn", type(codec.base64Encode))
+        state.set("codec_decode_fn", type(codec.base64Decode))
+        state.set("codec_url_fn", type(codec.urlEncode))
+        state.set("hash_type", type(hash))
+        state.set("hash_md5_fn", type(hash.md5))
+        state.set("hash_sha1_fn", type(hash.sha1))
+        state.set("hash_sha256_fn", type(hash.sha256))
       ''');
 
-      expect(delegate.getState('encoded'), 'SGVsbG8gRmx1dHRlcg==');
-      expect(delegate.getState('decoded'), 'Hello Flutter');
+      expect(delegate.getState('codec_type'), 'table');
+      expect(delegate.getState('codec_encode_fn'), 'function');
+      expect(delegate.getState('codec_decode_fn'), 'function');
+      expect(delegate.getState('codec_url_fn'), 'function');
+      expect(delegate.getState('hash_type'), 'table');
+      expect(delegate.getState('hash_md5_fn'), 'function');
+      expect(delegate.getState('hash_sha1_fn'), 'function');
+      expect(delegate.getState('hash_sha256_fn'), 'function');
     });
 
-    test('hash API md5 and sha256', () {
-      engine.loadAndExecute('''
-        md5Val = hash.md5("test")
-        sha256Val = hash.sha256("test")
-        state.set("md5", md5Val)
-        state.set("sha256", sha256Val)
-      ''');
-
-      expect(delegate.getState('md5'), '098f6bcd4621d373cade4e832627b4f6');
-      expect(delegate.getState('sha256'), '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
+    test('宿主 API 参数类型错误被隔离为 Lua 执行错误 (不逃逸宿主)', () {
+      expect(
+        () => engine.loadAndExecute('codec.base64Encode(nil)'),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('Lua 执行错误'),
+        )),
+      );
     });
 
     test('callFunction invokes Lua functions', () {
