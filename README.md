@@ -13,6 +13,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)](#安装与运行)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#架构设计)
+[![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
 
 **简体中文** · [English](README.en.md)
 
@@ -45,14 +46,17 @@ plugin-toolbox/
 │   ├── lib/              # 页面、路由 (go_router)、全局状态 (Riverpod)
 │   └── test/             # 宿主 Widget 测试与组件交互测试
 ├── packages/
-│   ├── core/             # 领域核心：插件模型、注册中心、安装器与隔离服务（纯 Dart）
-│   ├── lua/              # 脚本执行层：Lua 5.1/LuaJIT 脚本引擎与沙箱 API 绑定
+│   ├── core/             # 领域核心：插件模型、注册中心、安装器与沙箱安全（纯 Dart）
+│   ├── lua/              # 脚本执行层：Lua 脚本引擎与沙箱 API 绑定（含指令数预算防护）
 │   ├── dui/              # 声明式 UI 引擎：JSON AST -> Flutter Widget 动态渲染
-│   └── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
+│   ├── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
+│   └── third_party/
+│       └── lua_dardo/    # Lua VM 本地维护分支 (Apache-2.0)：新增指令数预算能力
 ├── sample_plugins/       # 官方样例插件源码与打包脚本 (pack.py)
 │   ├── base64_tool/      # Base64 文本编解码插件
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 哈希计算插件
 ├── tool/                 # 独立质量工程工具套件 (verify.dart, shots.py)
+├── .github/workflows/    # CI 流水线：analyze + verify + 全模块测试
 └── AGENTS.md             # 统一架构标准、开发门槛与 AI Agent 协作规范
 ```
 
@@ -236,10 +240,10 @@ flutter build apk --release --split-per-abi
 # 1. 静态代码分析（保持 0 错误 0 警告）
 dart analyze
 
-# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，63 项断言全通过）
+# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，80 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备）
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 62 用例）
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
@@ -248,6 +252,16 @@ cd app && flutter test
 
 # 4. 真机截图与视觉规范验证（需连接真机，自动裁剪系统栏并压缩）
 python tool/shots.py 01-home 02-manager 03-settings
+```
+
+### 统一任务入口 (melos)
+
+```bash
+melos run analyze        # 各包静态分析
+melos run test           # 各包测试
+melos run verify         # 独立验证套件
+melos run pack:plugins   # 打包示例插件
+melos run build:apk      # 构建发布 APK
 ```
 
 ---

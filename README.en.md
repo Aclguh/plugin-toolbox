@@ -13,6 +13,7 @@ A deeply decoupled, fully offline, and hot-pluggable Android toolbox application
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)](#installation--usage)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#architecture)
+[![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
 
 [简体中文](README.md) · **English**
 
@@ -44,13 +45,17 @@ plugin-toolbox/
 │   ├── lib/              # Pages, routing (go_router), global state (Riverpod)
 │   └── test/             # Host widget tests & component interaction tests
 ├── packages/
-│   ├── core/             # Domain core: plugin models, registry, installer, isolation services (Pure Dart)
-│   ├── lua/              # Script execution: Lua 5.1/LuaJIT engine & sandbox API bindings
+│   ├── core/             # Domain core: plugin models, registry, installer & sandbox security (Pure Dart)
+│   ├── lua/              # Script execution: Lua engine & sandbox API bindings (with instruction budget)
 │   ├── dui/              # Declarative UI engine: JSON AST -> Flutter Widget dynamic rendering
-│   └── ui/               # Shared presentation: AppTheme brand design system & reusable widget library
+│   ├── ui/               # Shared presentation: AppTheme brand design system & reusable widget library
+│   └── third_party/
+│       └── lua_dardo/    # Locally maintained Lua VM fork (Apache-2.0): adds instruction budget
 ├── sample_plugins/       # Official reference plugins with packing scripts
 │   ├── base64_tool/      # Base64 text encoder/decoder plugin
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 hash calculator plugin
+├── tool/                 # Standalone quality engineering toolkit (verify.dart, shots.py)
+├── .github/workflows/    # CI pipeline: analyze + verify + all-package tests
 └── AGENTS.md             # Unified architecture standards, quality gates & AI Agent guidelines
 ```
 
@@ -229,10 +234,10 @@ flutter build apk --release --split-per-abi
 # 1. Static code analysis (0 warnings, 0 errors)
 dart analyze
 
-# 2. Automated specification and logic verification (verify.dart suite)
+# 2. Automated specification and logic verification (80 assertions, pure Dart)
 dart run tool/verify.dart
 
-# 3. Layered unit & widget tests (pure software testing, no devices needed)
+# 3. Layered unit & widget tests (pure software testing, 62 cases, no devices needed)
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
@@ -241,6 +246,16 @@ cd app && flutter test
 
 # 4. On-device visual & layout inspection (with connected Android device)
 python tool/shots.py 01-home 02-manager 03-settings
+```
+
+### Unified task entry (melos)
+
+```bash
+melos run analyze        # Per-package static analysis
+melos run test           # Per-package tests
+melos run verify         # Standalone verification suite
+melos run pack:plugins   # Pack sample plugins into .ptx
+melos run build:apk      # Build release APKs (split-per-abi)
 ```
 
 ---
