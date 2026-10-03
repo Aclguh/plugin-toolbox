@@ -25,10 +25,17 @@ class SettingsPage extends ConsumerWidget {
             },
           ),
           const SectionHeader(title: '关于'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('PluginToolbox'),
-            subtitle: Text('版本 0.1.0 • 万物皆插件'),
+          ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/icons/plugin-toolbox-icon.png',
+                width: 36,
+                height: 36,
+              ),
+            ),
+            title: const Text('PluginToolbox'),
+            subtitle: const Text('版本 0.1.0 • 万物皆插件'),
           ),
         ],
       ),

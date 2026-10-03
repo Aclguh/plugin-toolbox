@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="100" y1="40" x2="930" y2="990" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111936"/>
+      <stop offset=".52" stop-color="#202956"/>
+      <stop offset="1" stop-color="#26366A"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="matrix(440 0 0 420 300 290)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#31D9D0" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#31D9D0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo2" cx="0" cy="0" r="1" gradientTransform="matrix(350 0 0 350 790 760)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9D72" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#FF9D72" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="handle" x1="414" y1="210" x2="620" y2="366" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A7E7FF"/>
+      <stop offset="1" stop-color="#788CFF"/>
+    </linearGradient>
+    <linearGradient id="case" x1="210" y1="340" x2="815" y2="824" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FBFF"/>
+      <stop offset=".6" stop-color="#EAF1FF"/>
+      <stop offset="1" stop-color="#CAD9F8"/>
+    </linearGradient>
+    <linearGradient id="tileMint" x1="250" y1="420" x2="507" y2="541" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#52E6CF"/><stop offset="1" stop-color="#1DC6B6"/>
+    </linearGradient>
+    <linearGradient id="tileBlue" x1="518" y1="420" x2="776" y2="541" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DB7FF"/><stop offset="1" stop-color="#6683F5"/>
+    </linearGradient>
+    <linearGradient id="tileCoral" x1="250" y1="548" x2="507" y2="671" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9C91"/><stop offset="1" stop-color="#F16D91"/>
+    </linearGradient>
+    <linearGradient id="tileAmber" x1="518" y1="548" x2="776" y2="671" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD478"/><stop offset="1" stop-color="#F6A950"/>
+    </linearGradient>
+    <linearGradient id="latch" x1="442" y1="725" x2="582" y2="787" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8299FF"/><stop offset="1" stop-color="#6277E9"/>
+    </linearGradient>
+    <filter id="shadow" x="116" y="186" width="792" height="725" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="22"/>
+      <feGaussianBlur stdDeviation="22"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix values="0 0 0 0 0.025 0 0 0 0 0.045 0 0 0 0 0.13 0 0 0 .46 0"/>
+      <feBlend in2="BackgroundImageFix" result="effect1_dropShadow"/>
+      <feBlend in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+    </filter>
+    <clipPath id="iconClip"><rect width="1024" height="1024" rx="224"/></clipPath>
+  </defs>
+  <g clip-path="url(#iconClip)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#halo)"/>
+    <rect width="1024" height="1024" fill="url(#halo2)"/>
+    <circle cx="512" cy="512" r="385" fill="none" stroke="#B4C9FF" stroke-opacity=".045" stroke-width="2"/>
+    <circle cx="512" cy="512" r="326" fill="none" stroke="#B4C9FF" stroke-opacity=".035" stroke-width="2"/>
+
+    <g filter="url(#shadow)">
+      <path d="M409 365V279c0-34 27-61 61-61h84c34 0 61 27 61 61v86" fill="none" stroke="#111A39" stroke-opacity=".72" stroke-width="86" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M409 365V279c0-34 27-61 61-61h84c34 0 61 27 61 61v86" fill="none" stroke="url(#handle)" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M425 344V280c0-25 20-45 45-45h84c25 0 45 20 45 45v64" fill="none" stroke="#E5F8FF" stroke-opacity=".72" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <rect x="176" y="342" width="672" height="493" rx="105" fill="url(#case)"/>
+      <path d="M203 405c0-19 15-34 34-34h550c19 0 34 15 34 34v17H203v-17Z" fill="#FFFFFF" fill-opacity=".66"/>
+      <rect x="222" y="407" width="580" height="293" rx="48" fill="#1B2445"/>
+      <rect x="229" y="414" width="566" height="279" rx="41" fill="#222D50"/>
+
+      <rect x="250" y="430" width="256" height="116" rx="28" fill="url(#tileMint)"/>
+      <rect x="250" y="430" width="256" height="116" rx="28" fill="none" stroke="#D7FFF7" stroke-opacity=".34" stroke-width="2"/>
+      <rect x="518" y="430" width="256" height="116" rx="28" fill="url(#tileBlue)"/>
+      <rect x="518" y="430" width="256" height="116" rx="28" fill="none" stroke="#E1EAFF" stroke-opacity=".38" stroke-width="2"/>
+      <rect x="250" y="560" width="256" height="116" rx="28" fill="url(#tileCoral)"/>
+      <rect x="250" y="560" width="256" height="116" rx="28" fill="none" stroke="#FFE7EA" stroke-opacity=".38" stroke-width="2"/>
+      <rect x="518" y="560" width="256" height="116" rx="28" fill="url(#tileAmber)"/>
+      <rect x="518" y="560" width="256" height="116" rx="28" fill="none" stroke="#FFF2D0" stroke-opacity=".48" stroke-width="2"/>
+
+      <!-- A clean plus marks an add-on; the adjacent plug identifies the system. -->
+      <path d="M378 455v66M345 488h66" fill="none" stroke="#F7FFFE" stroke-width="18" stroke-linecap="round"/>
+      <path d="M620 473v-22M662 473v-22" fill="none" stroke="#F7FBFF" stroke-width="14" stroke-linecap="round"/>
+      <rect x="606" y="468" width="70" height="49" rx="19" fill="#F7FBFF"/>
+      <path d="M641 516v15c0 12 10 22 22 22h7" fill="none" stroke="#F7FBFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Simple sliders and a sparkle suggest a toolbox of varied capabilities. -->
+      <path d="M326 590h104M326 618h104M326 646h104" fill="none" stroke="#FFF9FC" stroke-opacity=".96" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="355" cy="590" r="10" fill="#F47D91"/>
+      <circle cx="397" cy="618" r="10" fill="#F47D91"/>
+      <circle cx="370" cy="646" r="10" fill="#F47D91"/>
+      <path d="M640 578c4 18 15 29 34 34-19 4-30 15-34 34-4-19-15-30-34-34 19-5 30-16 34-34Z" fill="#FFFEF8"/>
+      <path d="M696 579c2 8 7 13 15 15-8 2-13 7-15 15-2-8-7-13-15-15 8-2 13-7 15-15Z" fill="#FFFEF8" fill-opacity=".88"/>
+
+      <path d="M206 725h612" stroke="#AABDE1" stroke-opacity=".66" stroke-width="4"/>
+      <rect x="442" y="724" width="140" height="58" rx="20" fill="url(#latch)"/>
+      <rect x="462" y="739" width="100" height="8" rx="4" fill="#EAF0FF" fill-opacity=".8"/>
+      <rect x="493" y="755" width="38" height="7" rx="3.5" fill="#D2DCFF" fill-opacity=".64"/>
+      <path d="M204 794h18M802 794h18" stroke="#A6B7DE" stroke-opacity=".68" stroke-width="5" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
