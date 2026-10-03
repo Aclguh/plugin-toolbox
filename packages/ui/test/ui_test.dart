@@ -16,6 +16,8 @@ void main() {
       expect(dark.scaffoldBackgroundColor, const Color(0xFF26366A));
       expect(dark.colorScheme.surface, const Color(0xFF26366A));
       expect(dark.colorScheme.onSurface, const Color(0xFFB4C9FF));
+      expect(dark.cardTheme.clipBehavior, Clip.antiAlias);
+      expect((dark.cardTheme.shape as RoundedRectangleBorder).borderRadius, BorderRadius.circular(16));
     });
 
     testWidgets('SectionHeader displays title and trailing widget', (tester) async {
@@ -85,6 +87,9 @@ void main() {
 
       expect(find.text('Mock Plugin'), findsOneWidget);
       expect(find.text('Mock Description'), findsOneWidget);
+      final card = tester.widget<Card>(find.byType(Card));
+      expect(card.clipBehavior, Clip.antiAlias);
+      expect(card.margin, EdgeInsets.zero);
 
       await tester.tap(find.text('Mock Plugin'));
       expect(tapped, isTrue);

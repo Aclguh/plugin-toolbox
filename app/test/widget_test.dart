@@ -71,8 +71,16 @@ void main() {
     expect(find.text('Plugin 1'), findsOneWidget);
     expect(find.text('Plugin 2'), findsOneWidget);
 
-    // Verify ReorderableGridView is used
-    expect(find.byType(ReorderableGridView), findsOneWidget);
+    // Verify ReorderableGridView is used and configured with rounded-corner dragWidgetBuilder
+    final gridView = tester.widget<ReorderableGridView>(find.byType(ReorderableGridView));
+    expect(gridView.dragWidgetBuilderV2, isNotNull);
+    final dragWidget = gridView.dragWidgetBuilderV2!.builder(0, const SizedBox(), null);
+    expect(dragWidget, isA<Material>());
+    final material = dragWidget as Material;
+    expect(material.shape, isA<RoundedRectangleBorder>());
+    final shape = material.shape as RoundedRectangleBorder;
+    expect((shape.borderRadius as BorderRadius).topLeft.x, 16.0);
+    expect(material.elevation, 8.0);
 
     // Verify NO category SectionHeaders are present
     expect(find.text(PluginCategory.calculator.label), findsNothing);
@@ -93,6 +101,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // Verify ReorderableListView has rounded proxyDecorator
+    final listView = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
+    expect(listView.proxyDecorator, isNotNull);
 
     // Verify drag indicator icon on left
     expect(find.byIcon(Icons.drag_indicator), findsOneWidget);

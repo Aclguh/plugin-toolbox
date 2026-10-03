@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -168,12 +169,43 @@ class PluginManagerPage extends ConsumerWidget {
               onReorderItem: (oldIndex, newIndex) async {
                 await ref.read(pluginRegistryProvider.notifier).reorder(oldIndex, newIndex);
               },
+              proxyDecorator: (Widget child, int index, Animation<double> animation) {
+                return AnimatedBuilder(
+                  animation: animation,
+                  builder: (BuildContext context, Widget? child) {
+                    final double animValue = Curves.easeInOut.transform(animation.value);
+                    final double elevation = lerpDouble(2, 8, animValue) ?? 6;
+                    return Material(
+                      color: Colors.transparent,
+                      elevation: 0,
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          cardTheme: Theme.of(context).cardTheme.copyWith(
+                            elevation: elevation,
+                            shadowColor: Colors.black.withValues(alpha: 0.6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                  },
+                  child: child,
+                );
+              },
               itemBuilder: (context, index) {
                 final plugin = allPlugins[index];
                 final isEnabled = registry.isEnabled(plugin.id);
                 return Card(
                   key: ValueKey(plugin.id),
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  clipBehavior: Clip.antiAlias,
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                     leading: ReorderableDelayedDragStartListener(

@@ -69,6 +69,22 @@ class HomePage extends ConsumerWidget {
             onReorder: (oldIndex, newIndex) async {
               await ref.read(pluginRegistryProvider.notifier).reorderEnabled(oldIndex, newIndex);
             },
+            dragWidgetBuilder: (index, child) {
+              return Material(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                    width: 1.5,
+                  ),
+                ),
+                elevation: 8,
+                shadowColor: Colors.black.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                clipBehavior: Clip.antiAlias,
+                child: child,
+              );
+            },
             itemBuilder: (context, index) {
               final plugin = plugins[index];
               return PluginCard(
