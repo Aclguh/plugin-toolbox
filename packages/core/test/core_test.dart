@@ -117,5 +117,71 @@ void main() {
       await sub.cancel();
       eventBus.dispose();
     });
+
+    test('reorders plugins and preserves order', () async {
+      final registry = PluginRegistry(
+        eventBus: EventBusImpl(),
+        storageFactory: const PluginStorageFactory(),
+      );
+
+      const m1 = PluginManifest(
+        id: 'p1',
+        name: 'P1',
+        version: '1.0.0',
+        description: 'd1',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'e.lua',
+        ui: 'u.json',
+      );
+      const m2 = PluginManifest(
+        id: 'p2',
+        name: 'P2',
+        version: '1.0.0',
+        description: 'd2',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'e.lua',
+        ui: 'u.json',
+      );
+      const m3 = PluginManifest(
+        id: 'p3',
+        name: 'P3',
+        version: '1.0.0',
+        description: 'd3',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'e.lua',
+        ui: 'u.json',
+      );
+
+      registry.register(DynamicPlugin(manifest: m1, rootDir: Directory('.')));
+      registry.register(DynamicPlugin(manifest: m2, rootDir: Directory('.')));
+      registry.register(DynamicPlugin(manifest: m3, rootDir: Directory('.')));
+
+      expect(registry.allPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
+
+      // reorder in all plugins
+      registry.reorder(2, 0); // move p3 to start
+      expect(registry.allPlugins.map((p) => p.id).toList(), ['p3', 'p1', 'p2']);
+
+      // reorder enabled plugins with some disabled
+      await registry.setEnabled('p1', false);
+      expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p3', 'p2']);
+
+      registry.reorderEnabled(1, 0); // move p2 before p3
+      expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p2', 'p3']);
+      expect(registry.allPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
+
+      // loadOrder
+      registry.loadOrder(['p1', 'p2', 'p3']);
+      expect(registry.allPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
+    });
   });
 }

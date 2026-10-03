@@ -22,9 +22,57 @@ class PluginRegistry {
   final Map<String, ToolPlugin> _plugins = {};
   final Set<String> _disabledPlugins = {};
   final Set<String> _initializedPlugins = {};
+  final List<String> _order = [];
+
+  List<String> get pluginOrder => List.unmodifiable(_order);
+
+  void loadOrder(List<String> savedOrder) {
+    _order.clear();
+    for (final id in savedOrder) {
+      if (_plugins.containsKey(id) && !_order.contains(id)) {
+        _order.add(id);
+      }
+    }
+    for (final id in _plugins.keys) {
+      if (!_order.contains(id)) {
+        _order.add(id);
+      }
+    }
+  }
+
+  void reorder(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _order.length) return;
+    if (newIndex < 0 || newIndex >= _order.length) return;
+    if (oldIndex == newIndex) return;
+    final item = _order.removeAt(oldIndex);
+    _order.insert(newIndex, item);
+  }
+
+  void reorderEnabled(int oldIndex, int newIndex) {
+    final enabled = enabledPlugins;
+    if (oldIndex < 0 || oldIndex >= enabled.length) return;
+    if (newIndex < 0 || newIndex >= enabled.length) return;
+    if (oldIndex == newIndex) return;
+
+    final movingId = enabled[oldIndex].id;
+    final targetId = enabled[newIndex].id;
+
+    _order.remove(movingId);
+    final targetPos = _order.indexOf(targetId);
+    if (targetPos == -1) {
+      _order.add(movingId);
+    } else if (oldIndex < newIndex) {
+      _order.insert(targetPos + 1, movingId);
+    } else {
+      _order.insert(targetPos, movingId);
+    }
+  }
 
   void register(ToolPlugin plugin) {
     _plugins[plugin.id] = plugin;
+    if (!_order.contains(plugin.id)) {
+      _order.add(plugin.id);
+    }
     _logger.i('Registered plugin: ${plugin.id} (dynamic: ${plugin.isDynamic})');
   }
 
@@ -35,6 +83,7 @@ class PluginRegistry {
   }
 
   Future<void> unregister(String pluginId) async {
+    _order.remove(pluginId);
     final plugin = _plugins.remove(pluginId);
     if (plugin != null) {
       if (_initializedPlugins.contains(pluginId)) {
@@ -76,10 +125,22 @@ class PluginRegistry {
     }
   }
 
-  List<ToolPlugin> get allPlugins => List.unmodifiable(_plugins.values.toList());
+  List<ToolPlugin> get allPlugins {
+    final list = <ToolPlugin>[];
+    for (final id in _order) {
+      final p = _plugins[id];
+      if (p != null) list.add(p);
+    }
+    for (final entry in _plugins.entries) {
+      if (!_order.contains(entry.key)) {
+        list.add(entry.value);
+      }
+    }
+    return List.unmodifiable(list);
+  }
 
   List<ToolPlugin> get enabledPlugins =>
-      _plugins.values.where((p) => !_disabledPlugins.contains(p.id)).toList();
+      allPlugins.where((p) => !_disabledPlugins.contains(p.id)).toList();
 
   Map<PluginCategory, List<ToolPlugin>> get pluginsByCategory {
     final map = <PluginCategory, List<ToolPlugin>>{};

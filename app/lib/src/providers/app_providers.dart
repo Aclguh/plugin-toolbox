@@ -16,11 +16,32 @@ final storageFactoryProvider = Provider<PluginStorageFactory>((ref) {
 class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
   PluginRegistryNotifier(super.state);
 
+  static const _orderKey = 'plugin_toolbox_plugin_order';
+
   @override
   bool updateShouldNotify(PluginRegistry old, PluginRegistry current) => true;
 
   void refresh() {
     state = state;
+  }
+
+  Future<void> saveOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_orderKey, state.pluginOrder);
+    } catch (_) {}
+  }
+
+  Future<void> reorder(int oldIndex, int newIndex) async {
+    state.reorder(oldIndex, newIndex);
+    state = state;
+    await saveOrder();
+  }
+
+  Future<void> reorderEnabled(int oldIndex, int newIndex) async {
+    state.reorderEnabled(oldIndex, newIndex);
+    state = state;
+    await saveOrder();
   }
 }
 
@@ -90,6 +111,15 @@ final appInitFutureProvider = FutureProvider<void>((ref) async {
   final installedPlugins = await PluginLoader.loadAllInstalledPlugins();
   registry.registerAll(installedPlugins);
 
-  // 3. 初始化所有插件
+  // 3. 加载持久化的插件排序
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedOrder = prefs.getStringList(PluginRegistryNotifier._orderKey);
+    if (savedOrder != null && savedOrder.isNotEmpty) {
+      registry.loadOrder(savedOrder);
+    }
+  } catch (_) {}
+
+  // 4. 初始化所有插件
   await registry.initializeAll();
 });

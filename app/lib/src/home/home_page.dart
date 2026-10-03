@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
+import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 
 import '../providers/app_providers.dart';
 
@@ -31,8 +32,8 @@ class HomePage extends ConsumerWidget {
       ),
       body: init.when(
         data: (_) {
-          final categories = registry.pluginsByCategory;
-          if (categories.isEmpty) {
+          final plugins = registry.enabledPlugins;
+          if (plugins.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -52,34 +53,24 @@ class HomePage extends ConsumerWidget {
 
           final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
 
-          return ListView.builder(
-            itemCount: categories.length,
-            itemBuilder: (context, idx) {
-              final cat = categories.keys.elementAt(idx);
-              final plugins = categories[cat]!;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(title: cat.label),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: isPortrait ? 3 : 4,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: isPortrait ? 0.80 : 0.95,
-                    ),
-                    itemCount: plugins.length,
-                    itemBuilder: (context, i) {
-                      return PluginCard(
-                        plugin: plugins[i],
-                        onTap: () => context.push('/plugin/${plugins[i].routePath}'),
-                      );
-                    },
-                  ),
-                ],
+          return ReorderableGridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isPortrait ? 3 : 4,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: isPortrait ? 0.80 : 0.95,
+            ),
+            itemCount: plugins.length,
+            onReorder: (oldIndex, newIndex) async {
+              await ref.read(pluginRegistryProvider.notifier).reorderEnabled(oldIndex, newIndex);
+            },
+            itemBuilder: (context, index) {
+              final plugin = plugins[index];
+              return PluginCard(
+                key: ValueKey(plugin.id),
+                plugin: plugin,
+                onTap: () => context.push('/plugin/${plugin.routePath}'),
               );
             },
           );
