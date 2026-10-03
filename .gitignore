@@ -45,3 +45,7 @@ build/
 
 # Implementation documentation
 docs/
+
+# Local AI Agent configuration
+AGENTS.md
+
