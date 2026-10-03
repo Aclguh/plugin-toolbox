@@ -49,3 +49,5 @@ docs/
 # Local AI Agent configuration
 AGENTS.md
 
+# 动态插件开发目录
+PTX-plugins/

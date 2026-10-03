@@ -297,6 +297,7 @@ void main() {
   expect(gitignore.existsSync(), '.gitignore 存在');
   final gitignoreContent = gitignore.readAsStringSync();
   expect(gitignoreContent.contains('AGENTS.md'), '.gitignore 中排除了本地 AI 规范文件 AGENTS.md');
+  expect(gitignoreContent.contains('PTX-plugins/'), '.gitignore 中排除了插件开发目录 PTX-plugins/');
 
   final license = File('LICENSE');
   expect(license.existsSync(), 'LICENSE 存在');
