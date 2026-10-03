@@ -231,7 +231,6 @@ flutter build apk --release --split-per-abi
 
 ## 验证与测试
 
-本项目采用严格的质量保障体系（详见 [AGENTS.md](AGENTS.md)），遵循**软件测试只做软件本身测试、不做插件测试**的职责边界。在声明完成或发布前执行：
 
 ```bash
 # 1. 静态代码分析（保持 0 错误 0 警告）

@@ -225,8 +225,6 @@ flutter build apk --release --split-per-abi
 
 ## Verification & Testing
 
-Strict automated quality gates are enforced throughout development (see [AGENTS.md](AGENTS.md)), adhering to the principle that **software testing focuses solely on the software infrastructure and host system itself, not on dynamic plugin business logic**:
-
 ```bash
 # 1. Static code analysis (0 warnings, 0 errors)
 dart analyze
