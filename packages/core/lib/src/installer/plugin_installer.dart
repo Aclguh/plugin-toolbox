@@ -52,6 +52,10 @@ class PluginInstaller {
     // 5. 解压所有文件到沙箱目录
     for (final file in archive) {
       final filename = file.name;
+      // 防御 Zip Slip 路径穿越攻击
+      if (filename.contains('..') || filename.startsWith('/') || filename.startsWith('\\')) {
+        throw FormatException('检测到非法的包内相对路径: $filename');
+      }
       if (file.isFile) {
         final data = file.content as List<int>;
         final outFile = File('${targetDir.path}/$filename');

@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../model/plugin_manifest.dart';
 import '../model/plugin_category.dart';
@@ -8,6 +8,8 @@ import 'plugin_context.dart';
 
 /// 动态加载的 .ptx 插件实体
 class DynamicPlugin extends ToolPlugin {
+  static const IconData defaultIcon = IconData(0xe247, fontFamily: 'MaterialIcons');
+
   final PluginManifest manifest;
   final Directory rootDir;
   PluginContext? _context;
@@ -36,7 +38,7 @@ class DynamicPlugin extends ToolPlugin {
   PluginCategory get category => manifest.category;
 
   @override
-  IconData get icon => Icons.extension; // 动态插件通用图标，若有本地图标由 UI 渲染
+  IconData get icon => defaultIcon; // 动态插件通用图标，若有本地图标由 UI 渲染
 
   File get entryScriptFile => File('${rootDir.path}/${manifest.entry}');
   File get uiDefinitionFile => File('${rootDir.path}/${manifest.ui}');

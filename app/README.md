@@ -104,18 +104,27 @@ dependencies:
 # 获取依赖
 flutter pub get
 
-# 本地真机/模拟器运行
+# 本地真机/模拟器调试运行
 flutter run
 ```
 
 ### 2. 执行自动化测试套件
 
 ```bash
-# 运行全部单元与 Widget 测试
-flutter test
+# 静态分析
+cd .. && dart analyze
 
-# 运行特定端到端集成测试
+# 独立规则与规范验证
+dart run tool/verify.dart
+
+# 运行 App 模块单元测试与 Widget 测试
+cd app && flutter test
+
+# 运行特定端到端集成测试（.ptx 插件安装至执行）
 flutter test test/ptx_integration_test.dart
+
+# 真机视觉与布局截图验证（连接 Android 设备）
+python ../tool/shots.py 01-home 02-manager 03-settings
 ```
 
 ### 3. 构建发布包

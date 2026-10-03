@@ -1,5 +1,17 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+    # 独立验证与自动化脚本, 依赖 print 与终端交互
+    - tool/**
+
 linter:
   rules:
     prefer_const_constructors: true

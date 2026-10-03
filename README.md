@@ -49,9 +49,10 @@ plugin-toolbox/
 │   ├── lua/              # 脚本执行层：Lua 5.1/LuaJIT 脚本引擎与沙箱 API 绑定
 │   ├── dui/              # 声明式 UI 引擎：JSON AST -> Flutter Widget 动态渲染
 │   └── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
-├── sample_plugins/       # 官方样例插件源码与打包打包脚本
+├── sample_plugins/       # 官方样例插件源码与打包脚本 (pack.py)
 │   ├── base64_tool/      # Base64 文本编解码插件
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 哈希计算插件
+├── tool/                 # 独立质量工程工具套件 (verify.dart, shots.py)
 └── AGENTS.md             # 统一架构标准、开发门槛与 AI Agent 协作规范
 ```
 
@@ -177,16 +178,19 @@ function on_encode()
 end
 ```
 
-### 4. 一键打包脚本 (`pack.py`)
+### 4. 插件跨平台打包 (`sample_plugins/pack.py`)
 
-在插件源码根目录下执行：
+在工程根目录下执行跨平台 Python 打包脚本：
 
 ```bash
-python pack.py
-# 将在 dist/ 目录下自动生成经过校验的 <plugin_id>.ptx
+# 一键打包所有插件目录为 .ptx
+python sample_plugins/pack.py
+
+# 或打包指定插件
+python sample_plugins/pack.py base64_tool
 ```
 
-
+---
 
 ## 安装与运行
 
@@ -195,7 +199,7 @@ python pack.py
 要求环境：
 - Flutter SDK 3.29+ / Dart SDK 3.7+
 - Android SDK (API 34+), Java 17+
-- Python 3.10+ (仅用于插件打包与图标脚本)
+- Python 3.10+ (用于质量工具与插件打包)
 
 ```bash
 # 克隆仓库
@@ -203,6 +207,7 @@ git clone https://github.com/Aclguh/plugin-toolbox.git
 cd plugin-toolbox
 
 # 安装依赖
+flutter pub get
 cd app && flutter pub get
 
 # 启动调试（需连接真机或启动模拟器）
@@ -226,20 +231,27 @@ flutter build apk --release --split-per-abi
 
 ## 验证与测试
 
-我们在开发过程中贯彻严格的自动化测试门槛（详见 [AGENTS.md](AGENTS.md)）：
+本项目采用严格的质量保障体系（详见 [AGENTS.md](AGENTS.md)），在声明完成或发布前执行：
 
 ```bash
-# 1. 静态代码分析（保持 0 警告 0 错误）
+# 1. 静态代码分析（保持 0 错误 0 警告）
 dart analyze
 
-# 2. 共享表现层测试
+# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，62 项断言全通过）
+dart run tool/verify.dart
+
+# 3. 分层单元测试与 Widget 测试（无需外部设备）
+cd packages/core && flutter test
+cd packages/lua && flutter test
+cd packages/dui && flutter test
 cd packages/ui && flutter test
+cd app && flutter test
 
-# 3. 宿主集成测试与 Widget 测试（包含真机交互与拖拽断言）
-cd ../../app && flutter test
+# 4. 动态插件端到端集成测试（.ptx 安装、Lua 脚本与 DUI 渲染闭环）
+cd app && flutter test test/ptx_integration_test.dart
 
-# 4. 动态插件 E2E 验证（测试 .ptx 安装与数据流运转）
-flutter test test/ptx_integration_test.dart
+# 5. 真机截图与视觉规范验证（需连接真机，自动裁剪系统栏并压缩）
+python tool/shots.py 01-home 02-manager 03-settings
 ```
 
 ---
