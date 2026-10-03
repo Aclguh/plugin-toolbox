@@ -23,7 +23,11 @@ import tempfile
 
 from PIL import Image
 
-OUT_DIR = os.path.join("docs", "screenshots")
+# 输出目录锚定到脚本所在仓库根, 允许从任意工作目录执行截图脚本
+OUT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "docs", "screenshots",
+)
 
 # README 中图片按 260px-270px 显示, 540px 宽相当于 2x, 足够清晰且体积小。
 TARGET_WIDTH = 540

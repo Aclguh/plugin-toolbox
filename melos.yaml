@@ -31,3 +31,15 @@ scripts:
     description: 代码生成
     packageFilters:
       dependsOn: build_runner
+
+  verify:
+    run: dart run tool/verify.dart
+    description: 运行独立规范与逻辑自动化验证套件 (须在仓库根目录)
+
+  pack:plugins:
+    run: python sample_plugins/pack.py
+    description: 打包全部示例动态插件为 .ptx
+
+  build:apk:
+    run: cd app && flutter build apk --release --split-per-abi
+    description: 按架构拆分构建发布 APK

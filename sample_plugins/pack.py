@@ -12,6 +12,21 @@ import os
 import zipfile
 import json
 
+# 开发环境的临时/系统元数据文件不打入分发包，避免泄露开发环境信息
+EXCLUDED_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
+
+def is_excluded(rel_path: str) -> bool:
+    parts = rel_path.replace(os.sep, "/").split("/")
+    for part in parts:
+        if not part:
+            continue
+        # 隐藏文件/目录 (以 . 开头) 与 vim 交换文件等开发临时文件一律跳过
+        if part.startswith(".") or part.endswith(".swp"):
+            return True
+        if part in EXCLUDED_FILES:
+            return True
+    return False
+
 def pack_plugin(plugin_dir: str, output_ptx: str):
     manifest_path = os.path.join(plugin_dir, "plugin.json")
     if not os.path.isfile(manifest_path):
@@ -29,7 +44,13 @@ def pack_plugin(plugin_dir: str, output_ptx: str):
             for file in files:
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, plugin_dir)
-                zf.write(full_path, rel_path)
+                if is_excluded(rel_path):
+                    continue
+                # ZIP 规范要求条目路径使用正斜杠:
+                # Windows 上 os.path.relpath 产生反斜杠, 会导致 Android 端
+                # archive.findFile('ui/main.ui.json') 之类的查找失败
+                zip_path = rel_path.replace(os.sep, "/")
+                zf.write(full_path, zip_path)
 
     size_kb = os.path.getsize(output_ptx) / 1024
     print(f"  [成功] 生成 {output_ptx} ({size_kb:.1f} KB)")

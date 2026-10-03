@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+// M-14: 直接导入 packages/core 的生产沙箱路径校验器,
+// 断言的是真正运行在用户设备上的安全算法 (该文件为纯 Dart 实现, 无 Flutter 依赖)
+import '../packages/core/lib/src/sandbox/sandbox_path.dart';
+
 int _pass = 0;
 int _fail = 0;
 
@@ -65,33 +69,6 @@ double contrastRatio(int hex1, int hex2) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/// 路径安全检查（防止路径穿越）
-bool isSafeSubpath(String basePath, String relativeSubpath) {
-  // 包含任何连续点号 (.. 或 .... 等) 直接判定为潜在路径穿越攻击
-  if (relativeSubpath.contains(RegExp(r'\.{2,}'))) {
-    return false;
-  }
-  final cleanBase = basePath.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
-  final fullPath = '$cleanBase/${relativeSubpath.replaceAll('\\', '/')}';
-  final segments = fullPath.split('/');
-  final resolved = <String>[];
-  for (final seg in segments) {
-    if (seg == '' || seg == '.') continue;
-    if (seg == '..') {
-      if (resolved.isEmpty) return false;
-      resolved.removeLast();
-    } else {
-      resolved.add(seg);
-    }
-  }
-  final baseSegments = cleanBase.split('/').where((s) => s.isNotEmpty).toList();
-  if (resolved.length < baseSegments.length) return false;
-  for (int i = 0; i < baseSegments.length; i++) {
-    if (resolved[i] != baseSegments[i]) return false;
-  }
-  return true;
-}
-
 /// 列表重排测试算法
 List<T> simulateReorder<T>(List<T> list, int oldIndex, int newIndex) {
   final copy = List<T>.from(list);
@@ -128,6 +105,16 @@ void main() {
     '设置页需包含: 版本 $versionSemver',
   );
 
+  // 版本号第三处同步: widget_test.dart 中的版本断言
+  final widgetTestFile = File('app/test/widget_test.dart');
+  expect(widgetTestFile.existsSync(), 'app/test/widget_test.dart 存在');
+  final widgetTestContent = widgetTestFile.readAsStringSync();
+  expect(
+    widgetTestContent.contains(versionSemver),
+    'widget_test.dart 中包含与 pubspec.yaml 一致的版本断言',
+    'widget_test.dart 需包含版本号: $versionSemver',
+  );
+
   // 2. 品牌主题色彩规范与 WCAG AAA 对比度验证
   print('\n--- 2. 品牌主题与 WCAG AAA 对比度断言 ---');
   const bgHex = 0x26366A; // 用户指定主背景色 #26366A
@@ -154,6 +141,27 @@ void main() {
   final colorSchemesFile = File('packages/ui/lib/src/theme/color_schemes.dart');
   expect(colorSchemesFile.existsSync(), 'packages/ui/lib/src/theme/color_schemes.dart 存在');
   final colorSchemesCode = colorSchemesFile.readAsStringSync();
+
+  // 次级文字色 (onSurfaceVariant) 对卡片底色的 AAA 合规 (M-6)
+  final onSurfaceVariantMatch =
+      RegExp(r'onSurfaceVariant:\s*Color\(0xFF([0-9A-Fa-f]{6})\)').allMatches(colorSchemesCode).toList();
+  expect(
+    onSurfaceVariantMatch.isNotEmpty &&
+        onSurfaceVariantMatch.first.group(1)!.toUpperCase() == '99B2E0',
+    '深色主题 onSurfaceVariant 已调亮至 #99B2E0 (WCAG AAA)',
+  );
+  if (onSurfaceVariantMatch.isNotEmpty) {
+    final variantHex = int.parse(onSurfaceVariantMatch.first.group(1)!, radix: 16);
+    final variantContrast = contrastRatio(variantHex, cardHex);
+    print(
+        '    次级文字 #${onSurfaceVariantMatch.first.group(1)} 与 卡片底色 #1B2445 对比度: ${variantContrast.toStringAsFixed(2)} : 1');
+    expect(
+      variantContrast >= 7.0,
+      '次级文字与卡片容器对比度符合 WCAG AAA 标准 (>= 7.0:1)',
+      '当前对比度: ${variantContrast.toStringAsFixed(2)}',
+    );
+  }
+
   expect(
     colorSchemesCode.contains('0xFF26366A'),
     'color_schemes.dart 声明了 #26366A 品牌主背景色',
@@ -253,14 +261,29 @@ void main() {
   final packScript = File('sample_plugins/pack.py');
   expect(packScript.existsSync(), '全局插件打包脚本 sample_plugins/pack.py 存在');
 
-  // 5. 沙箱路径隔离与 Path Traversal 防御算法
-  print('\n--- 5. 沙箱存储与防路径穿越安全算法断言 ---');
+  // 5. 沙箱路径隔离与 Path Traversal 防御算法 (直接断言 packages/core 生产实现)
+  print('\n--- 5. 沙箱存储与防路径穿越安全算法断言 (生产实现) ---');
   const baseBox = 'app_data/plugins/base64_tool';
-  expectEq(isSafeSubpath(baseBox, 'data/storage.json'), true, '沙箱内合法子路径放行');
-  expectEq(isSafeSubpath(baseBox, 'sub/nested/file.txt'), true, '沙箱多级合法子路径放行');
-  expectEq(isSafeSubpath(baseBox, '../../etc/passwd'), false, '恶意父级穿越路径被成功拦截');
-  expectEq(isSafeSubpath(baseBox, r'..\..\Windows\System32\cmd.exe'), false, 'Windows 风格反斜杠穿越路径拦截');
-  expectEq(isSafeSubpath(baseBox, '....//....//escape'), false, '异形双点混淆路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, 'data/storage.json'), true, '沙箱内合法子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, 'sub/nested/file.txt'), true, '沙箱多级合法子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '../../etc/passwd'), false, '恶意父级穿越路径被成功拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'..\..\Windows\System32\cmd.exe'), false, 'Windows 风格反斜杠穿越路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '....//....//escape'), false, '异形双点混淆路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:\evil.bat'), false, 'Windows 盘符绝对路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:evil.bat'), false, 'Windows 盘符相对形式拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'\\server\share\evil'), false, 'UNC 网络共享路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '/etc/passwd'), false, 'POSIX 绝对路径不作为相对子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, ''), false, '空路径不放行');
+
+  // ZIP 解压条目 (Zip Slip) 校验
+  expectEq(SandboxPath.isSafeRelativeEntry('ui/main.ui.json'), true, '压缩包合法条目路径放行');
+  expectEq(SandboxPath.isSafeRelativeEntry('icon.png'), true, '压缩包根级文件条目放行');
+  expectEq(SandboxPath.isSafeRelativeEntry('../evil.txt'), false, '压缩包父级穿越条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry(r'C:\evil.bat'), false, '压缩包 Windows 盘符条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry(r'\\server\share\evil'), false, '压缩包 UNC 条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry('/abs/evil.txt'), false, '压缩包 POSIX 绝对路径条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry('a/../../evil'), false, '压缩包嵌套穿越条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry(''), false, '压缩包空条目路径拦截');
 
   // 6. 双向排序数学一致性算法验证
   print('\n--- 6. 双向排序同步算法逻辑断言 ---');
