@@ -7,6 +7,7 @@ import 'package:plugin_toolbox/src/home/home_page.dart';
 import 'package:plugin_toolbox/src/plugin_manager/plugin_manager_page.dart';
 import 'package:plugin_toolbox/src/settings/settings_page.dart';
 import 'package:plugin_toolbox/src/providers/app_providers.dart';
+import 'package:plugin_toolbox/src/plugin_host/dynamic_plugin_host_page.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -177,5 +178,22 @@ void main() {
     expect(find.text('主题模式'), findsOneWidget);
     expect(find.text('动态取色 (Material You)'), findsOneWidget);
     expect(find.text('品牌深色（默认）'), findsOneWidget);
+  });
+
+  testWidgets('DynamicPluginHostPage handles missing UI file with graceful ErrorView',
+      (WidgetTester tester) async {
+    final mockPlugin = createMockPlugin('missing_ui', '测试插件');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 验证 AppBar 标题为插件名称
+    expect(find.text('测试插件'), findsOneWidget);
+    // 验证当 UI 描述文件缺失时，宿主容器安全降级展示错误视图，而不是崩溃
+    expect(find.textContaining('插件运行错误'), findsOneWidget);
   });
 }

@@ -43,7 +43,7 @@
 plugin-toolbox/
 ├── app/                  # Android 宿主主工程（Flutter App）
 │   ├── lib/              # 页面、路由 (go_router)、全局状态 (Riverpod)
-│   └── test/             # Widget 测试与端到端插件集成测试
+│   └── test/             # 宿主 Widget 测试与组件交互测试
 ├── packages/
 │   ├── core/             # 领域核心：插件模型、注册中心、安装器与隔离服务（纯 Dart）
 │   ├── lua/              # 脚本执行层：Lua 5.1/LuaJIT 脚本引擎与沙箱 API 绑定
@@ -231,7 +231,7 @@ flutter build apk --release --split-per-abi
 
 ## 验证与测试
 
-本项目采用严格的质量保障体系（详见 [AGENTS.md](AGENTS.md)），在声明完成或发布前执行：
+本项目采用严格的质量保障体系（详见 [AGENTS.md](AGENTS.md)），遵循**软件测试只做软件本身测试、不做插件测试**的职责边界。在声明完成或发布前执行：
 
 ```bash
 # 1. 静态代码分析（保持 0 错误 0 警告）
@@ -240,17 +240,14 @@ dart analyze
 # 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，62 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（无需外部设备）
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备）
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
 cd packages/ui && flutter test
 cd app && flutter test
 
-# 4. 动态插件端到端集成测试（.ptx 安装、Lua 脚本与 DUI 渲染闭环）
-cd app && flutter test test/ptx_integration_test.dart
-
-# 5. 真机截图与视觉规范验证（需连接真机，自动裁剪系统栏并压缩）
+# 4. 真机截图与视觉规范验证（需连接真机，自动裁剪系统栏并压缩）
 python tool/shots.py 01-home 02-manager 03-settings
 ```
 

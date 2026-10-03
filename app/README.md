@@ -42,8 +42,7 @@ app/
 │       ├── router/           # 声明式路由定义 (app_router.dart)
 │       └── providers/        # 全局 Riverpod 提供者与持久化调度器 (app_providers.dart)
 ├── test/
-│   ├── widget_test.dart      # 核心 UI 逻辑断言（排序双向联动、删除弹窗、主题设置）
-│   └── ptx_integration_test.dart # .ptx 插件安装至执行的端到端集成测试
+│   └── widget_test.dart      # 宿主核心交互与容器断言（网格重排、管理中心手柄、删除弹窗、主题设置与错误降级）
 └── pubspec.yaml              # 依赖声明与 assets 资源配置
 ```
 
@@ -117,11 +116,8 @@ cd .. && dart analyze
 # 独立规则与规范验证
 dart run tool/verify.dart
 
-# 运行 App 模块单元测试与 Widget 测试
+# 运行 App 模块单元测试与 Widget 测试（纯宿主软件测试，不测插件业务）
 cd app && flutter test
-
-# 运行特定端到端集成测试（.ptx 插件安装至执行）
-flutter test test/ptx_integration_test.dart
 
 # 真机视觉与布局截图验证（连接 Android 设备）
 python ../tool/shots.py 01-home 02-manager 03-settings

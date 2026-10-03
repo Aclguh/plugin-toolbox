@@ -42,7 +42,7 @@ This project is organized as a clean Monorepo with single-responsibility, unidir
 plugin-toolbox/
 ├── app/                  # Android host application (Flutter App)
 │   ├── lib/              # Pages, routing (go_router), global state (Riverpod)
-│   └── test/             # Widget tests & end-to-end plugin integration tests
+│   └── test/             # Host widget tests & component interaction tests
 ├── packages/
 │   ├── core/             # Domain core: plugin models, registry, installer, isolation services (Pure Dart)
 │   ├── lua/              # Script execution: Lua 5.1/LuaJIT engine & sandbox API bindings
@@ -225,20 +225,24 @@ flutter build apk --release --split-per-abi
 
 ## Verification & Testing
 
-Strict automated quality gates are enforced throughout development (see [AGENTS.md](AGENTS.md)):
+Strict automated quality gates are enforced throughout development (see [AGENTS.md](AGENTS.md)), adhering to the principle that **software testing focuses solely on the software infrastructure and host system itself, not on dynamic plugin business logic**:
 
 ```bash
-# 1. Static analysis (keep 0 warnings, 0 errors)
+# 1. Static code analysis (0 warnings, 0 errors)
 dart analyze
 
-# 2. Shared presentation layer tests
+# 2. Automated specification and logic verification (verify.dart suite)
+dart run tool/verify.dart
+
+# 3. Layered unit & widget tests (pure software testing, no devices needed)
+cd packages/core && flutter test
+cd packages/lua && flutter test
+cd packages/dui && flutter test
 cd packages/ui && flutter test
+cd app && flutter test
 
-# 3. Host integration & widget tests (including on-device interaction and drag assertions)
-cd ../../app && flutter test
-
-# 4. Dynamic plugin E2E verification (.ptx installation and data flow)
-flutter test test/ptx_integration_test.dart
+# 4. On-device visual & layout inspection (with connected Android device)
+python tool/shots.py 01-home 02-manager 03-settings
 ```
 
 ---
