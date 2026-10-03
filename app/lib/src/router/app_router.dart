@@ -12,6 +12,8 @@ import '../providers/app_providers.dart';
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
+    // 非法路由展示品牌化错误页，而非框架默认的无样式错误
+    errorBuilder: (context, state) => _RouteNotFoundPage(uri: state.uri.toString()),
     routes: [
       GoRoute(
         path: '/',
@@ -50,3 +52,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// 非法路由的品牌化"页面未找到"界面
+class _RouteNotFoundPage extends StatelessWidget {
+  final String uri;
+
+  const _RouteNotFoundPage({required this.uri});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('页面未找到')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.explore_off_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            const Text('要访问的页面不存在'),
+            const SizedBox(height: 8),
+            Text(
+              uri,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: () => context.go('/'),
+              child: const Text('返回工具箱首页'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

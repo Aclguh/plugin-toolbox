@@ -36,35 +36,35 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       pluginRootDir: widget.plugin.rootDir,
     );
 
-    _duiState.addListener(() {
-      if (mounted) setState(() {});
-    });
-
     _startPlugin();
   }
 
   Future<void> _startPlugin() async {
     try {
-      // 1. 读取并解析 UI JSON 描述
-      final uiFile = widget.plugin.uiDefinitionFile;
-      if (!uiFile.existsSync()) {
-        throw Exception('未找到 UI 定义文件: ${uiFile.path}');
+      // 1. 读取并解析 UI JSON 描述（异步读取，避免阻塞 UI 线程）
+      final uiJsonStr = await widget.plugin.uiDefinitionFile.readAsString();
+      final decoded = json.decode(uiJsonStr);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('UI 描述文件必须是 JSON 对象');
       }
-      final uiJsonStr = uiFile.readAsStringSync();
-      _uiRootNode = json.decode(uiJsonStr) as Map<String, dynamic>;
+      _uiRootNode = decoded;
 
       // 2. 初始化 Lua 运行时
       _runner = LuaPluginRunner(plugin: widget.plugin, delegate: this);
-      _runner!.start();
+      await _runner!.start();
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _loadError = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -159,7 +159,8 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
           : _loadError != null
               ? ErrorView(message: '插件运行错误:\n$_loadError')
               : _uiRootNode != null
-                  ? _renderer.buildWidget(context, _uiRootNode!)
+                  // 渲染器顶层已通过 ListenableBuilder 订阅状态，无需手动 setState
+                  ? _renderer.build(context, _uiRootNode!)
                   : const Center(child: Text('无 UI 描述')),
     );
   }

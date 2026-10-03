@@ -42,19 +42,31 @@ class PluginManagerPage extends ConsumerWidget {
           );
         }
       }
-    } catch (e) {
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('安装失败'),
-            content: Text(e.toString()),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('确定')),
-            ],
-          ),
-        );
-      }
+    } on FormatException catch (e) {
+      if (!context.mounted) return;
+      _showInstallError(context, '安装包无效：${e.message}');
+    } on FileSystemException {
+      if (!context.mounted) return;
+      _showInstallError(context, '安装包文件读取失败，请确认文件完整后重试');
+    } catch (_) {
+      // 未预期的异常不向用户展示原始堆栈信息
+      if (!context.mounted) return;
+      _showInstallError(context, '安装失败，发生未知错误，请重试');
+    }
+  }
+
+  void _showInstallError(BuildContext context, String message) {
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('安装失败'),
+          content: Text(message),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('确定')),
+          ],
+        ),
+      );
     }
   }
 
@@ -113,19 +125,24 @@ class PluginManagerPage extends ConsumerWidget {
   }
 
   Widget _buildPluginIcon(BuildContext context, ToolPlugin plugin) {
-    if (plugin is DynamicPlugin) {
-      final iconFile = plugin.iconFile;
-      if (iconFile != null && iconFile.existsSync()) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Image.file(
-            iconFile,
-            width: 32,
-            height: 32,
-            fit: BoxFit.cover,
+    // 多态图标：经基类 iconProvider 获取图片源，避免对动态插件类型硬检查；
+    // 图片解码失败或文件缺失时回退矢量图标，不在 build 中做同步磁盘检查
+    final imageProvider = plugin.iconProvider;
+    if (imageProvider != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image(
+          image: ResizeImage(imageProvider, width: 128),
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(
+            plugin.icon,
+            size: 30,
+            color: Theme.of(context).colorScheme.primary,
           ),
-        );
-      }
+        ),
+      );
     }
     return Icon(
       plugin.icon,

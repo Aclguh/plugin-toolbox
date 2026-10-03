@@ -56,44 +56,57 @@ class HomePage extends ConsumerWidget {
           }
 
           final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+          final crossAxisCount = isPortrait ? 3 : 4;
 
-          return ReorderableGridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isPortrait ? 3 : 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: isPortrait ? 0.80 : 0.95,
-            ),
-            itemCount: plugins.length,
-            onReorder: (oldIndex, newIndex) async {
-              await ref.read(pluginRegistryProvider.notifier).reorderEnabled(oldIndex, newIndex);
-            },
-            dragWidgetBuilder: (index, child) {
-              return Material(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-                    width: 1.5,
+          // 卡片宽高比随可用宽度动态计算：固定值在小屏会挤压文字、
+          // 在平板等大屏会过度拉伸留白
+          return LayoutBuilder(builder: (context, constraints) {
+            const horizontalPadding = 16.0;
+            const crossSpacing = 10.0;
+            final itemWidth = (constraints.maxWidth -
+                    horizontalPadding * 2 -
+                    crossSpacing * (crossAxisCount - 1)) /
+                crossAxisCount;
+            final childAspectRatio = (itemWidth / 130).clamp(0.78, 1.15);
+
+            return ReorderableGridView.builder(
+              padding: const EdgeInsets.all(horizontalPadding),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: crossSpacing,
+                childAspectRatio: childAspectRatio,
+              ),
+              itemCount: plugins.length,
+              onReorder: (oldIndex, newIndex) async {
+                await ref.read(pluginRegistryProvider.notifier).reorderEnabled(oldIndex, newIndex);
+              },
+              dragWidgetBuilder: (index, child) {
+                return Material(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                      width: 1.5,
+                    ),
                   ),
-                ),
-                elevation: 8,
-                shadowColor: Colors.black.withValues(alpha: 0.6),
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                clipBehavior: Clip.antiAlias,
-                child: child,
-              );
-            },
-            itemBuilder: (context, index) {
-              final plugin = plugins[index];
-              return PluginCard(
-                key: ValueKey(plugin.id),
-                plugin: plugin,
-                onTap: () => context.push('/plugin/${plugin.routePath}'),
-              );
-            },
-          );
+                  elevation: 8,
+                  shadowColor: Colors.black.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  clipBehavior: Clip.antiAlias,
+                  child: child,
+                );
+              },
+              itemBuilder: (context, index) {
+                final plugin = plugins[index];
+                return PluginCard(
+                  key: ValueKey(plugin.id),
+                  plugin: plugin,
+                  onTap: () => context.push('/plugin/${plugin.routePath}'),
+                );
+              },
+            );
+          });
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => ErrorView(message: '加载插件失败: $err'),

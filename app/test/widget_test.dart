@@ -1,10 +1,12 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox/src/app.dart';
 import 'package:plugin_toolbox/src/home/home_page.dart';
 import 'package:plugin_toolbox/src/plugin_manager/plugin_manager_page.dart';
+import 'package:plugin_toolbox/src/router/app_router.dart';
 import 'package:plugin_toolbox/src/settings/settings_page.dart';
 import 'package:plugin_toolbox/src/providers/app_providers.dart';
 import 'package:plugin_toolbox/src/plugin_host/dynamic_plugin_host_page.dart';
@@ -12,44 +14,60 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 创建已注入 mock SharedPreferences 的测试容器 (状态隔离, 无跨用例残留)
+Future<ProviderContainer> createContainer({
+  List<Override> overrides = const [],
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  final container = ProviderContainer(overrides: [
+    sharedPreferencesProvider.overrideWithValue(prefs),
+    ...overrides,
+  ]);
+  addTearDown(container.dispose);
+  return container;
+}
+
+ToolPlugin createMockPlugin(String id, String name) {
+  return DynamicPlugin(
+    manifest: PluginManifest(
+      id: id,
+      name: name,
+      version: '1.0.0',
+      description: 'Description for $name',
+      author: 'Tester',
+      type: 'lua',
+      category: PluginCategory.calculator,
+      permissions: [],
+      entry: 'entry.lua',
+      ui: 'ui.json',
+    ),
+    rootDir: Directory('.'),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
-  ToolPlugin createMockPlugin(String id, String name) {
-    return DynamicPlugin(
-      manifest: PluginManifest(
-        id: id,
-        name: name,
-        version: '1.0.0',
-        description: 'Description for $name',
-        author: 'Tester',
-        type: 'lua',
-        category: PluginCategory.calculator,
-        permissions: [],
-        entry: 'entry.lua',
-        ui: 'ui.json',
-      ),
-      rootDir: Directory('.'),
-    );
-  }
-
   testWidgets('App launches and renders title smoke test', (WidgetTester tester) async {
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+
     await tester.pumpWidget(
-      const ProviderScope(
-        child: PluginToolboxApp(),
+      UncontrolledProviderScope(
+        container: container,
+        child: const PluginToolboxApp(),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('PluginToolbox'), findsOneWidget);
   });
 
   testWidgets('HomePage renders plugins in ReorderableGridView without category headers',
       (WidgetTester tester) async {
-    final container = ProviderContainer(
+    final container = await createContainer(
       overrides: [
         appInitFutureProvider.overrideWith((ref) async {}),
       ],
@@ -89,7 +107,7 @@ void main() {
 
   testWidgets('PluginManagerPage has left drag handle, switch, no trash icon, and long-press delete dialog',
       (WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = await createContainer();
     final registry = container.read(pluginRegistryProvider);
     registry.register(createMockPlugin('p1', 'Plugin 1'));
 
@@ -138,7 +156,7 @@ void main() {
 
   testWidgets('Order is synchronized between HomePage and PluginManagerPage',
       (WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = await createContainer();
     final registry = container.read(pluginRegistryProvider);
     final notifier = container.read(pluginRegistryProvider.notifier);
 
@@ -162,7 +180,7 @@ void main() {
 
   testWidgets('SettingsPage allows changing theme mode and toggling dynamic color',
       (WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = await createContainer();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -178,6 +196,9 @@ void main() {
     expect(find.text('主题模式'), findsOneWidget);
     expect(find.text('动态取色 (Material You)'), findsOneWidget);
     expect(find.text('品牌深色（默认）'), findsOneWidget);
+
+    // 版本号第三处同步断言: 与 pubspec.yaml (0.1.0+1) 保持一致
+    expect(find.textContaining('版本 0.1.0'), findsOneWidget);
   });
 
   testWidgets('DynamicPluginHostPage handles missing UI file with graceful ErrorView',
@@ -189,11 +210,39 @@ void main() {
         home: DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
       ),
     );
+
+    // 宿主页对 UI 描述的读取是真实异步 IO (H-2 移除了同步阻塞读),
+    // fake-async 测试环境需要 runAsync 留出真实事件循环窗口
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
     await tester.pumpAndSettle();
 
     // 验证 AppBar 标题为插件名称
     expect(find.text('测试插件'), findsOneWidget);
     // 验证当 UI 描述文件缺失时，宿主容器安全降级展示错误视图，而不是崩溃
     expect(find.textContaining('插件运行错误'), findsOneWidget);
+  });
+
+  testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final router = container.read(appRouterProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/definitely/not/exist');
+    await tester.pumpAndSettle();
+
+    expect(find.text('页面未找到'), findsOneWidget);
+    expect(find.text('要访问的页面不存在'), findsOneWidget);
+    expect(find.text('返回工具箱首页'), findsOneWidget);
   });
 }

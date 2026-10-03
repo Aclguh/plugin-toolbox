@@ -32,17 +32,18 @@ app/
 ├── assets/
 │   └── icons/                # 应用高分辨率图标与矢量 SVG 图标
 ├── lib/
-│   ├── main.dart             # 程序唯一入口点，启动 ProviderScope
+│   ├── main.dart             # 程序唯一入口点：初始化 SharedPreferences 并注入 Riverpod 容器
 │   └── src/
 │       ├── app.dart          # MaterialApp 顶层容器，集成 DynamicColor 与主题监听
-│       ├── home/             # 主页网格：扁平化无分类展示，支持长按拖拽排序
+│       ├── home/             # 主页网格：扁平化无分类展示，支持长按拖拽排序与自适应宽高比
 │       ├── plugin_manager/   # 插件管理中心：文件导入、启用开关、长按删除、左侧把手排序
-│       ├── host/             # 动态插件运行时宿主页面，挂载 DUI 渲染树
+│       ├── plugin_host/      # 动态插件运行时宿主页面，挂载 DUI 响应式渲染树
 │       ├── settings/         # 设置页面：外观显示设置、重力旋转、主题模式、动态取色、关于
-│       ├── router/           # 声明式路由定义 (app_router.dart)
+│       ├── router/           # 声明式路由定义与品牌化"页面未找到"错误页 (app_router.dart)
 │       └── providers/        # 全局 Riverpod 提供者与持久化调度器 (app_providers.dart)
 ├── test/
-│   └── widget_test.dart      # 宿主核心交互与容器断言（网格重排、管理中心手柄、删除弹窗、主题设置与错误降级）
+│   ├── widget_test.dart      # 宿主核心交互与容器断言（网格重排、管理中心手柄、删除弹窗、主题设置、版本断言与错误降级）
+│   └── notifiers_test.dart   # Riverpod Notifier 单元测试（主题模式/重力旋转/动态取色状态转换）
 └── pubspec.yaml              # 依赖声明与 assets 资源配置
 ```
 
