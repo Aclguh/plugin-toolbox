@@ -1,0 +1,20 @@
+name: plugin_toolbox_ui
+description: PluginToolbox 共享 UI 组件和 Material Design 3 主题系统。
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.13.0
+  flutter: '>=3.47.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_toolbox_core:
+    path: ../plugin_toolbox_core
+  dynamic_color: ^1.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

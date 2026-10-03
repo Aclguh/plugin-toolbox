@@ -1,0 +1,13 @@
+{
+  "id": "base64_tool",
+  "name": "Base64 编解码",
+  "version": "1.0.0",
+  "description": "Base64 文本编码与解码转换工具",
+  "author": "PluginToolbox Team",
+  "minAppVersion": "0.1.0",
+  "type": "lua",
+  "category": "encoding",
+  "permissions": ["clipboard"],
+  "entry": "main.lua",
+  "ui": "ui/main.ui.json"
+}

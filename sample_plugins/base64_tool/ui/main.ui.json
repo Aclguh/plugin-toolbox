@@ -1,0 +1,110 @@
+{
+  "type": "SingleChildScrollView",
+  "props": { "padding": 16 },
+  "children": [
+    {
+      "type": "Column",
+      "props": { "crossAxisAlignment": "stretch" },
+      "children": [
+        {
+          "type": "TextField",
+          "ref": "inputText",
+          "props": {
+            "label": "输入文本",
+            "hint": "在此输入原始文本或 Base64 字符串...",
+            "maxLines": 5
+          }
+        },
+        { "type": "SizedBox", "props": { "height": 16 } },
+        {
+          "type": "Row",
+          "props": { "mainAxisAlignment": "center" },
+          "children": [
+            {
+              "type": "FilledButton",
+              "props": { "text": "编码", "icon": "arrow_downward" },
+              "events": {
+                "onPressed": { "action": "callLua", "function": "encode" }
+              }
+            },
+            { "type": "SizedBox", "props": { "width": 12 } },
+            {
+              "type": "OutlinedButton",
+              "props": { "text": "解码", "icon": "arrow_upward" },
+              "events": {
+                "onPressed": { "action": "callLua", "function": "decode" }
+              }
+            },
+            { "type": "SizedBox", "props": { "width": 12 } },
+            {
+              "type": "IconButton",
+              "props": { "icon": "swap_vert", "tooltip": "内容对调" },
+              "events": {
+                "onPressed": { "action": "callLua", "function": "swapText" }
+              }
+            }
+          ]
+        },
+        { "type": "SizedBox", "props": { "height": 12 } },
+        {
+          "type": "Text",
+          "props": {
+            "text": "{{state.errorMsg}}",
+            "style": "bodySmall"
+          },
+          "visible": "{{state.hasError}}"
+        },
+        { "type": "SizedBox", "props": { "height": 8 } },
+        {
+          "type": "Card",
+          "children": [
+            {
+              "type": "Padding",
+              "props": { "padding": 14 },
+              "children": [
+                {
+                  "type": "Column",
+                  "props": { "crossAxisAlignment": "stretch" },
+                  "children": [
+                    {
+                      "type": "Row",
+                      "children": [
+                        {
+                          "type": "Expanded",
+                          "children": [
+                            {
+                              "type": "Text",
+                              "props": { "text": "转换结果", "style": "titleSmall" }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "IconButton",
+                          "props": { "icon": "content_copy", "tooltip": "复制结果" },
+                          "events": {
+                            "onPressed": {
+                              "action": "copyToClipboard",
+                              "text": "{{state.resultText}}"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    { "type": "SizedBox", "props": { "height": 6 } },
+                    {
+                      "type": "SelectableText",
+                      "props": {
+                        "text": "{{state.resultText}}",
+                        "style": "bodyMedium"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

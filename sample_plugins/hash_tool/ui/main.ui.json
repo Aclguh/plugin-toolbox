@@ -1,0 +1,51 @@
+{
+  "type": "SingleChildScrollView",
+  "props": { "padding": 16 },
+  "children": [
+    {
+      "type": "Column",
+      "props": { "crossAxisAlignment": "stretch" },
+      "children": [
+        {
+          "type": "TextField",
+          "ref": "input",
+          "props": { "label": "输入原文", "hint": "输入需要计算哈希的文本...", "maxLines": 3 }
+        },
+        { "type": "SizedBox", "props": { "height": 16 } },
+        {
+          "type": "FilledButton",
+          "props": { "text": "开始计算哈希" },
+          "events": {
+            "onPressed": { "action": "callLua", "function": "calculate" }
+          }
+        },
+        { "type": "SizedBox", "props": { "height": 16 } },
+        {
+          "type": "Card",
+          "children": [
+            {
+              "type": "Padding",
+              "props": { "padding": 12 },
+              "children": [
+                {
+                  "type": "Column",
+                  "props": { "crossAxisAlignment": "stretch" },
+                  "children": [
+                    { "type": "Text", "props": { "text": "MD5", "style": "titleSmall" } },
+                    { "type": "SelectableText", "props": { "text": "{{state.md5Val}}" } },
+                    { "type": "SizedBox", "props": { "height": 10 } },
+                    { "type": "Text", "props": { "text": "SHA-1", "style": "titleSmall" } },
+                    { "type": "SelectableText", "props": { "text": "{{state.sha1Val}}" } },
+                    { "type": "SizedBox", "props": { "height": 10 } },
+                    { "type": "Text", "props": { "text": "SHA-256", "style": "titleSmall" } },
+                    { "type": "SelectableText", "props": { "text": "{{state.sha256Val}}" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

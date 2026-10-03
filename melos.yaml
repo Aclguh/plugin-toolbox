@@ -1,0 +1,32 @@
+name: plugin_toolbox_workspace
+repository: https://github.com/user/plugin-toolbox
+
+packages:
+  - packages/**
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    exec: dart analyze --fatal-infos
+    description: 静态分析
+    packageFilters:
+      dirExists: lib
+
+  test:
+    exec: flutter test
+    description: 运行测试
+    packageFilters:
+      dirExists: test
+
+  format:
+    exec: dart format .
+    description: 格式化
+
+  build_runner:
+    exec: dart run build_runner build --delete-conflicting-outputs
+    description: 代码生成
+    packageFilters:
+      dependsOn: build_runner

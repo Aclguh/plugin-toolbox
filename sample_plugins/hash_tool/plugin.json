@@ -1,0 +1,13 @@
+{
+  "id": "hash_tool",
+  "name": "哈希计算器",
+  "version": "1.0.0",
+  "description": "计算字符串的 MD5、SHA-1 与 SHA-256 哈希值",
+  "author": "PluginToolbox Team",
+  "minAppVersion": "0.1.0",
+  "type": "lua",
+  "category": "calculator",
+  "permissions": ["clipboard"],
+  "entry": "main.lua",
+  "ui": "ui/main.ui.json"
+}

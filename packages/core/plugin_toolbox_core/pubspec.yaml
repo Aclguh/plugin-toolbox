@@ -1,0 +1,25 @@
+name: plugin_toolbox_core
+description: PluginToolbox 核心模型、插件系统、安装器与隔离服务。
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.13.0
+  flutter: '>=3.47.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.0
+  riverpod_annotation: ^2.6.0
+  shared_preferences: ^2.3.0
+  path_provider: ^2.1.0
+  archive: ^3.6.1
+  equatable: ^2.0.7
+  logger: ^2.5.0
+  go_router: ^14.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

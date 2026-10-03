@@ -1,0 +1,21 @@
+name: plugin_toolbox_dui
+description: PluginToolbox 声明式 UI (JSON -> Flutter Widget) 渲染引擎。
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.13.0
+  flutter: '>=3.47.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_toolbox_core:
+    path: ../plugin_toolbox_core
+  plugin_toolbox_lua:
+    path: ../plugin_toolbox_lua
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
