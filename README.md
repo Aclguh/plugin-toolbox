@@ -27,11 +27,11 @@
   - 基于标准 Zip 归档格式的 `.ptx` (Plugin Toolbox Extension) 插件包，支持一键安装、即刻启用与安全卸载。
   - 每个动态插件拥有独立沙箱存储空间，防止插件间数据污染与越权访问。
 - **声明式动态 UI (DUI)**：
-  - 纯 JSON 描述组件树（`ui.json`），由宿主运行时原生映射为高性能 Flutter Widget。
-  - 支持 `${state.key}` 响应式数据绑定与事件驱动机制，无需编写复杂的前端逻辑。
+  - 纯 JSON 描述组件树，由宿主运行时原生映射为高性能 Flutter Widget。
+  - 支持响应式数据绑定与事件驱动机制，无需编写复杂的前端逻辑。
 - **轻量受控脚本引擎**：
-  - 内置沙箱级 Lua 脚本运行时（`entry.lua`），兼具高性能与轻量化。
-  - 提供安全宿主 API 集合：剪贴板（`toolbox.clipboard`）、沙箱存储（`toolbox.storage`）、系统信息与日志追踪。
+  - 内置沙箱级 Lua 脚本运行时，兼具高性能与轻量化。
+  - 提供安全宿主 API 集合：剪贴板、沙箱存储、系统信息。
 
 
 ---
@@ -73,15 +73,15 @@ sequenceDiagram
 
     User->>App: 导入 .ptx 文件
     App->>Core: PluginInstaller.installFromPtx(file)
-    Core->>Core: 解压校验 manifest.json 并建立沙箱目录
+    Core->>Core: 解压校验 plugin.json 并建立沙箱目录
     Core->>App: 注册插件至 PluginRegistry
     User->>App: 点击插件卡片进入
     App->>Lua: 初始化 Lua 插件运行时与隔离存储
-    App->>DUI: 解析 ui.json 构建组件树并绑定 state
+    App->>DUI: 解析 UI 定义构建组件树并绑定 state
     DUI->>User: 渲染原生 Flutter 交互页面
     User->>DUI: 触发界面交互（如点击转换）
-    DUI->>Lua: 派发事件 eventHandler.emit('encode')
-    Lua->>Lua: 执行业务逻辑并调用 toolbox.ui.set_state(...)
+    DUI->>Lua: 派发事件至 Lua 全局处理函数
+    Lua->>Lua: 执行业务逻辑并调用宿主 API 更新状态
     Lua-->>DUI: 更新响应式状态
     DUI-->>User: 局部刷新视图结果
 ```
@@ -90,99 +90,11 @@ sequenceDiagram
 
 ## `.ptx` 插件规范与编写指南
 
-一个标准的 `.ptx` 实际上是一个普通的 Zip 归档包（后缀为 `.ptx`），其根目录下包含以下文件：
+一个标准的 `.ptx` 实际上是一个普通的 Zip 归档包（后缀为 `.ptx`），由宿主在安装时
+解压至插件独立沙箱目录。插件包结构、清单字段、声明式 UI 语法与宿主 Lua API 以仓库
+生产实现为准，可直接参考官方样例 `sample_plugins/`（base64_tool、hash_tool）。
 
-```
-my_plugin.ptx
-├── manifest.json         # 插件清单与元数据（必选）
-├── entry.lua             # 核心逻辑脚本（必选）
-├── ui.json               # 声明式组件树定义（必选）
-└── icon.png              # 插件图标，推荐 128x128 PNG（可选）
-```
-
-### 1. 插件清单 (`manifest.json`)
-
-```json
-{
-  "id": "base64_tool",
-  "name": "Base64 编解码",
-  "version": "1.0.0",
-  "description": "Base64 文本编码与解码转换工具",
-  "author": "PluginToolbox Team",
-  "type": "lua",
-  "category": "utility",
-  "entry": "entry.lua",
-  "ui": "ui.json",
-  "permissions": ["storage", "clipboard"]
-}
-```
-
-### 2. 声明式 UI (`ui.json`)
-
-```json
-{
-  "type": "Column",
-  "props": {
-    "crossAxisAlignment": "stretch"
-  },
-  "children": [
-    {
-      "type": "TextField",
-      "props": {
-        "label": "输入文本",
-        "value": "${state.input_text}",
-        "maxLines": 4
-      },
-      "events": {
-        "onChanged": "on_input_changed"
-      }
-    },
-    {
-      "type": "Row",
-      "children": [
-        {
-          "type": "ElevatedButton",
-          "props": { "label": "编码" },
-          "events": { "onTap": "on_encode" }
-        }
-      ]
-    },
-    {
-      "type": "Card",
-      "children": [
-        {
-          "type": "Text",
-          "props": { "text": "${state.result_text}" }
-        }
-      ]
-    }
-  ]
-}
-```
-
-### 3. 业务脚本 (`entry.lua`)
-
-```lua
--- 初始化插件状态
-toolbox.ui.set_state({
-    input_text = "",
-    result_text = ""
-})
-
--- 输入文本监听
-function on_input_changed(value)
-    toolbox.ui.set_state({ input_text = value })
-end
-
--- 编码点击事件
-function on_encode()
-    local text = toolbox.ui.get_state("input_text") or ""
-    local encoded = toolbox.crypto.base64_encode(text)
-    toolbox.ui.set_state({ result_text = encoded })
-end
-```
-
-### 4. 插件跨平台打包 (`sample_plugins/pack.py`)
+### 插件跨平台打包 (`sample_plugins/pack.py`)
 
 在工程根目录下执行跨平台 Python 打包脚本：
 
@@ -243,7 +155,7 @@ dart analyze
 # 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，80 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 62 用例）
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 67 用例）
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
