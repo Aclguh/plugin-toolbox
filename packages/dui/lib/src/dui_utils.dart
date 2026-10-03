@@ -49,6 +49,19 @@ class DuiUtils {
     return accessor(Theme.of(context).textTheme);
   }
 
+  /// 解析十六进制颜色字符串：支持 `#RRGGBB` 与 `#AARRGGBB`（可省略 `#`）。
+  /// 非法输入统一返回 null 交由调用方降级，绝不允许使插件页面崩溃。
+  static Color? parseColor(dynamic val) {
+    if (val == null) return null;
+    var hex = val.toString().trim();
+    if (hex.startsWith('#')) hex = hex.substring(1);
+    if (hex.length == 6) hex = 'FF$hex';
+    if (hex.length != 8) return null;
+    if (hex.contains(RegExp('[^0-9a-fA-F]'))) return null;
+    final value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(value);
+  }
+
   /// 解析 EdgeInsets；数值与字符串数字统一容错
   static EdgeInsets parsePadding(dynamic paddingVal) {
     if (paddingVal == null) return EdgeInsets.zero;

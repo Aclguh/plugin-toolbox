@@ -253,6 +253,7 @@ class DuiRenderer {
         width: node.width,
         height: node.height,
         decoration: BoxDecoration(
+          color: DuiUtils.parseColor(node.props['color']),
           borderRadius:
               borderRadiusVal != null ? BorderRadius.circular(borderRadiusVal) : null,
         ),

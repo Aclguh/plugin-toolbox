@@ -8,6 +8,7 @@ import 'api/dialog_api.dart';
 import 'api/codec_api.dart';
 import 'api/hash_api.dart';
 import 'api/util_api.dart';
+import 'api/system_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托
@@ -63,13 +64,14 @@ class LuaEngine {
         delegate.onStateChanged(key, value);
 
     StateApi.bind(_ls, delegate);
-    ClipboardApi.bind(_ls, context);
+    ClipboardApi.bind(_ls, context, callbacks, writeState);
     StorageApi.bind(_ls, context, callbacks, writeState);
     NetworkApi.bind(_ls, context, callbacks, writeState);
     DialogApi.bind(_ls, delegate, callbacks);
     CodecApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
+    SystemApi.bind(_ls);
   }
 
   /// 执行 Lua 源代码字符串

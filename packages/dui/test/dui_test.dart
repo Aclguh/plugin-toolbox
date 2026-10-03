@@ -47,6 +47,23 @@ void main() {
     });
   });
 
+  group('DuiUtils 颜色解析', () {
+    test('parseColor 支持 #RRGGBB / #AARRGGBB / 无 # 前缀', () {
+      expect(DuiUtils.parseColor('#788CFF'), const Color(0xFF788CFF));
+      expect(DuiUtils.parseColor('788CFF'), const Color(0xFF788CFF));
+      expect(DuiUtils.parseColor('#80112233'), const Color(0x80112233));
+    });
+
+    test('parseColor 非法输入安全返回 null 而非抛异常', () {
+      expect(DuiUtils.parseColor(null), isNull);
+      expect(DuiUtils.parseColor(''), isNull);
+      expect(DuiUtils.parseColor('#12345'), isNull);
+      expect(DuiUtils.parseColor('#GGHHII'), isNull);
+      expect(DuiUtils.parseColor('0x788CFF'), isNull);
+      expect(DuiUtils.parseColor('#-123456'), isNull);
+    });
+  });
+
   group('DuiRenderer Tests', () {
     testWidgets('renders Text, Button and handles click events', (tester) async {
       final state = DuiState();
@@ -209,6 +226,44 @@ void main() {
 
       await tester.pumpWidget(buildHost(renderer, node));
       expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('Container color 属性渲染背景色, 非法值降级为无色不崩溃', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'Column',
+        'children': [
+          {
+            'type': 'Container',
+            'props': {'color': '#788CFF', 'width': 48, 'height': 24},
+          },
+          {
+            'type': 'Container',
+            'props': {'color': 'not-a-color', 'width': 48, 'height': 24},
+          },
+        ]
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+
+      final containers =
+          tester.widgetList<Container>(find.byType(Container)).toList();
+      expect((containers[0].decoration as BoxDecoration).color,
+          const Color(0xFF788CFF));
+      expect((containers[1].decoration as BoxDecoration).color, isNull);
     });
 
     testWidgets('TextField 双向绑定: 输入回写状态, 状态变更同步 UI', (tester) async {

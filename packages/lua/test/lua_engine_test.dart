@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -155,6 +156,32 @@ void main() {
       );
     });
 
+    test('system 宿主 API 以全局表形式绑定注入 (仅验证绑定, 不验证设备相关取值)', () {
+      engine.loadAndExecute('''
+        state.set("system_type", type(system))
+        state.set("system_platform_fn", type(system.platform))
+        state.set("system_os_version_fn", type(system.osVersion))
+        state.set("system_hostname_fn", type(system.hostname))
+        state.set("system_cores_fn", type(system.cores))
+        state.set("system_locale_fn", type(system.locale))
+        state.set("system_screen_w_fn", type(system.screenWidth))
+        state.set("system_screen_h_fn", type(system.screenHeight))
+        state.set("system_pixel_ratio_fn", type(system.pixelRatio))
+        state.set("system_brightness_fn", type(system.brightness))
+      ''');
+
+      expect(delegate.getState('system_type'), 'table');
+      expect(delegate.getState('system_platform_fn'), 'function');
+      expect(delegate.getState('system_os_version_fn'), 'function');
+      expect(delegate.getState('system_hostname_fn'), 'function');
+      expect(delegate.getState('system_cores_fn'), 'function');
+      expect(delegate.getState('system_locale_fn'), 'function');
+      expect(delegate.getState('system_screen_w_fn'), 'function');
+      expect(delegate.getState('system_screen_h_fn'), 'function');
+      expect(delegate.getState('system_pixel_ratio_fn'), 'function');
+      expect(delegate.getState('system_brightness_fn'), 'function');
+    });
+
     test('callFunction invokes Lua functions', () {
       engine.loadAndExecute('''
         function add(a, b)
@@ -283,6 +310,28 @@ void main() {
 
     tearDown(() {
       engine.close();
+    });
+
+    test('clipboard.get 通过回调异步返回剪贴板文本', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      const channel = SystemChannels.platform;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'Clipboard.getData') {
+          return <String, dynamic>{'text': 'mock-clipboard-text'};
+        }
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding.instance
+          .defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null));
+
+      engine.loadAndExecute('''
+        clipboard.get(function(val) state.set("clip_value", val) end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('clip_value'), 'mock-clipboard-text');
     });
 
     test('storage.get 通过回调返回已存储的值', () async {
