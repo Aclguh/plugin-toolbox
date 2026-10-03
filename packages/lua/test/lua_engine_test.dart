@@ -157,4 +157,160 @@ void main() {
       expect(result, 35);
     });
   });
+
+  group('Lua 沙箱安全与执行防护', () {
+    late MockLuaHostDelegate delegate;
+    late PluginContext context;
+    late LuaEngine engine;
+
+    setUp(() {
+      delegate = MockLuaHostDelegate();
+      context = PluginContext(
+        pluginId: 'test_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+      );
+      engine = LuaEngine(context: context, delegate: delegate);
+    });
+
+    tearDown(() {
+      engine.close();
+    });
+
+    test('危险标准库全局全部被置空', () {
+      engine.loadAndExecute('''
+        state.set("os_type", type(os))
+        state.set("io_type", type(io))
+        state.set("debug_type", type(debug))
+        state.set("package_type", type(package))
+        state.set("require_type", type(require))
+        state.set("dofile_type", type(dofile))
+        state.set("loadfile_type", type(loadfile))
+      ''');
+
+      expect(delegate.getState('os_type'), 'nil');
+      expect(delegate.getState('io_type'), 'nil');
+      expect(delegate.getState('debug_type'), 'nil');
+      expect(delegate.getState('package_type'), 'nil');
+      expect(delegate.getState('require_type'), 'nil');
+      expect(delegate.getState('dofile_type'), 'nil');
+      expect(delegate.getState('loadfile_type'), 'nil');
+    });
+
+    test('安全基础库 (table/string/math) 保持可用', () {
+      engine.loadAndExecute('''
+        local t = {3, 1, 2}
+        table.sort(t)
+        state.set("first", tostring(t[1]))
+        state.set("upper", string.upper("abc"))
+        state.set("abs", tostring(math.abs(-5)))
+      ''');
+
+      expect(delegate.getState('first'), '1');
+      expect(delegate.getState('upper'), 'ABC');
+      expect(delegate.getState('abs'), '5');
+    });
+
+    test('os.execute 不可调用并降级为执行错误', () {
+      expect(
+        () => engine.loadAndExecute('os.execute("echo pwned")'),
+        throwsException,
+      );
+    });
+
+    test('loadfile 不可调用并降级为执行错误', () {
+      expect(
+        () => engine.loadAndExecute('loadfile("/etc/passwd")'),
+        throwsException,
+      );
+    });
+
+    test('指令数预算阻断死循环', () {
+      final limited = LuaEngine(
+        context: context,
+        delegate: delegate,
+        instructionBudget: 5000,
+      );
+      try {
+        expect(
+          () => limited.loadAndExecute('while true do end'),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('Lua 执行错误'),
+          )),
+        );
+      } finally {
+        limited.close();
+      }
+    });
+
+    test('包含循环引用的集合压栈被拒绝', () {
+      engine.loadAndExecute('function sink(v) return 1 end');
+      final cyclic = <String, dynamic>{'k': 'v'};
+      cyclic['self'] = cyclic;
+      expect(() => engine.callFunction('sink', [cyclic]), throwsException);
+    });
+  });
+
+  group('Lua 异步宿主 API', () {
+    late MockLuaHostDelegate delegate;
+    late PluginContext context;
+    late LuaEngine engine;
+
+    setUp(() {
+      delegate = MockLuaHostDelegate();
+      context = PluginContext(
+        pluginId: 'test_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+      );
+      engine = LuaEngine(context: context, delegate: delegate);
+    });
+
+    tearDown(() {
+      engine.close();
+    });
+
+    test('storage.get 通过回调返回已存储的值', () async {
+      engine.loadAndExecute('''
+        storage.set("k1", "v1")
+        storage.get("k1", function(val) state.set("got", val) end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('got'), 'v1');
+    });
+
+    test('storage.remove 删除后 get 回调收到 nil', () async {
+      engine.loadAndExecute('''
+        storage.set("k2", "v2")
+        storage.remove("k2")
+        storage.get("k2", function(val) state.set("got_nil", val == nil) end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('got_nil'), true);
+    });
+
+    test('dialog.confirm 异步携带用户选择回调', () async {
+      engine.loadAndExecute('''
+        dialog.confirm("标题", "内容", function(ok) state.set("confirmed", ok) end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('confirmed'), true);
+    });
+
+    test('未声明 network 权限时 network.get 直接报错', () {
+      expect(
+        () => engine.loadAndExecute('network.get("http://example.com")'),
+        throwsException,
+      );
+    });
+  });
 }

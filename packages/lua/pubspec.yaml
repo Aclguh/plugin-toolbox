@@ -12,7 +12,10 @@ dependencies:
     sdk: flutter
   plugin_toolbox_core:
     path: ../core
-  lua_dardo: ^0.0.5
+  # 本地维护分支 (packages/third_party/lua_dardo): 在 VM 执行循环中加入指令数预算,
+  # 支撑宿主侧脚本执行上限防护; 上游 lua_dardo 0.0.5 未提供 debug hook 能力。
+  lua_dardo:
+    path: ../third_party/lua_dardo
   http: ^1.2.2
   crypto: ^3.0.5
   uuid: ^4.5.1

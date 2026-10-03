@@ -1,6 +1,7 @@
 library;
 
 export 'src/lua_engine.dart';
+export 'src/lua_callback_invoker.dart';
 export 'src/lua_plugin_runner.dart';
 export 'src/api/state_api.dart';
 export 'src/api/clipboard_api.dart';

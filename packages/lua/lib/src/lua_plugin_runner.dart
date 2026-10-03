@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:logger/logger.dart';
+
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'lua_engine.dart';
 
@@ -12,14 +12,14 @@ class LuaPluginRunner {
     required this.plugin,
     required this.delegate,
   }) {
-    final ctx = plugin.context ??
-        PluginContext(
-          pluginId: plugin.id,
-          storage: PluginStorageImpl(namespace: plugin.id),
-          eventBus: EventBusImpl(),
-          logger: Logger(),
-          grantedPermissions: plugin.manifest.permissions.toSet(),
-        );
+    // 只允许使用宿主 PluginRegistry 初始化时注入的上下文：
+    // 自行构造默认上下文会绕过宿主权限管理与统一事件总线。
+    final ctx = plugin.context;
+    if (ctx == null) {
+      throw StateError(
+        '插件 [${plugin.id}] 尚未通过 PluginRegistry 完成初始化，拒绝启动 Lua 运行时',
+      );
+    }
 
     _engine = LuaEngine(
       context: ctx,
@@ -27,12 +27,12 @@ class LuaPluginRunner {
     );
   }
 
-  void start() {
+  Future<void> start() async {
     final entryFile = plugin.entryScriptFile;
-    if (!entryFile.existsSync()) {
+    if (!await entryFile.exists()) {
       throw FileSystemException('入口 Lua 文件不存在', entryFile.path);
     }
-    final content = entryFile.readAsStringSync();
+    final content = await entryFile.readAsString();
     _engine.loadAndExecute(content);
     _engine.callFunction('onInit');
   }

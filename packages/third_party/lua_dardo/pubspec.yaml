@@ -1,0 +1,13 @@
+name: lua_dardo
+description: >-
+  Lua 5.3 virtual machine written in Dart (fork of lua_dardo 0.0.5,
+  Apache-2.0, upstream: https://github.com/arcticfox1919/LuaDardo).
+  本地维护分支: 在 VM 执行循环中加入指令数预算 (instruction budget),
+  用于宿主侧限制插件脚本的最长执行指令数, 超限自动抛出异常, 防止死循环冻结应用。
+version: 0.0.5+toolbox.1
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  sprintf: ^6.0.0
