@@ -16,26 +16,23 @@ class PluginCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Widget iconWidget;
-    if (plugin is DynamicPlugin) {
-      final dynamicPlugin = plugin as DynamicPlugin;
-      final iconFile = dynamicPlugin.iconFile;
-      if (iconFile != null && iconFile.existsSync()) {
-        iconWidget = ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            iconFile,
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-          ),
-        );
-      } else {
-        iconWidget = Icon(plugin.icon, size: 38, color: colorScheme.primary);
-      }
-    } else {
-      iconWidget = Icon(plugin.icon, size: 38, color: colorScheme.primary);
-    }
+    // 多态图标：通过基类 iconProvider 获取图片源，避免对具体插件类型硬检查
+    final imageProvider = plugin.iconProvider;
+    final Widget iconWidget = imageProvider != null
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image(
+              // 限制解码宽度, 防止超大图标占用过多内存
+              image: ResizeImage(imageProvider, width: 128),
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              // 图标文件损坏或缺失时回退到矢量图标，不红屏
+              errorBuilder: (_, __, ___) =>
+                  Icon(plugin.icon, size: 38, color: colorScheme.primary),
+            ),
+          )
+        : Icon(plugin.icon, size: 38, color: colorScheme.primary);
 
     return Card(
       clipBehavior: Clip.antiAlias,

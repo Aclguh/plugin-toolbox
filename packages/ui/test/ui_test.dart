@@ -16,6 +16,8 @@ void main() {
       expect(dark.scaffoldBackgroundColor, const Color(0xFF26366A));
       expect(dark.colorScheme.surface, const Color(0xFF26366A));
       expect(dark.colorScheme.onSurface, const Color(0xFFB4C9FF));
+      // 次级文字色调亮后对卡片底色保持 WCAG AAA (M-6)
+      expect(dark.colorScheme.onSurfaceVariant, const Color(0xFF99B2E0));
       expect(dark.cardTheme.clipBehavior, Clip.antiAlias);
       expect((dark.cardTheme.shape as RoundedRectangleBorder).borderRadius, BorderRadius.circular(16));
     });
@@ -93,6 +95,51 @@ void main() {
 
       await tester.tap(find.text('Mock Plugin'));
       expect(tapped, isTrue);
+    });
+
+    testWidgets('PluginCard 在 iconProvider 缺失时回退矢量图标', (tester) async {
+      const manifest = PluginManifest(
+        id: 'mock_plugin',
+        name: 'Mock Plugin',
+        version: '1.0.0',
+        description: 'Mock Description',
+        author: 'Author',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      );
+
+      final plugin = DynamicPlugin(
+        manifest: manifest,
+        rootDir: Directory('.'),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PluginCard(plugin: plugin, onTap: () {}),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(plugin.icon), findsOneWidget);
+    });
+
+    testWidgets('CopyButton 复制并弹出 SnackBar', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: CopyButton(text: 'copy-me'),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.content_copy));
+      await tester.pump();
+
+      expect(find.text('已复制到剪贴板'), findsOneWidget);
     });
   });
 }

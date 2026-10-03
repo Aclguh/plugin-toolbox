@@ -52,7 +52,7 @@ class AppColorSchemes {
     onErrorContainer: Color(0xFFFFDAD6),
     surface: brandBackground, // #26366A 为背景
     onSurface: brandFont, // #B4C9FF 为字体
-    onSurfaceVariant: Color(0xFF8EA4D8), // 次级文字采用浅淡蓝紫色
+    onSurfaceVariant: Color(0xFF99B2E0), // 次级文字调亮至 #99B2E0，对卡片底色 #1B2445 对比度达 7.07:1 (WCAG AAA)
     surfaceContainerLowest: brandDeepNavy,
     surfaceContainerLow: brandInnerNavy, // 工具箱内槽卡片色
     surfaceContainer: Color(0xFF202B54),

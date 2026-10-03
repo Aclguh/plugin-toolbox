@@ -14,7 +14,10 @@ class CopyButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: () {
         Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).showSnackBar(
+        final messenger = ScaffoldMessenger.of(context);
+        // 快速连点时先清空队列，防止 SnackBar 排队导致提示延迟消失
+        messenger.clearSnackBars();
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('已复制到剪贴板'),
             duration: Duration(seconds: 1),
