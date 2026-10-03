@@ -4,6 +4,12 @@ import 'package:flutter/foundation.dart';
 class DuiState extends ChangeNotifier {
   final Map<String, dynamic> _values = {};
 
+  /// 正则在 UI 构建期被高频命中，静态化避免每次调用重新编译
+  static final RegExp _interpolatePattern =
+      RegExp(r'\{\{state\.([a-zA-Z0-9_]+)\}\}');
+  static final RegExp _visibleExprPattern =
+      RegExp(r'^\{\{state\.([a-zA-Z0-9_]+)\}\}$');
+
   dynamic get(String key) => _values[key];
 
   void set(String key, dynamic value) {
@@ -17,8 +23,7 @@ class DuiState extends ChangeNotifier {
 
   /// 解析包含 {{state.key}} 模板语法的文本
   String interpolate(String template) {
-    final regex = RegExp(r'\{\{state\.([a-zA-Z0-9_]+)\}\}');
-    return template.replaceAllMapped(regex, (match) {
+    return template.replaceAllMapped(_interpolatePattern, (match) {
       final key = match.group(1);
       if (key == null) return '';
       final val = _values[key];
@@ -36,7 +41,7 @@ class DuiState extends ChangeNotifier {
     if (str == 'false') return false;
 
     // 解析形如 "{{state.hasError}}"
-    final match = RegExp(r'^\{\{state\.([a-zA-Z0-9_]+)\}\}$').firstMatch(str);
+    final match = _visibleExprPattern.firstMatch(str);
     if (match != null) {
       final key = match.group(1)!;
       final val = _values[key];

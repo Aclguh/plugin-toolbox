@@ -1,19 +1,79 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'dui_state.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+
 import 'dui_event_handler.dart';
+import 'dui_state.dart';
 import 'dui_utils.dart';
+
+/// 组件工厂上下文：封装单个 JSON 节点的解析结果，
+/// 供 [DuiWidgetFactory] 构建组件时取用属性、子节点与事件。
+class DuiNodeContext {
+  final BuildContext context;
+  final DuiRenderer renderer;
+  final Map<String, dynamic> props;
+  final List<Map<String, dynamic>> children;
+  final Map<String, dynamic> events;
+  final String? ref;
+
+  const DuiNodeContext({
+    required this.context,
+    required this.renderer,
+    required this.props,
+    required this.children,
+    required this.events,
+    required this.ref,
+  });
+
+  /// 构建第 [index] 个子节点
+  Widget childAt(int index) => renderer.buildWidget(context, children[index]);
+
+  /// 首个子节点；无子节点时返回占位
+  Widget get firstChild =>
+      children.isNotEmpty ? childAt(0) : const SizedBox.shrink();
+
+  /// 构建全部子节点
+  List<Widget> get childrenWidgets => [for (var i = 0; i < children.length; i++) childAt(i)];
+
+  // ---- 常用安全属性读取快捷方式 ----
+  double? get width => DuiUtils.tryDouble(props['width']);
+  double? get height => DuiUtils.tryDouble(props['height']);
+}
+
+typedef DuiWidgetFactory = Widget Function(DuiNodeContext node);
 
 class DuiRenderer {
   final DuiState state;
   final DuiEventHandler eventHandler;
   final Directory? pluginRootDir;
 
+  final Map<String, DuiWidgetFactory> _factories = {};
+
   DuiRenderer({
     required this.state,
     required this.eventHandler,
     this.pluginRootDir,
-  });
+  }) {
+    _registerBuiltinFactories();
+  }
+
+  /// 注册（或覆盖）组件类型工厂。
+  ///
+  /// 渲染器对扩展开放：新增组件类型无需修改渲染器本身，
+  /// 宿主或高级插件可通过注册自定义工厂扩展组件集。
+  void registerFactory(String type, DuiWidgetFactory factory) {
+    _factories[type] = factory;
+  }
+
+  /// 顶层构建入口：以 ListenableBuilder 订阅 [state]，
+  /// 状态变更后自动重建声明式组件树，宿主页面无需再手动 setState。
+  Widget build(BuildContext context, Map<String, dynamic> rootNode) {
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) => buildWidget(context, rootNode),
+    );
+  }
 
   /// 将 JSON 节点递归转换为 Flutter Widget
   Widget buildWidget(BuildContext context, Map<String, dynamic> node) {
@@ -23,217 +83,236 @@ class DuiRenderer {
       return const SizedBox.shrink();
     }
 
-    final type = node['type'] as String? ?? 'Container';
-    final props = node['props'] as Map<String, dynamic>? ?? {};
-    final childrenRaw = node['children'] as List<dynamic>? ?? [];
-    final events = node['events'] as Map<String, dynamic>? ?? {};
-    final ref = node['ref'] as String?;
+    final type = node['type']?.toString() ?? 'Container';
+    final props = _asMap(node['props']);
+    final childrenRaw = node['children'] as List<dynamic>? ?? const [];
+    final events = _asMap(node['events']);
+    final ref = node['ref']?.toString();
 
-    switch (type) {
-      // 布局类
-      case 'Column':
-        return Column(
-          crossAxisAlignment: _parseCrossAxis(props['crossAxisAlignment']),
-          mainAxisAlignment: _parseMainAxis(props['mainAxisAlignment']),
-          mainAxisSize: props['mainAxisSize'] == 'min' ? MainAxisSize.min : MainAxisSize.max,
-          children: childrenRaw
-              .map((c) => buildWidget(context, Map<String, dynamic>.from(c as Map)))
-              .toList(),
-        );
-
-      case 'Row':
-        return Row(
-          crossAxisAlignment: _parseCrossAxis(props['crossAxisAlignment']),
-          mainAxisAlignment: _parseMainAxis(props['mainAxisAlignment']),
-          mainAxisSize: props['mainAxisSize'] == 'min' ? MainAxisSize.min : MainAxisSize.max,
-          children: childrenRaw
-              .map((c) => buildWidget(context, Map<String, dynamic>.from(c as Map)))
-              .toList(),
-        );
-
-      case 'Stack':
-        return Stack(
-          alignment: Alignment.center,
-          children: childrenRaw
-              .map((c) => buildWidget(context, Map<String, dynamic>.from(c as Map)))
-              .toList(),
-        );
-
-      case 'Padding':
-        final childNode = childrenRaw.isNotEmpty ? childrenRaw.first as Map : null;
-        return Padding(
-          padding: DuiUtils.parsePadding(props['padding']),
-          child: childNode != null
-              ? buildWidget(context, Map<String, dynamic>.from(childNode))
-              : const SizedBox.shrink(),
-        );
-
-      case 'Center':
-        final childNode = childrenRaw.isNotEmpty ? childrenRaw.first as Map : null;
-        return Center(
-          child: childNode != null
-              ? buildWidget(context, Map<String, dynamic>.from(childNode))
-              : const SizedBox.shrink(),
-        );
-
-      case 'Expanded':
-        final childNode = childrenRaw.isNotEmpty ? childrenRaw.first as Map : null;
-        return Expanded(
-          flex: (props['flex'] as num?)?.toInt() ?? 1,
-          child: childNode != null
-              ? buildWidget(context, Map<String, dynamic>.from(childNode))
-              : const SizedBox.shrink(),
-        );
-
-      case 'SizedBox':
-        return SizedBox(
-          width: (props['width'] as num?)?.toDouble(),
-          height: (props['height'] as num?)?.toDouble(),
-          child: childrenRaw.isNotEmpty
-              ? buildWidget(context, Map<String, dynamic>.from(childrenRaw.first as Map))
-              : null,
-        );
-
-      case 'SingleChildScrollView':
-        final childNode = childrenRaw.isNotEmpty ? childrenRaw.first as Map : null;
-        return SingleChildScrollView(
-          padding: DuiUtils.parsePadding(props['padding']),
-          child: childNode != null
-              ? buildWidget(context, Map<String, dynamic>.from(childNode))
-              : const SizedBox.shrink(),
-        );
-
-      // 文本类
-      case 'Text':
-        final rawText = props['text'] as String? ?? '';
-        return Text(
-          state.interpolate(rawText),
-          style: DuiUtils.parseTextStyle(context, props['style'] as String?),
-          maxLines: (props['maxLines'] as num?)?.toInt(),
-          overflow: props['overflow'] == 'ellipsis' ? TextOverflow.ellipsis : null,
-        );
-
-      case 'SelectableText':
-        final rawText = props['text'] as String? ?? '';
-        return SelectableText(
-          state.interpolate(rawText),
-          style: DuiUtils.parseTextStyle(context, props['style'] as String?),
-        );
-
-      // 输入框 (带双向绑定)
-      case 'TextField':
-        final currentVal = ref != null ? (state.get(ref)?.toString() ?? '') : '';
-        return _BoundTextField(
-          initialText: currentVal,
-          hint: props['hint'] as String?,
-          label: props['label'] as String?,
-          maxLines: (props['maxLines'] as num?)?.toInt() ?? 1,
-          readOnly: props['readOnly'] == true,
-          onChanged: (val) {
-            if (ref != null) {
-              state.set(ref, val);
-            }
-            if (events.containsKey('onChanged')) {
-              eventHandler.handleEvent(events['onChanged'] as Map<String, dynamic>?, val);
-            }
-          },
-        );
-
-      // 按钮类
-      case 'FilledButton':
-        final label = state.interpolate(props['text'] as String? ?? '');
-        final iconStr = props['icon'] as String?;
-        return iconStr != null
-            ? FilledButton.icon(
-                icon: Icon(DuiUtils.parseIcon(iconStr)),
-                label: Text(label),
-                onPressed: () => eventHandler.handleEvent(events['onPressed'] as Map<String, dynamic>?),
-              )
-            : FilledButton(
-                onPressed: () => eventHandler.handleEvent(events['onPressed'] as Map<String, dynamic>?),
-                child: Text(label),
-              );
-
-      case 'OutlinedButton':
-        final label = state.interpolate(props['text'] as String? ?? '');
-        final iconStr = props['icon'] as String?;
-        return iconStr != null
-            ? OutlinedButton.icon(
-                icon: Icon(DuiUtils.parseIcon(iconStr)),
-                label: Text(label),
-                onPressed: () => eventHandler.handleEvent(events['onPressed'] as Map<String, dynamic>?),
-              )
-            : OutlinedButton(
-                onPressed: () => eventHandler.handleEvent(events['onPressed'] as Map<String, dynamic>?),
-                child: Text(label),
-              );
-
-      case 'IconButton':
-        return IconButton(
-          icon: Icon(DuiUtils.parseIcon(props['icon'] as String?)),
-          tooltip: props['tooltip'] as String?,
-          onPressed: () => eventHandler.handleEvent(events['onPressed'] as Map<String, dynamic>?),
-        );
-
-      // 容器类
-      case 'Card':
-        return Card(
-          elevation: (props['elevation'] as num?)?.toDouble() ?? 0,
-          child: childrenRaw.isNotEmpty
-              ? buildWidget(context, Map<String, dynamic>.from(childrenRaw.first as Map))
-              : const SizedBox.shrink(),
-        );
-
-      case 'Container':
-        return Container(
-          padding: DuiUtils.parsePadding(props['padding']),
-          width: (props['width'] as num?)?.toDouble(),
-          height: (props['height'] as num?)?.toDouble(),
-          decoration: BoxDecoration(
-            borderRadius: props['borderRadius'] != null
-                ? BorderRadius.circular((props['borderRadius'] as num).toDouble())
-                : null,
-          ),
-          child: childrenRaw.isNotEmpty
-              ? buildWidget(context, Map<String, dynamic>.from(childrenRaw.first as Map))
-              : null,
-        );
-
-      // 列表类
-      case 'ListView':
-        return ListView(
-          shrinkWrap: props['shrinkWrap'] == true,
-          padding: DuiUtils.parsePadding(props['padding']),
-          children: childrenRaw
-              .map((c) => buildWidget(context, Map<String, dynamic>.from(c as Map)))
-              .toList(),
-        );
-
-      case 'ListTile':
-        return ListTile(
-          title: Text(state.interpolate(props['title'] as String? ?? '')),
-          subtitle: props['subtitle'] != null ? Text(state.interpolate(props['subtitle'].toString())) : null,
-          leading: props['leading'] != null ? Icon(DuiUtils.parseIcon(props['leading'].toString())) : null,
-          onTap: () => eventHandler.handleEvent(events['onTap'] as Map<String, dynamic>?),
-        );
-
-      // 图片显示 (从插件本地沙箱目录加载)
-      case 'Image':
-        final src = props['src'] as String? ?? '';
-        final file = File('${pluginRootDir?.path}/$src');
-        if (file.existsSync()) {
-          return Image.file(
-            file,
-            width: (props['width'] as num?)?.toDouble(),
-            height: (props['height'] as num?)?.toDouble(),
-            fit: BoxFit.contain,
-          );
-        }
-        return const SizedBox.shrink();
-
-      default:
-        return const SizedBox.shrink();
+    final factory = _factories[type];
+    if (factory == null) {
+      return const SizedBox.shrink();
     }
+
+    final parsedChildren = <Map<String, dynamic>>[];
+    for (final c in childrenRaw) {
+      if (c is Map) parsedChildren.add(_asMap(c));
+    }
+
+    return factory(
+      DuiNodeContext(
+        context: context,
+        renderer: this,
+        props: props,
+        children: parsedChildren,
+        events: events,
+        ref: ref,
+      ),
+    );
+  }
+
+  void _registerBuiltinFactories() {
+    // ---- 布局类 ----
+    registerFactory('Column', (node) => Column(
+          crossAxisAlignment: _parseCrossAxis(node.props['crossAxisAlignment']),
+          mainAxisAlignment: _parseMainAxis(node.props['mainAxisAlignment']),
+          mainAxisSize: node.props['mainAxisSize'] == 'min'
+              ? MainAxisSize.min
+              : MainAxisSize.max,
+          children: node.childrenWidgets,
+        ));
+
+    registerFactory('Row', (node) => Row(
+          crossAxisAlignment: _parseCrossAxis(node.props['crossAxisAlignment']),
+          mainAxisAlignment: _parseMainAxis(node.props['mainAxisAlignment']),
+          mainAxisSize: node.props['mainAxisSize'] == 'min'
+              ? MainAxisSize.min
+              : MainAxisSize.max,
+          children: node.childrenWidgets,
+        ));
+
+    registerFactory('Stack', (node) => Stack(
+          alignment: Alignment.center,
+          children: node.childrenWidgets,
+        ));
+
+    registerFactory('Padding', (node) => Padding(
+          padding: DuiUtils.parsePadding(node.props['padding']),
+          child: node.firstChild,
+        ));
+
+    registerFactory('Center', (node) => Center(child: node.firstChild));
+
+    registerFactory('Expanded', (node) => Expanded(
+          flex: DuiUtils.tryInt(node.props['flex']) ?? 1,
+          child: node.firstChild,
+        ));
+
+    registerFactory('SizedBox', (node) => SizedBox(
+          width: node.width,
+          height: node.height,
+          child: node.children.isNotEmpty ? node.firstChild : null,
+        ));
+
+    registerFactory('SingleChildScrollView', (node) =>
+        SingleChildScrollView(
+          padding: DuiUtils.parsePadding(node.props['padding']),
+          child: node.firstChild,
+        ));
+
+    // ---- 文本类 ----
+    registerFactory('Text', (node) {
+      final rawText = node.props['text']?.toString() ?? '';
+      return Text(
+        state.interpolate(rawText),
+        style: DuiUtils.parseTextStyle(
+            node.context, node.props['style']?.toString()),
+        maxLines: DuiUtils.tryInt(node.props['maxLines']),
+        overflow: node.props['overflow'] == 'ellipsis'
+            ? TextOverflow.ellipsis
+            : null,
+      );
+    });
+
+    registerFactory('SelectableText', (node) {
+      final rawText = node.props['text']?.toString() ?? '';
+      return SelectableText(
+        state.interpolate(rawText),
+        style: DuiUtils.parseTextStyle(
+            node.context, node.props['style']?.toString()),
+      );
+    });
+
+    // ---- 输入框 (带双向绑定) ----
+    registerFactory('TextField', (node) {
+      final currentVal =
+          node.ref != null ? (state.get(node.ref!)?.toString() ?? '') : '';
+      return _BoundTextField(
+        initialText: currentVal,
+        hint: node.props['hint']?.toString(),
+        label: node.props['label']?.toString(),
+        maxLines: DuiUtils.tryInt(node.props['maxLines']) ?? 1,
+        readOnly: DuiUtils.tryBool(node.props['readOnly']),
+        onChanged: (val) {
+          if (node.ref != null) {
+            state.set(node.ref!, val);
+          }
+          if (node.events.containsKey('onChanged')) {
+            eventHandler.handleEvent(node.events['onChanged'], val);
+          }
+        },
+      );
+    });
+
+    // ---- 按钮类 ----
+    registerFactory('FilledButton', (node) {
+      final label = state.interpolate(node.props['text']?.toString() ?? '');
+      final iconStr = node.props['icon']?.toString();
+      void onPressed() =>
+          eventHandler.handleEvent(node.events['onPressed']);
+      return iconStr != null
+          ? FilledButton.icon(
+              icon: Icon(DuiUtils.parseIcon(iconStr)),
+              label: Text(label),
+              onPressed: onPressed,
+            )
+          : FilledButton(onPressed: onPressed, child: Text(label));
+    });
+
+    registerFactory('OutlinedButton', (node) {
+      final label = state.interpolate(node.props['text']?.toString() ?? '');
+      final iconStr = node.props['icon']?.toString();
+      void onPressed() =>
+          eventHandler.handleEvent(node.events['onPressed']);
+      return iconStr != null
+          ? OutlinedButton.icon(
+              icon: Icon(DuiUtils.parseIcon(iconStr)),
+              label: Text(label),
+              onPressed: onPressed,
+            )
+          : OutlinedButton(onPressed: onPressed, child: Text(label));
+    });
+
+    registerFactory('IconButton', (node) => IconButton(
+          icon: Icon(DuiUtils.parseIcon(node.props['icon']?.toString())),
+          tooltip: node.props['tooltip']?.toString(),
+          onPressed: () =>
+              eventHandler.handleEvent(node.events['onPressed']),
+        ));
+
+    // ---- 容器类 ----
+    registerFactory('Card', (node) => Card(
+          elevation: DuiUtils.tryDouble(node.props['elevation']) ?? 0,
+          child: node.firstChild,
+        ));
+
+    registerFactory('Container', (node) {
+      final borderRadiusVal = DuiUtils.tryDouble(node.props['borderRadius']);
+      return Container(
+        padding: DuiUtils.parsePadding(node.props['padding']),
+        width: node.width,
+        height: node.height,
+        decoration: BoxDecoration(
+          borderRadius:
+              borderRadiusVal != null ? BorderRadius.circular(borderRadiusVal) : null,
+        ),
+        child: node.children.isNotEmpty ? node.firstChild : null,
+      );
+    });
+
+    // ---- 列表类 ----
+    registerFactory('ListView', (node) => ListView(
+          shrinkWrap: DuiUtils.tryBool(node.props['shrinkWrap']),
+          padding: DuiUtils.parsePadding(node.props['padding']),
+          children: node.childrenWidgets,
+        ));
+
+    registerFactory('ListTile', (node) => ListTile(
+          title:
+              Text(state.interpolate(node.props['title']?.toString() ?? '')),
+          subtitle: node.props['subtitle'] != null
+              ? Text(state.interpolate(node.props['subtitle'].toString()))
+              : null,
+          leading: node.props['leading'] != null
+              ? Icon(DuiUtils.parseIcon(node.props['leading'].toString()))
+              : null,
+          onTap: () => eventHandler.handleEvent(node.events['onTap']),
+        ));
+
+    // ---- 图片显示 (从插件本地沙箱目录加载) ----
+    registerFactory('Image', _imageWidget);
+  }
+
+  /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，
+  /// 直接强转 `Map<String, dynamic>` 会抛 TypeError 使插件页面崩溃
+  static Map<String, dynamic> _asMap(Object? raw) {
+    if (raw is Map) {
+      return {
+        for (final entry in raw.entries)
+          if (entry.key is String) entry.key as String: entry.value,
+      };
+    }
+    return const {};
+  }
+
+  Widget _imageWidget(DuiNodeContext node) {
+    final src = node.props['src']?.toString() ?? '';
+    final rootDir = node.renderer.pluginRootDir;
+    // 路径穿越防御：src 必须归一化后仍严格位于插件沙箱根目录之内，
+    // 否则 (例如 "../../etc/passwd") 直接拒绝渲染
+    if (rootDir == null ||
+        src.isEmpty ||
+        !SandboxPath.isSafeSubpath(rootDir.path, src)) {
+      return const SizedBox.shrink();
+    }
+    return Image.file(
+      File('${rootDir.path}/$src'),
+      width: node.width,
+      height: node.height,
+      fit: BoxFit.contain,
+      cacheWidth: 256,
+      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    );
   }
 
   CrossAxisAlignment _parseCrossAxis(String? val) {

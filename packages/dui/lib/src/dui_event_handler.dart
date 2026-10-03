@@ -15,25 +15,31 @@ class DuiEventHandler {
     required this.executor,
   });
 
-  void handleEvent(Map<String, dynamic>? eventDef, [dynamic payload]) {
+  /// 事件定义接受宽容的 Map 类型并做防御式取值：
+  /// 第三方插件 JSON 的嵌套结构可能被解析为 `Map<dynamic, dynamic>`，
+  /// 直接强转会抛 TypeError 使插件页面崩溃
+  void handleEvent(Map? eventDef, [dynamic payload]) {
     if (eventDef == null) return;
-    final action = eventDef['action'] as String?;
+    final action = eventDef['action']?.toString();
     if (action == null) return;
 
     switch (action) {
       case 'callLua':
-        final func = eventDef['function'] as String;
-        final args = eventDef['args'] as List<dynamic>? ?? [];
+        final func = eventDef['function']?.toString();
+        if (func == null) return;
+        final args =
+            eventDef['args'] is List ? eventDef['args'] as List<dynamic> : const <dynamic>[];
         executor.callLua(func, args);
         break;
 
       case 'setState':
-        final key = eventDef['key'] as String;
+        final key = eventDef['key']?.toString();
+        if (key == null) return;
         state.set(key, payload);
         break;
 
       case 'copyToClipboard':
-        final rawText = eventDef['text'] as String? ?? '';
+        final rawText = eventDef['text']?.toString() ?? '';
         final text = state.interpolate(rawText);
         Clipboard.setData(ClipboardData(text: text));
         executor.showToast('已复制到剪贴板');

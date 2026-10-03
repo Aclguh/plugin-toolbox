@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
@@ -86,6 +88,151 @@ void main() {
 
       await tester.tap(find.text('Click Me'));
       expect(executor.calledFunctions, contains('onButtonClicked'));
+    });
+  });
+
+  group('DuiRenderer 响应式与容错', () {
+    Widget buildHost(DuiRenderer renderer, Map<String, dynamic> node) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Builder(builder: (context) => renderer.build(context, node)),
+        ),
+      );
+    }
+
+    testWidgets('状态变更经 ListenableBuilder 自动刷新 UI', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'Text',
+        'props': {'text': 'Value: {{state.result}}'},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(find.text('Value: Initial'), findsNothing);
+
+      state.set('result', 'Initial');
+      await tester.pump();
+      expect(find.text('Value: Initial'), findsOneWidget);
+
+      // 无需任何外部 setState, 状态写入后 UI 自动更新
+      state.set('result', 'Updated');
+      await tester.pump();
+      expect(find.text('Value: Updated'), findsOneWidget);
+    });
+
+    testWidgets('registerFactory 支持扩展自定义组件类型', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+      renderer.registerFactory(
+        'Badge',
+        (node) => Text('BADGE:${node.props['label']}',
+            textDirection: TextDirection.ltr),
+      );
+
+      final node = {
+        'type': 'Badge',
+        'props': {'label': 'X'},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(find.text('BADGE:X'), findsOneWidget);
+    });
+
+    testWidgets('未知组件类型安全降级为空白而非崩溃', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      await tester.pumpWidget(buildHost(renderer, {
+        'type': 'DefinitelyUnknownWidget',
+        'props': {},
+      }));
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('数值属性为字符串时安全解析不崩溃 (类型容错)', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'SizedBox',
+        'props': {'width': '100', 'height': '50', 'maxLines': '3'},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(tester.takeException(), isNull);
+
+      final sizedBox = tester.widget<SizedBox>(
+        find.byWidgetPredicate((w) => w is SizedBox && w.width == 100.0),
+      );
+      expect(sizedBox.height, 50.0);
+    });
+
+    testWidgets('Image src 路径穿越被拦截, 不发起任何文件加载', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(
+        state: state,
+        eventHandler: handler,
+        pluginRootDir: Directory.systemTemp,
+      );
+
+      final node = {
+        'type': 'Image',
+        'props': {'src': '../../../../etc/passwd'},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(Image), findsNothing);
+    });
+
+    testWidgets('Image src 指向沙箱内合法相对路径时正常构建', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(
+        state: state,
+        eventHandler: handler,
+        pluginRootDir: Directory.systemTemp,
+      );
+
+      final node = {
+        'type': 'Image',
+        'props': {'src': 'definitely_missing_icon.png'},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('TextField 双向绑定: 输入回写状态, 状态变更同步 UI', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'TextField',
+        'ref': 'input',
+        'props': {},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+
+      // 用户输入 -> 状态回写
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.pump();
+      expect(state.get('input'), 'hello');
+
+      // 宿主写入状态 -> UI 更新
+      state.set('input', 'from host');
+      await tester.pump();
+      expect(find.text('from host'), findsOneWidget);
     });
   });
 }
