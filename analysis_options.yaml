@@ -13,6 +13,8 @@ analyzer:
     - tool/**
     # 第三方本地维护分支 (lua_dardo fork), 保持上游代码原貌, 不纳入本仓库 lint 门禁
     - packages/third_party/**
+    # 本地独立插件开发空间 (已 gitignore), 插件代码质量由插件自身保障, 不纳入宿主 lint 门禁
+    - PTX-plugins/**
 
 linter:
   rules:
