@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox/src/app.dart';
@@ -152,6 +153,62 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('卸载插件'), findsNothing);
+  });
+
+  testWidgets('批量导入: 逐文件安装, 单文件失败不影响其余, 结果可汇总',
+      (WidgetTester tester) async {
+    // 扩展名过滤
+    expect(isPtxPackage('a.ptx'), isTrue);
+    expect(isPtxPackage('a.PTX'), isTrue);
+    expect(isPtxPackage('a.zip'), isTrue);
+    expect(isPtxPackage('a.txt'), isFalse);
+    expect(isPtxPackage('noext'), isFalse);
+
+    Future<DynamicPlugin> fakeInstaller(File file) async {
+      final name = file.uri.pathSegments.last;
+      if (name == 'broken.ptx') {
+        throw const FormatException('安装包中未找到 plugin.json 清单文件');
+      }
+      if (name == 'boom.ptx') {
+        throw Exception('unexpected');
+      }
+      return DynamicPlugin(
+        manifest: PluginManifest(
+          id: name.split('.').first,
+          name: name,
+          version: '1.1.0',
+          description: 'd',
+          author: 'Tester',
+          type: 'lua',
+          category: PluginCategory.generator,
+          permissions: [],
+          entry: 'main.lua',
+          ui: 'ui/main.ui.json',
+        ),
+        rootDir: Directory('.'),
+      );
+    }
+
+    final outcome = await importPtxFiles(
+      files: [
+        PlatformFile(name: 'ok1.ptx', size: 10, path: '/tmp/ok1.ptx'),
+        PlatformFile(name: 'notes.txt', size: 10, path: '/tmp/notes.txt'),
+        PlatformFile(name: 'no_path.ptx', size: 0),
+        PlatformFile(name: 'broken.ptx', size: 10, path: '/tmp/broken.ptx'),
+        PlatformFile(name: 'boom.ptx', size: 10, path: '/tmp/boom.ptx'),
+        PlatformFile(name: 'ok2.ptx', size: 10, path: '/tmp/ok2.ptx'),
+      ],
+      installer: fakeInstaller,
+    );
+
+    // 成功 2 个, 失败 4 个 (含扩展名/路径缺失/安装异常/未知异常)
+    expect(outcome.succeeded, ['ok1.ptx v1.1.0', 'ok2.ptx v1.1.0']);
+    expect(outcome.installed.length, 2);
+    expect(outcome.failed.length, 4);
+    expect(outcome.failed[0], contains('仅支持 .ptx 或 .zip'));
+    expect(outcome.failed[1], contains('无法读取文件'));
+    expect(outcome.failed[2], contains('未找到 plugin.json'));
+    expect(outcome.failed[3], contains('未知错误'));
   });
 
   testWidgets('Order is synchronized between HomePage and PluginManagerPage',

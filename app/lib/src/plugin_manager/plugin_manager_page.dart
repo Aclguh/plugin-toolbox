@@ -1,53 +1,108 @@
 import 'dart:io';
 import 'dart:ui' show lerpDouble;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 import '../providers/app_providers.dart';
+
+/// .ptx 不是 Android MIME 表中的注册类型，FileType.custom 会被 SAF 过滤器
+/// 置灰不可选，因此放开为任意文件；选中后在此统一校验扩展名（批量导入逐文件过滤）。
+bool isPtxPackage(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  if (dot == -1) return false;
+  final ext = fileName.substring(dot + 1).toLowerCase();
+  return ext == 'ptx' || ext == 'zip';
+}
+
+/// 批量导入结果: installed 为成功注册所需的插件对象, 其余为界面展示文案
+@visibleForTesting
+class PtxImportOutcome {
+  PtxImportOutcome({
+    required this.installed,
+    required this.succeeded,
+    required this.failed,
+  });
+
+  final List<DynamicPlugin> installed;
+  final List<String> succeeded;
+  final List<String> failed;
+}
+
+/// 逐文件执行安装并汇总成败; 单个文件失败不影响其余文件。
+/// [installer] 注入以便测试替身 (生产环境为 PluginInstaller.installFromPtx)。
+@visibleForTesting
+Future<PtxImportOutcome> importPtxFiles({
+  required List<PlatformFile> files,
+  required Future<DynamicPlugin> Function(File file) installer,
+}) async {
+  final installed = <DynamicPlugin>[];
+  final succeeded = <String>[];
+  final failed = <String>[];
+  for (final picked in files) {
+    final path = picked.path;
+    if (path == null) {
+      failed.add('${picked.name}: 无法读取文件');
+      continue;
+    }
+    if (!isPtxPackage(picked.name)) {
+      failed.add('${picked.name}: 仅支持 .ptx 或 .zip 插件安装包');
+      continue;
+    }
+    try {
+      final plugin = await installer(File(path));
+      installed.add(plugin);
+      succeeded.add('${plugin.name} v${plugin.version}');
+    } on FormatException catch (e) {
+      failed.add('${picked.name}: ${e.message}');
+    } on FileSystemException {
+      failed.add('${picked.name}: 安装包文件读取失败，请确认文件完整后重试');
+    } catch (_) {
+      failed.add('${picked.name}: 安装失败，发生未知错误');
+    }
+  }
+  return PtxImportOutcome(installed: installed, succeeded: succeeded, failed: failed);
+}
 
 class PluginManagerPage extends ConsumerWidget {
   const PluginManagerPage({super.key});
 
   Future<void> _pickAndInstall(BuildContext context, WidgetRef ref) async {
     try {
-      // .ptx 不是 Android MIME 表中的注册类型，FileType.custom 会被 SAF 过滤器
-      // 置灰不可选，因此放开为任意文件，选中后再校验扩展名
-      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      // 批量导入: 允许一次选择多个 .ptx/.zip, 逐个安装, 单个失败不影响其余
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+      );
+      if (result == null || result.files.isEmpty) return;
 
-      if (result != null && result.files.single.path != null) {
-        final filePath = result.files.single.path!;
-        final fileName = filePath.split(Platform.pathSeparator).last;
-        final dotIndex = fileName.lastIndexOf('.');
-        final extension = dotIndex == -1 ? '' : fileName.substring(dotIndex + 1).toLowerCase();
-        if (extension != 'ptx' && extension != 'zip') {
-          if (!context.mounted) return;
-          _showInstallError(context, '仅支持导入 .ptx 或 .zip 插件安装包');
-          return;
-        }
-        final file = File(filePath);
+      final outcome = await importPtxFiles(
+        files: result.files,
+        installer: PluginInstaller.installFromPtx,
+      );
 
-        // 安装解析
-        final plugin = await PluginInstaller.installFromPtx(file);
-
-        // 注册到系统
-        final registry = ref.read(pluginRegistryProvider);
+      // 注册并初始化全部成功项 (同 ID 覆盖即插件更新)
+      final registry = ref.read(pluginRegistryProvider);
+      for (final plugin in outcome.installed) {
         registry.register(plugin);
-        await registry.initializeAll();
+      }
+      await registry.initializeAll();
 
-        // 触发 UI 刷新
-        ref.read(pluginRegistryProvider.notifier).refresh();
-        await ref.read(pluginRegistryProvider.notifier).saveOrder();
+      // 触发 UI 刷新
+      ref.read(pluginRegistryProvider.notifier).refresh();
+      await ref.read(pluginRegistryProvider.notifier).saveOrder();
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('插件 [${plugin.name}] 安装成功！'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+      if (!context.mounted) return;
+      if (outcome.failed.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('成功导入 ${outcome.succeeded.length} 个插件'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        _showImportSummary(context, outcome);
       }
     } on FormatException catch (e) {
       if (!context.mounted) return;
@@ -60,6 +115,35 @@ class PluginManagerPage extends ConsumerWidget {
       if (!context.mounted) return;
       _showInstallError(context, '安装失败，发生未知错误，请重试');
     }
+  }
+
+  void _showImportSummary(BuildContext context, PtxImportOutcome outcome) {
+    final buffer = StringBuffer();
+    if (outcome.succeeded.isNotEmpty) {
+      buffer.writeln('成功 ${outcome.succeeded.length} 个:');
+      for (final name in outcome.succeeded) {
+        buffer.writeln('· $name');
+      }
+    }
+    if (outcome.failed.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.writeln();
+      buffer.writeln('失败 ${outcome.failed.length} 个:');
+      for (final reason in outcome.failed) {
+        buffer.writeln('· $reason');
+      }
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入结果'),
+        content: SingleChildScrollView(
+          child: Text(buffer.toString().trimRight()),
+        ),
+        actions: [
+          TextButton(onPressed: Navigator.of(ctx).pop, child: const Text('确定')),
+        ],
+      ),
+    );
   }
 
   void _showInstallError(BuildContext context, String message) {
@@ -167,7 +251,7 @@ class PluginManagerPage extends ConsumerWidget {
       title: '插件管理中心',
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('导入 .ptx 插件'),
+        label: const Text('批量导入插件'),
         onPressed: () => _pickAndInstall(context, ref),
       ),
       body: allPlugins.isEmpty
