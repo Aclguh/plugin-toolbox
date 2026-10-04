@@ -51,3 +51,6 @@ AGENTS.md
 
 # 动态插件开发目录
 PTX-plugins/
+
+# Archify 生成的图表产物
+.archify/
