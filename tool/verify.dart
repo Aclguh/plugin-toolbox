@@ -328,7 +328,15 @@ void main() {
   expect(licenseContent.contains('MIT License'), 'LICENSE 为标准的 MIT 开源协议');
 
   final agentsFile = File('AGENTS.md');
-  expect(agentsFile.existsSync(), '本地存在开发规范指南 AGENTS.md');
+  // AGENTS.md 是本地开发约定文件且被 .gitignore 排除: 开发者本机应存在,
+  // CI 干净检出时则必须不存在——两个方向共同验证忽略规则真实生效
+  final inCi = Platform.environment['CI'] == 'true' ||
+      Platform.environment['GITHUB_ACTIONS'] == 'true';
+  if (inCi) {
+    expect(!agentsFile.existsSync(), 'CI 干净检出不含本地开发规范指南 AGENTS.md');
+  } else {
+    expect(agentsFile.existsSync(), '本地存在开发规范指南 AGENTS.md');
+  }
 
   // 总结输出
   print('\n================================================================');
