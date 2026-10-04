@@ -282,10 +282,37 @@ class PluginManagerPage extends ConsumerWidget {
                         ],
                       ],
                     ),
-                    subtitle: Text(
-                      '${plugin.description}\n版本: ${plugin.version}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    // 简介与版本分行渲染: 版本号独立成行且不受 maxLines 约束,
+                    // 避免长简介折行占满额度后把版本号挤出可视范围
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          plugin.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '版本: ${plugin.version}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                      ],
                     ),
                     trailing: Switch(
                       value: isEnabled,
