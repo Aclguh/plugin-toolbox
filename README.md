@@ -71,8 +71,7 @@ plugin-toolbox/
 │   ├── base64_tool/      # Base64 文本编解码插件
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 哈希计算插件
 ├── tool/                 # 独立质量工程工具套件 (verify.dart, shots.py)
-├── .github/workflows/    # CI 流水线：analyze + verify + 全模块测试
-└── AGENTS.md             # 统一架构标准、开发门槛与 AI Agent 协作规范
+└── .github/workflows/    # CI 流水线：analyze + verify + 全模块测试
 ```
 
 ### 插件加载与运行流程
