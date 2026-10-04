@@ -251,7 +251,7 @@ class PluginManagerPage extends ConsumerWidget {
       title: '插件管理中心',
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('批量导入插件'),
+        label: const Text('导入 .ptx 插件'),
         onPressed: () => _pickAndInstall(context, ref),
       ),
       body: allPlugins.isEmpty
