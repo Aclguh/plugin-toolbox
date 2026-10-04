@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:logger/logger.dart';
 import '../event/event_bus.dart';
 import '../event/app_event.dart';
@@ -58,6 +60,16 @@ class PluginRegistry {
   }
 
   void register(ToolPlugin plugin) {
+    final existing = _plugins[plugin.id];
+    // 同 ID 覆盖 (导入新版 .ptx 即插件更新): 已初始化的旧实例必须先弃用。
+    // 否则新实例会被 initializeAll 的"按 ID 去重"过滤跳过, 永远拿不到
+    // PluginContext, 打开插件时被 LuaPluginRunner 的守卫拒绝启动。
+    if (existing != null &&
+        existing != plugin &&
+        _initializedPlugins.contains(plugin.id)) {
+      _initializedPlugins.remove(plugin.id);
+      unawaited(existing.dispose());
+    }
     _plugins[plugin.id] = plugin;
     _orderController.add(plugin.id);
     _invalidateCaches();

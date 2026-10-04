@@ -118,6 +118,55 @@ void main() {
       eventBus.dispose();
     });
 
+    test('same-id re-register re-initializes the new instance (插件更新场景)', () async {
+      final registry = PluginRegistry(
+        eventBus: EventBusImpl(),
+        storageFactory: const PluginStorageFactory(),
+      );
+
+      const v1 = PluginManifest(
+        id: 'up_plugin',
+        name: 'Updater',
+        version: '1.0.0',
+        description: 'old',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'main.ui.json',
+      );
+      const v2 = PluginManifest(
+        id: 'up_plugin',
+        name: 'Updater',
+        version: '1.1.0',
+        description: 'new',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'main.ui.json',
+      );
+
+      final oldPlugin = DynamicPlugin(manifest: v1, rootDir: Directory('.'));
+      final newPlugin = DynamicPlugin(manifest: v2, rootDir: Directory('.'));
+
+      registry.register(oldPlugin);
+      await registry.initializeAll();
+      expect(oldPlugin.context, isNotNull);
+      expect(registry.getPlugin('up_plugin'), same(oldPlugin));
+
+      // 导入新版 .ptx: 同 ID 覆盖注册, initializeAll 必须初始化新实例
+      registry.register(newPlugin);
+      await registry.initializeAll();
+
+      expect(registry.getPlugin('up_plugin'), same(newPlugin));
+      expect(newPlugin.context, isNotNull);
+      expect(oldPlugin.context, isNull);
+      expect(registry.allPlugins.length, 1);
+    });
+
     test('reorders plugins and preserves order', () async {
       final registry = PluginRegistry(
         eventBus: EventBusImpl(),
