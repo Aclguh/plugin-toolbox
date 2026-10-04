@@ -70,8 +70,7 @@ plugin-toolbox/
 │   ├── base64_tool/      # Base64 text encoder/decoder plugin
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 hash calculator plugin
 ├── tool/                 # Standalone quality engineering toolkit (verify.dart, shots.py)
-├── .github/workflows/    # CI pipeline: analyze + verify + all-package tests
-└── AGENTS.md             # Unified architecture standards, quality gates & AI Agent guidelines
+└── .github/workflows/    # CI pipeline: analyze + verify + all-package tests
 ```
 
 ### Plugin Loading & Execution Flow
