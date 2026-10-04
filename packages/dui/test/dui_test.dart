@@ -322,6 +322,41 @@ void main() {
       );
     });
 
+    testWidgets('Container color 支持状态插值, 非法值降级为无色', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      Widget buildHost(Map<String, dynamic> node) => MaterialApp(
+            home: Scaffold(
+              body: Builder(builder: (context) => renderer.build(context, node)),
+            ),
+          );
+
+      state.set('swatch', '#26366A');
+      await tester.pumpWidget(buildHost({
+        'type': 'Container',
+        'props': {'color': '{{state.swatch}}', 'width': 40, 'height': 20},
+      }));
+
+      var container = tester.widget<Container>(find.byType(Container));
+      expect((container.decoration as BoxDecoration).color,
+          const Color(0xFF26366A));
+
+      // 状态变更后插值随之更新
+      state.set('swatch', '#FF0000');
+      await tester.pump();
+      container = tester.widget<Container>(find.byType(Container));
+      expect((container.decoration as BoxDecoration).color,
+          const Color(0xFFFF0000));
+
+      // 非法插值结果安全降级
+      state.set('swatch', 'not-a-color');
+      await tester.pump();
+      container = tester.widget<Container>(find.byType(Container));
+      expect((container.decoration as BoxDecoration).color, isNull);
+    });
+
     testWidgets('TextField 双向绑定: 输入回写状态, 状态变更同步 UI', (tester) async {
       final state = DuiState();
       final handler = DuiEventHandler(state: state, executor: MockActionExecutor());

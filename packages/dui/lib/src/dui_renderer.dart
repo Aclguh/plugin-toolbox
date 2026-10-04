@@ -254,7 +254,8 @@ class DuiRenderer {
         width: node.width,
         height: node.height,
         decoration: BoxDecoration(
-          color: DuiUtils.parseColor(node.props['color']),
+          // color 支持渲染期状态插值 (如颜色工具的动态色块)
+          color: DuiUtils.parseColor(state.interpolate(node.props['color']?.toString() ?? '')),
           borderRadius:
               borderRadiusVal != null ? BorderRadius.circular(borderRadiusVal) : null,
         ),
