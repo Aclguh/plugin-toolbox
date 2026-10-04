@@ -12,13 +12,20 @@ class PluginManagerPage extends ConsumerWidget {
 
   Future<void> _pickAndInstall(BuildContext context, WidgetRef ref) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['ptx', 'zip'],
-      );
+      // .ptx 不是 Android MIME 表中的注册类型，FileType.custom 会被 SAF 过滤器
+      // 置灰不可选，因此放开为任意文件，选中后再校验扩展名
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
+        final fileName = filePath.split(Platform.pathSeparator).last;
+        final dotIndex = fileName.lastIndexOf('.');
+        final extension = dotIndex == -1 ? '' : fileName.substring(dotIndex + 1).toLowerCase();
+        if (extension != 'ptx' && extension != 'zip') {
+          if (!context.mounted) return;
+          _showInstallError(context, '仅支持导入 .ptx 或 .zip 插件安装包');
+          return;
+        }
         final file = File(filePath);
 
         // 安装解析
