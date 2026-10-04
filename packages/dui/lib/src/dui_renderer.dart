@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import 'dui_event_handler.dart';
+import 'dui_pixel_grid.dart';
 import 'dui_state.dart';
 import 'dui_utils.dart';
 
@@ -282,6 +283,25 @@ class DuiRenderer {
 
     // ---- 图片显示 (从插件本地沙箱目录加载) ----
     registerFactory('Image', _imageWidget);
+
+    // ---- 像素网格 (状态 0/1 位图逐格填充, 如二维码矩阵) ----
+    registerFactory('PixelGrid', (node) {
+      // data/cols/cellSize 均为渲染期取值, 支持从状态插值
+      final data = state.interpolate(node.props['data']?.toString() ?? '');
+      final cols =
+          DuiUtils.tryInt(state.interpolate(node.props['cols']?.toString() ?? ''));
+      final cellSize = DuiUtils.tryDouble(
+          state.interpolate(node.props['cellSize']?.toString() ?? ''));
+      return DuiPixelGrid(
+        data: data,
+        cols: cols ?? 0,
+        cellSize: cellSize ?? 4.0,
+        darkColor:
+            DuiUtils.parseColor(node.props['darkColor']) ?? const Color(0xFF000000),
+        lightColor: DuiUtils.parseColor(node.props['lightColor']) ??
+            const Color(0xFFFFFFFF),
+      );
+    });
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，

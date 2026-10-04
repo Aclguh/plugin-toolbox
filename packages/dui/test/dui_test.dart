@@ -266,6 +266,62 @@ void main() {
       expect((containers[1].decoration as BoxDecoration).color, isNull);
     });
 
+    testWidgets('PixelGrid 按状态位图渲染像素方块尺寸, 数据异常安全降级', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      Widget buildHost(Map<String, dynamic> node) => MaterialApp(
+            home: Scaffold(
+              body: Builder(builder: (context) => renderer.build(context, node)),
+            ),
+          );
+
+      // 3x3 位图, 单格 10 逻辑像素 -> 30x30
+      state.set('px', '010111101');
+      await tester.pumpWidget(buildHost({
+        'type': 'PixelGrid',
+        'props': {'data': '{{state.px}}', 'cols': '3', 'cellSize': '10'},
+      }));
+
+      final matches = tester.widgetList<SizedBox>(find.byWidgetPredicate(
+        (w) => w is SizedBox && w.width == 30.0,
+      ));
+      expect(matches, isNotEmpty);
+      expect(matches.first.height, 30.0);
+      final pixelPaint = tester.widgetList<CustomPaint>(find.byType(CustomPaint)).where(
+        (p) => p.painter.runtimeType.toString().endsWith('_PixelGridPainter'),
+      );
+      expect(pixelPaint, isNotEmpty);
+
+      // 位图长度与列数不匹配 -> 空白降级
+      state.set('px', '0101');
+      await tester.pumpWidget(buildHost({
+        'type': 'PixelGrid',
+        'props': {'data': '{{state.px}}', 'cols': '3', 'cellSize': '10'},
+      }));
+      expect(
+        tester
+            .widgetList<CustomPaint>(find.byType(CustomPaint))
+            .where((p) =>
+                p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
+        isEmpty,
+      );
+
+      // 空数据 -> 空白降级
+      await tester.pumpWidget(buildHost({
+        'type': 'PixelGrid',
+        'props': {'data': '{{state.empty}}', 'cols': '3', 'cellSize': '10'},
+      }));
+      expect(
+        tester
+            .widgetList<CustomPaint>(find.byType(CustomPaint))
+            .where((p) =>
+                p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
+        isEmpty,
+      );
+    });
+
     testWidgets('TextField 双向绑定: 输入回写状态, 状态变更同步 UI', (tester) async {
       final state = DuiState();
       final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
