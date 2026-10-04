@@ -14,10 +14,25 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#架构设计)
 [![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/Release-v0.1.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 
 **简体中文** · [English](README.en.md)
 
 </div>
+
+---
+
+## 下载
+
+前往 [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) 页面获取最新版本 **v0.1.0**，按设备架构选择对应 APK 安装：
+
+| 架构 | 适用设备 | 安装包 |
+|---|---|---|
+| arm64-v8a | 主流安卓手机（推荐） | `app-arm64-v8a-release.apk` |
+| armeabi-v7a | 老旧 32 位机型 | `app-armeabi-v7a-release.apk` |
+| x86_64 | 模拟器 | `app-x86_64-release.apk` |
+
+安装后在「插件管理中心」导入 `.ptx` 插件包即可启用新功能。
 
 ---
 

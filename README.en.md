@@ -14,10 +14,25 @@ A deeply decoupled, fully offline, and hot-pluggable Android toolbox application
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#architecture)
 [![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/Release-v0.1.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 
 [简体中文](README.md) · **English**
 
 </div>
+
+---
+
+## Download
+
+Head to the [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) page for the latest version **v0.1.0** and pick the APK matching your device ABI:
+
+| ABI | Target devices | Artifact |
+|---|---|---|
+| arm64-v8a | Mainstream Android phones (recommended) | `app-arm64-v8a-release.apk` |
+| armeabi-v7a | Legacy 32-bit devices | `app-armeabi-v7a-release.apk` |
+| x86_64 | Emulators | `app-x86_64-release.apk` |
+
+After installing, import a `.ptx` plugin package in the Plugin Manager to enable new features.
 
 ---
 
