@@ -198,6 +198,7 @@ void main() {
 
   int flutterImportViolations = 0;
   int uiImportViolations = 0;
+  int routerImportViolations = 0;
   for (final file in coreLibDir.listSync(recursive: true)) {
     if (file is File && file.path.endsWith('.dart')) {
       final code = file.readAsStringSync();
@@ -210,10 +211,23 @@ void main() {
         uiImportViolations++;
         print('    [违规] ${file.path} 反向依赖了 UI 模块');
       }
+      if (code.contains("package:go_router/")) {
+        routerImportViolations++;
+        print('    [违规] ${file.path} 依赖了 UI 路由框架 go_router');
+      }
     }
   }
   expectEq(flutterImportViolations, 0, 'packages/core 严禁依赖 Flutter Material/Cupertino 库 (保持领域层无样式绑定)');
   expectEq(uiImportViolations, 0, 'packages/core 严禁反向依赖 UI 模块');
+  expectEq(routerImportViolations, 0, 'packages/core 源码严禁依赖 go_router 路由包');
+
+  final corePubspecFile = File('packages/core/pubspec.yaml');
+  expect(corePubspecFile.existsSync(), 'packages/core/pubspec.yaml 存在');
+  final corePubspecContent = corePubspecFile.readAsStringSync();
+  final hasIllegalPubspecDeps = corePubspecContent.contains('go_router') ||
+      corePubspecContent.contains('flutter_riverpod') ||
+      corePubspecContent.contains('riverpod_annotation');
+  expect(!hasIllegalPubspecDeps, 'packages/core 规范排除 go_router 与 riverpod 等上层框架依赖');
 
   // 4. 动态插件规范与样例完整性校验
   print('\n--- 4. .ptx 动态插件与 Manifest 规范校验 ---');

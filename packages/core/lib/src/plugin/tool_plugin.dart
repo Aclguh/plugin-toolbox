@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:go_router/go_router.dart';
 import '../model/plugin_category.dart';
 import 'plugin_context.dart';
 
@@ -24,9 +23,6 @@ abstract class ToolPlugin {
 
   /// 插件路由标识
   String get routePath => id;
-
-  /// 构建插件所注册的页面路由
-  List<RouteBase> buildRoutes();
 
   /// 启动与初始化生命周期
   Future<void> initialize(PluginContext context);

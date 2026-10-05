@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/widgets.dart';
-import 'package:go_router/go_router.dart';
 import '../model/plugin_manifest.dart';
 import '../model/plugin_category.dart';
 import 'tool_plugin.dart';
@@ -51,20 +50,6 @@ class DynamicPlugin extends ToolPlugin {
   File? get iconFile => manifest.icon != null ? File('${rootDir.path}/${manifest.icon}') : null;
 
   PluginContext? get context => _context;
-
-  @override
-  List<RouteBase> buildRoutes() {
-    // 动态插件的路由跳转统一进入 DynamicPluginHostPage
-    return [
-      GoRoute(
-        path: '',
-        builder: (context, state) {
-          // 在 App 层会将该页面挂载到 DynamicPluginHostPage(plugin: this)
-          return const SizedBox.shrink();
-        },
-      ),
-    ];
-  }
 
   @override
   Future<void> initialize(PluginContext context) async {
