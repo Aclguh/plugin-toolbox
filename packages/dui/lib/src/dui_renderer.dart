@@ -325,6 +325,188 @@ class DuiRenderer {
             const Color(0xFFFFFFFF),
       );
     });
+
+    // ---- 流式布局 (Wrap) ----
+    registerFactory('Wrap', (node) => Wrap(
+          spacing: DuiUtils.tryDouble(node.props['spacing']) ?? 0.0,
+          runSpacing: DuiUtils.tryDouble(node.props['runSpacing']) ?? 0.0,
+          alignment: _parseWrapAlignment(node.props['alignment']?.toString()),
+          children: node.childrenWidgets,
+        ));
+
+    // ---- 分割线 (Divider) ----
+    registerFactory('Divider', (node) => Divider(
+          height: DuiUtils.tryDouble(node.props['height']),
+          thickness: DuiUtils.tryDouble(node.props['thickness']),
+          color: DuiUtils.parseColor(
+              state.interpolate(node.props['color']?.toString() ?? '')),
+        ));
+
+    // ---- 进度条 (ProgressBar) ----
+    registerFactory('ProgressBar', (node) {
+      final rawVal = node.props['value']?.toString() ?? '';
+      final keys = DuiState.extractKeys(rawVal);
+      Widget buildProgress() {
+        final interpolated = state.interpolate(rawVal);
+        final val = DuiUtils.tryDouble(interpolated);
+        return LinearProgressIndicator(
+          value: val,
+          color: DuiUtils.parseColor(
+              state.interpolate(node.props['color']?.toString() ?? '')),
+          backgroundColor: DuiUtils.parseColor(state
+              .interpolate(node.props['backgroundColor']?.toString() ?? '')),
+        );
+      }
+
+      if (keys.isEmpty) return buildProgress();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => buildProgress(),
+      );
+    });
+
+    // ---- 开关控件 (Switch) ----
+    registerFactory('Switch', (node) {
+      final label = node.props['label']?.toString();
+      final ref = node.ref;
+
+      Widget buildSwitch() {
+        bool currentVal = false;
+        if (ref != null) {
+          final stateVal = state.get(ref);
+          currentVal = (stateVal == true || stateVal == 'true');
+        } else if (node.props['value'] != null) {
+          final rawVal = state.interpolate(node.props['value'].toString());
+          currentVal = (rawVal == 'true' || rawVal == '1');
+        }
+
+        void onChanged(bool val) {
+          if (ref != null) {
+            state.set(ref, val);
+          }
+          if (node.events.containsKey('onChanged')) {
+            eventHandler.handleEvent(node.events['onChanged'], val);
+          }
+        }
+
+        final switchWidget = Switch(
+          value: currentVal,
+          onChanged: onChanged,
+        );
+
+        if (label != null && label.isNotEmpty) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(state.interpolate(label)),
+              const SizedBox(width: 8),
+              switchWidget,
+            ],
+          );
+        }
+        return switchWidget;
+      }
+
+      if (ref != null) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys({ref}),
+          builder: (_, __) => buildSwitch(),
+        );
+      }
+      return buildSwitch();
+    });
+
+    // ---- 滑块控件 (Slider) ----
+    registerFactory('Slider', (node) {
+      final ref = node.ref;
+      final min = DuiUtils.tryDouble(node.props['min']) ?? 0.0;
+      final max = DuiUtils.tryDouble(node.props['max']) ?? 1.0;
+      final divisions = DuiUtils.tryInt(node.props['divisions']);
+
+      Widget buildSlider() {
+        double currentVal = min;
+        if (ref != null) {
+          final stateVal = state.get(ref);
+          currentVal = DuiUtils.tryDouble(stateVal) ?? min;
+        } else if (node.props['value'] != null) {
+          final rawVal = state.interpolate(node.props['value'].toString());
+          currentVal = DuiUtils.tryDouble(rawVal) ?? min;
+        }
+        final clampedVal = currentVal.clamp(min, max);
+
+        return Slider(
+          value: clampedVal,
+          min: min,
+          max: max,
+          divisions: divisions,
+          onChanged: (val) {
+            if (ref != null) {
+              state.set(ref, val);
+            }
+            if (node.events.containsKey('onChanged')) {
+              eventHandler.handleEvent(node.events['onChanged'], val);
+            }
+          },
+        );
+      }
+
+      if (ref != null) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys({ref}),
+          builder: (_, __) => buildSlider(),
+        );
+      }
+      return buildSlider();
+    });
+
+    // ---- 下拉单选 (Dropdown) ----
+    registerFactory('Dropdown', (node) {
+      final ref = node.ref;
+      final rawItems = node.props['items'] as List<dynamic>? ?? const [];
+      final items = rawItems.map((e) => e.toString()).toList();
+      final hint = node.props['hint']?.toString();
+
+      Widget buildDropdown() {
+        String? currentVal;
+        if (ref != null) {
+          final stateVal = state.get(ref)?.toString();
+          if (items.contains(stateVal)) {
+            currentVal = stateVal;
+          }
+        } else if (node.props['value'] != null) {
+          final rawVal = state.interpolate(node.props['value'].toString());
+          if (items.contains(rawVal)) {
+            currentVal = rawVal;
+          }
+        }
+
+        return DropdownButton<String>(
+          value: currentVal,
+          hint: hint != null ? Text(state.interpolate(hint)) : null,
+          items: items
+              .map((it) => DropdownMenuItem(value: it, child: Text(it)))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) {
+              if (ref != null) {
+                state.set(ref, val);
+              }
+              if (node.events.containsKey('onChanged')) {
+                eventHandler.handleEvent(node.events['onChanged'], val);
+              }
+            }
+          },
+        );
+      }
+
+      if (ref != null) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys({ref}),
+          builder: (_, __) => buildDropdown(),
+        );
+      }
+      return buildDropdown();
+    });
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，
@@ -376,6 +558,17 @@ class DuiRenderer {
       case 'center': return MainAxisAlignment.center;
       case 'spaceBetween': return MainAxisAlignment.spaceBetween;
       default: return MainAxisAlignment.start;
+    }
+  }
+
+  WrapAlignment _parseWrapAlignment(String? val) {
+    switch (val) {
+      case 'center': return WrapAlignment.center;
+      case 'end': return WrapAlignment.end;
+      case 'spaceBetween': return WrapAlignment.spaceBetween;
+      case 'spaceAround': return WrapAlignment.spaceAround;
+      case 'spaceEvenly': return WrapAlignment.spaceEvenly;
+      default: return WrapAlignment.start;
     }
   }
 }

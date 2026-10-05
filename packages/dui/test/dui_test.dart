@@ -438,5 +438,87 @@ void main() {
       state.set('count', 10);
       expect(countNotified, 1);
     });
+
+    testWidgets('DuiRenderer 渲染 Switch、Slider、Dropdown、ProgressBar、Divider 与 Wrap 组件及双向绑定', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('switch_val', false);
+      state.set('slider_val', 0.5);
+      state.set('select_val', 'B');
+      state.set('progress_val', 0.75);
+
+      final node = {
+        'type': 'Column',
+        'children': [
+          {
+            'type': 'Switch',
+            'ref': 'switch_val',
+            'props': {'label': '开启功能'},
+          },
+          {
+            'type': 'Slider',
+            'ref': 'slider_val',
+            'props': {'min': 0.0, 'max': 1.0},
+          },
+          {
+            'type': 'Dropdown',
+            'ref': 'select_val',
+            'props': {
+              'items': ['A', 'B', 'C'],
+              'hint': '请选择',
+            },
+          },
+          {
+            'type': 'ProgressBar',
+            'props': {'value': '{{state.progress_val}}'},
+          },
+          {
+            'type': 'Divider',
+            'props': {'height': 16.0, 'thickness': 2.0},
+          },
+          {
+            'type': 'Wrap',
+            'props': {'spacing': 8.0},
+            'children': [
+              {
+                'type': 'Text',
+                'props': {'text': 'Tag1'},
+              },
+              {
+                'type': 'Text',
+                'props': {'text': 'Tag2'},
+              },
+            ],
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(Switch), findsOneWidget);
+      expect(find.byType(Slider), findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(Divider), findsOneWidget);
+      expect(find.byType(Wrap), findsOneWidget);
+      expect(find.text('开启功能'), findsOneWidget);
+      expect(find.text('Tag1'), findsOneWidget);
+
+      // 点击 Switch 触发状态回写
+      await tester.tap(find.byType(Switch));
+      await tester.pump();
+      expect(state.get('switch_val'), isTrue);
+    });
   });
 }
