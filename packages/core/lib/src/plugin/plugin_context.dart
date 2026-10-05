@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:logger/logger.dart';
 import '../event/event_bus.dart';
 import '../storage/plugin_storage.dart';
@@ -20,6 +21,9 @@ class PluginContext {
   /// 插件当前已获授权的权限集合
   final Set<PluginPermission> grantedPermissions;
 
+  /// 插件专属沙箱根目录（用于动态插件沙箱文件系统隔离）
+  final Directory? rootDir;
+
   /// 创建插件运行上下文
   const PluginContext({
     required this.pluginId,
@@ -27,6 +31,7 @@ class PluginContext {
     required this.eventBus,
     required this.logger,
     required this.grantedPermissions,
+    this.rootDir,
   });
 
   /// 检查插件是否已被授予指定权限 [perm]

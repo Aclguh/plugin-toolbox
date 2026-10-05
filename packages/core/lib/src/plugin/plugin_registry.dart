@@ -122,6 +122,7 @@ class PluginRegistry {
         grantedPermissions: plugin is DynamicPlugin
             ? plugin.manifest.permissions.toSet()
             : {},
+        rootDir: plugin is DynamicPlugin ? plugin.rootDir : null,
       );
       await plugin.initialize(context);
       _initializedPlugins.add(plugin.id);

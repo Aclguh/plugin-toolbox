@@ -2,13 +2,14 @@ import 'dart:io';
 import 'dart:ui' show Brightness, FlutterView, PlatformDispatcher, Size;
 
 import 'package:lua_dardo/lua.dart';
+import '../lua_engine.dart';
 
 /// `system` — 设备与运行环境基础信息（只读，无隐私敏感权限门槛）。
 ///
 /// 仅暴露非敏感的公开信息（系统版本 / CPU 核数 / 语言区域 / 屏幕尺寸等），
 /// 支撑"设备信息查看"类插件；文件系统、传感器、通话等敏感能力不在此面。
 class SystemApi {
-  static void bind(LuaState ls) {
+  static void bind(LuaState ls, [LuaHostDelegate? delegate]) {
     ls.newTable();
 
     // system.platform()
@@ -86,6 +87,16 @@ class SystemApi {
       return 1;
     });
     ls.setField(-2, 'brightness');
+
+    // system.openUrl(url)
+    ls.pushDartFunction((ls) {
+      final url = ls.checkString(1) ?? '';
+      if (delegate != null) {
+        delegate.openUrl(url);
+      }
+      return 0;
+    });
+    ls.setField(-2, 'openUrl');
 
     ls.setGlobal('system');
   }

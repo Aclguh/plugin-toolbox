@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
@@ -15,7 +18,11 @@ class DynamicPluginHostPage extends StatefulWidget {
 }
 
 class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
+    with WidgetsBindingObserver
     implements LuaHostDelegate, DuiActionExecutor {
+  static const MethodChannel _nativeChannel =
+      MethodChannel('com.plugintoolbox/host_native');
+
   late final DuiState _duiState;
   late final DuiEventHandler _eventHandler;
   late final DuiRenderer _renderer;
@@ -28,6 +35,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _duiState = DuiState();
     _eventHandler = DuiEventHandler(state: _duiState, executor: this);
     _renderer = DuiRenderer(
@@ -37,6 +45,16 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     );
 
     _startPlugin();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _runner?.onResume();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _runner?.onPause();
+    }
   }
 
   Future<void> _startPlugin() async {
@@ -70,6 +88,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _runner?.dispose();
     _duiState.dispose();
     super.dispose();
@@ -148,6 +167,110 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       ),
     );
     return res ?? false;
+  }
+
+  @override
+  void hideKeyboard() {
+    if (mounted) {
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  @override
+  void hapticFeedback(String type) {
+    switch (type) {
+      case 'light':
+        HapticFeedback.lightImpact();
+        break;
+      case 'medium':
+        HapticFeedback.mediumImpact();
+        break;
+      case 'heavy':
+        HapticFeedback.heavyImpact();
+        break;
+      case 'selection':
+        HapticFeedback.selectionClick();
+        break;
+      case 'vibrate':
+      default:
+        HapticFeedback.vibrate();
+        break;
+    }
+  }
+
+  @override
+  Future<void> shareText(String text, {String? subject}) async {
+    try {
+      await _nativeChannel.invokeMethod('shareText', {
+        'text': text,
+        'subject': subject,
+      });
+    } catch (_) {}
+  }
+
+  @override
+  Future<bool> openUrl(String url) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('openUrl', {
+        'url': url,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> pickFile({List<String>? allowedExtensions}) async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: (allowedExtensions != null && allowedExtensions.isNotEmpty)
+            ? FileType.custom
+            : FileType.any,
+        allowedExtensions: allowedExtensions,
+      );
+      if (res == null || res.files.isEmpty) return null;
+      final file = res.files.first;
+      final srcPath = file.path;
+      if (srcPath == null) return null;
+
+      final rootDir = widget.plugin.rootDir;
+      final fileName = file.name;
+      final destDir = Directory('${rootDir.path}/data');
+      if (!destDir.existsSync()) {
+        destDir.createSync(recursive: true);
+      }
+      final destFile = File('${destDir.path}/$fileName');
+      await File(srcPath).copy(destFile.path);
+      return 'data/$fileName';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> pickImage() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+      );
+      if (res == null || res.files.isEmpty) return null;
+      final file = res.files.first;
+      final srcPath = file.path;
+      if (srcPath == null) return null;
+
+      final rootDir = widget.plugin.rootDir;
+      final fileName = file.name;
+      final destDir = Directory('${rootDir.path}/data');
+      if (!destDir.existsSync()) {
+        destDir.createSync(recursive: true);
+      }
+      final destFile = File('${destDir.path}/$fileName');
+      await File(srcPath).copy(destFile.path);
+      return 'data/$fileName';
+    } catch (_) {
+      return null;
+    }
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
@@ -8,6 +9,12 @@ import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 class MockLuaHostDelegate implements LuaHostDelegate {
   final Map<String, dynamic> state = {};
   final List<String> toasts = [];
+  final List<String> haptics = [];
+  bool keyboardHidden = false;
+  String? sharedText;
+  String? openedUrl;
+  String? pickedFileResult;
+  String? pickedImageResult;
 
   @override
   void onStateChanged(String key, dynamic value) {
@@ -30,6 +37,34 @@ class MockLuaHostDelegate implements LuaHostDelegate {
 
   @override
   Future<bool> showConfirm(String title, String message) async => true;
+
+  @override
+  void hideKeyboard() {
+    keyboardHidden = true;
+  }
+
+  @override
+  void hapticFeedback(String type) {
+    haptics.add(type);
+  }
+
+  @override
+  Future<void> shareText(String text, {String? subject}) async {
+    sharedText = text;
+  }
+
+  @override
+  Future<bool> openUrl(String url) async {
+    openedUrl = url;
+    return true;
+  }
+
+  @override
+  Future<String?> pickFile({List<String>? allowedExtensions}) async =>
+      pickedFileResult;
+
+  @override
+  Future<String?> pickImage() async => pickedImageResult;
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -596,6 +631,244 @@ void main() {
     test('network.post 以绑定形式注入 (仅验证绑定)', () {
       engine.loadAndExecute('state.set("post_fn", type(network.post))');
       expect(delegate.getState('post_fn'), 'function');
+    });
+
+    test('HapticApi 触觉反馈调用委派给宿主', () {
+      engine.loadAndExecute('''
+        haptic.light()
+        haptic.medium()
+        haptic.heavy()
+        haptic.selection()
+        haptic.vibrate()
+      ''');
+      expect(delegate.haptics, ['light', 'medium', 'heavy', 'selection', 'vibrate']);
+    });
+
+    test('UiApi 软键盘收起与 Toast 委派给宿主', () {
+      engine.loadAndExecute('''
+        ui.hideKeyboard()
+        ui.toast("测试提示")
+      ''');
+      expect(delegate.keyboardHidden, true);
+      expect(delegate.toasts.contains('测试提示'), true);
+    });
+
+    test('ShareApi 文本分享委派给宿主', () {
+      engine.loadAndExecute('share.text("分享文本内容", "主题")');
+      expect(delegate.sharedText, '分享文本内容');
+    });
+
+    test('SystemApi.openUrl 外部链接跳转委派给宿主', () {
+      engine.loadAndExecute('system.openUrl("https://example.com")');
+      expect(delegate.openedUrl, 'https://example.com');
+    });
+
+    test('MediaApi 未声明 photoLibrary 权限时拒绝 pickImage', () {
+      expect(
+        () => engine.loadAndExecute('media.pickImage()'),
+        throwsException,
+      );
+    });
+
+    test('MediaApi 声明权限后 pickImage 与 pickFile 正常调用', () async {
+      final mediaCtx = PluginContext(
+        pluginId: 'media_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.photoLibrary, PluginPermission.storage},
+      );
+      final mediaEngine = LuaEngine(context: mediaCtx, delegate: delegate);
+      delegate.pickedImageResult = 'data/test.jpg';
+      delegate.pickedFileResult = 'data/doc.pdf';
+
+      mediaEngine.loadAndExecute('''
+        media.pickImage(function(path)
+          state.set("image_path", path)
+        end)
+        media.pickFile(function(path)
+          state.set("file_path", path)
+        end)
+      ''');
+
+      await pumpEventQueue();
+      expect(delegate.getState('image_path'), 'data/test.jpg');
+      expect(delegate.getState('file_path'), 'data/doc.pdf');
+    });
+
+    test('TimerApi setTimeout 与 clear', () async {
+      engine.loadAndExecute('''
+        timer.setTimeout(10, function()
+          state.set("timeout_called", true)
+        end)
+        local toCancel = timer.setTimeout(500, function()
+          state.set("cancelled_called", true)
+        end)
+        timer.clear(toCancel)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(delegate.getState('timeout_called'), true);
+      expect(delegate.getState('cancelled_called'), isNull);
+    });
+
+    test('TimerApi clearAll 与 close 自动回收所有定时器', () async {
+      engine.loadAndExecute('''
+        timer.setTimeout(200, function()
+          state.set("never_call", true)
+        end)
+      ''');
+      engine.close();
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      expect(delegate.getState('never_call'), isNull);
+    });
+
+    test('FsApi 沙箱文件读写、罗列与路径穿越拦截', () {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_fs_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final fsCtx = PluginContext(
+        pluginId: 'fs_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final fsEngine = LuaEngine(context: fsCtx, delegate: delegate);
+
+      // 1. 路径穿越拦截
+      expect(
+        () => fsEngine.loadAndExecute('fs.readFile("../../etc/passwd")'),
+        throwsException,
+      );
+
+      // 2. 正常写入与读取
+      fsEngine.loadAndExecute('''
+        fs.writeFile("sub/test.txt", "hello sandbox")
+        local content = fs.readFile("sub/test.txt")
+        state.set("read_content", content)
+        state.set("file_exists", fs.exists("sub/test.txt"))
+        state.set("not_exists", fs.exists("no_such.txt"))
+        
+        local stat = fs.stat("sub/test.txt")
+        state.set("file_size", stat.size)
+        state.set("is_dir", stat.isDirectory)
+
+        local list = fs.listFiles("sub")
+        state.set("list_len", #list)
+        state.set("list_first", list[1])
+
+        fs.remove("sub/test.txt")
+        state.set("after_remove_exists", fs.exists("sub/test.txt"))
+      ''');
+
+      expect(delegate.getState('read_content'), 'hello sandbox');
+      expect(delegate.getState('file_exists'), true);
+      expect(delegate.getState('not_exists'), false);
+      expect(delegate.getState('file_size'), 'hello sandbox'.length);
+      expect(delegate.getState('is_dir'), false);
+      expect(delegate.getState('list_len'), 1);
+      expect(delegate.getState('list_first'), 'test.txt');
+      expect(delegate.getState('after_remove_exists'), false);
+    });
+
+    test('CryptoApi HMAC 与 SHA512 计算', () {
+      engine.loadAndExecute('''
+        state.set("h_md5", crypto.hmacMd5("key", "data"))
+        state.set("h_sha1", crypto.hmacSha1("key", "data"))
+        state.set("h_sha256", crypto.hmacSha256("key", "data"))
+        state.set("sha512", crypto.sha512("data"))
+      ''');
+
+      expect(delegate.getState('h_md5'), isA<String>());
+      expect(delegate.getState('h_sha1'), isA<String>());
+      expect(delegate.getState('h_sha256'), isA<String>());
+      expect((delegate.getState('sha512') as String).length, 128);
+    });
+
+    test('RegexApi 正则匹配、查找与替换', () {
+      engine.loadAndExecute('''
+        state.set("is_match", regex.test("^\\\\d+\$", "12345"))
+        state.set("not_match", regex.test("^\\\\d+\$", "123a"))
+        state.set("first", regex.firstMatch("\\\\d+", "abc123def456"))
+        
+        local all = regex.findAll("\\\\d+", "abc123def456")
+        state.set("all_count", #all)
+        state.set("all_1", all[1])
+        state.set("all_2", all[2])
+
+        state.set("replaced", regex.replace("\\\\d+", "a1b2c", "#"))
+        state.set("replaced_all", regex.replaceAll("\\\\d+", "a1b2c", "#"))
+      ''');
+
+      expect(delegate.getState('is_match'), true);
+      expect(delegate.getState('not_match'), false);
+      expect(delegate.getState('first'), '123');
+      expect(delegate.getState('all_count'), 2);
+      expect(delegate.getState('all_1'), '123');
+      expect(delegate.getState('all_2'), '456');
+      expect(delegate.getState('replaced'), 'a#b2c');
+      expect(delegate.getState('replaced_all'), 'a#b#c');
+    });
+
+    test('ColorApi Hex, RGB 与 HSL 颜色空间互相转换', () {
+      engine.loadAndExecute('''
+        local rgb = color.hexToRgb("#FF8000")
+        state.set("rgb_r", rgb.r)
+        state.set("rgb_g", rgb.g)
+        state.set("rgb_b", rgb.b)
+
+        state.set("hex_str", color.rgbToHex(255, 128, 0))
+
+        local hsl = color.rgbToHsl(255, 0, 0)
+        state.set("hsl_h", hsl.h)
+        state.set("hsl_s", hsl.s)
+        state.set("hsl_l", hsl.l)
+
+        local fromHsl = color.hslToRgb(0, 1.0, 0.5)
+        state.set("from_h_r", fromHsl.r)
+        state.set("from_h_g", fromHsl.g)
+        state.set("from_h_b", fromHsl.b)
+      ''');
+
+      expect(delegate.getState('rgb_r'), 255);
+      expect(delegate.getState('rgb_g'), 128);
+      expect(delegate.getState('rgb_b'), 0);
+      expect(delegate.getState('hex_str'), '#FF8000');
+      expect(delegate.getState('hsl_h'), 0.0);
+      expect(delegate.getState('hsl_s'), 1.0);
+      expect(delegate.getState('hsl_l'), 0.5);
+      expect(delegate.getState('from_h_r'), 255);
+      expect(delegate.getState('from_h_g'), 0);
+      expect(delegate.getState('from_h_b'), 0);
+    });
+
+    test('UtilApi formatTime 与 parseTime', () {
+      engine.loadAndExecute('''
+        local ms = 1700000000000
+        local formatted = util.formatTime(ms, "yyyy-MM-dd HH:mm:ss")
+        state.set("formatted", formatted)
+        local parsed = util.parseTime(formatted, "yyyy-MM-dd HH:mm:ss")
+        state.set("parsed_ms", parsed)
+      ''');
+
+      expect(delegate.getState('formatted'), isA<String>());
+      expect(delegate.getState('parsed_ms'), 1700000000000);
+    });
+
+    test('NetworkApi 支持 put, delete 与 request 方法绑定', () {
+      engine.loadAndExecute('''
+        state.set("has_put", type(network.put))
+        state.set("has_delete", type(network.delete))
+        state.set("has_request", type(network.request))
+      ''');
+
+      expect(delegate.getState('has_put'), 'function');
+      expect(delegate.getState('has_delete'), 'function');
+      expect(delegate.getState('has_request'), 'function');
     });
   });
 }

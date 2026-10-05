@@ -41,9 +41,24 @@ class LuaPluginRunner {
     _engine.callFunction(functionName, args);
   }
 
+  void onResume() {
+    try {
+      _engine.callFunction('onResume');
+    } catch (_) {}
+  }
+
+  void onPause() {
+    try {
+      _engine.callFunction('onPause');
+    } catch (_) {}
+  }
+
   void dispose() {
     try {
       _engine.callFunction('onDispose');
+    } catch (_) {}
+    try {
+      _engine.callFunction('onDestroy');
     } catch (_) {}
     _engine.close();
   }

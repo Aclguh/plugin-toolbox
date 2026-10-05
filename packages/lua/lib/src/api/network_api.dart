@@ -6,10 +6,11 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
 
+/// `network` — 现代 HTTP 网络请求 API。
+///
+/// 具备完整的 RESTful 请求（GET/POST/PUT/DELETE/REQUEST）、自定义请求头、
+/// 独立回调支持与超时控制；同时向后兼容旧版写入全局状态与全局函数机制。
 class NetworkApi {
-  /// 异步响应无法在 Lua 同步栈中直接返回：结果统一写入状态
-  /// （`__http_status` / `__http_body` / `__http_error`），并回调脚本定义的
-  /// 全局函数 `onNetworkResponse(status, body)` / `onNetworkError(message)`。
   static void bind(
     LuaState ls,
     PluginContext context,
@@ -18,13 +19,88 @@ class NetworkApi {
   ) {
     ls.newTable();
 
-    // network.get(url)
-    ls.pushDartFunction((ls) {
+    void checkPermission(LuaState ls) {
       if (!context.hasPermission(PluginPermission.network)) {
         ls.error2('权限不足: 插件未声明 network 权限');
-        return 0;
       }
+    }
+
+    Map<String, String> parseHeaders(LuaState ls, int idx) {
+      final headers = <String, String>{};
+      if (ls.type(idx) == LuaType.luaTable) {
+        ls.pushNil();
+        while (ls.next(idx)) {
+          final k = ls.toStr(-2);
+          final v = ls.toStr(-1);
+          if (k != null && v != null) {
+            headers[k] = v;
+          }
+          ls.pop(1);
+        }
+      }
+      return headers;
+    }
+
+    void handleResponse(
+      http.Response response,
+      int? cbRef,
+    ) {
+      if (cbRef != null) {
+        callbacks.invokeAndRelease(cbRef, [
+          {
+            'ok': response.statusCode >= 200 && response.statusCode < 300,
+            'status': response.statusCode,
+            'body': response.body,
+            'headers': response.headers,
+          }
+        ]);
+      } else {
+        writeState('__http_status', response.statusCode);
+        writeState('__http_body', response.body);
+        callbacks.invokeGlobal('onNetworkResponse', [
+          response.statusCode,
+          response.body,
+        ]);
+      }
+    }
+
+    void handleError(
+      Object error,
+      int? cbRef,
+    ) {
+      final errorMsg = error.toString();
+      if (cbRef != null) {
+        callbacks.invokeAndRelease(cbRef, [
+          {
+            'ok': false,
+            'status': 0,
+            'body': '',
+            'headers': <String, String>{},
+            'error': errorMsg,
+          }
+        ]);
+      } else {
+        writeState('__http_error', errorMsg);
+        callbacks.invokeGlobal('onNetworkError', [errorMsg]);
+      }
+    }
+
+    // network.get(url [, headers | callback, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
       final url = ls.checkString(1) ?? '';
+      Map<String, String>? headers;
+      int? cbRef;
+
+      if (ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      } else if (ls.type(2) == LuaType.luaTable) {
+        headers = parseHeaders(ls, 2);
+        if (ls.type(3) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(3);
+        }
+      }
+
       final Uri uri;
       try {
         uri = Uri.parse(url);
@@ -32,33 +108,41 @@ class NetworkApi {
         ls.error2('URL 不合法: $e');
         return 0;
       }
-      // .then 内的异常不会被外层 try-catch 捕获，必须自带 catchError 兜底
+
       unawaited(
-        http.get(uri).then((response) {
-          writeState('__http_status', response.statusCode);
-          writeState('__http_body', response.body);
-          callbacks.invokeGlobal('onNetworkResponse', [
-            response.statusCode,
-            response.body,
-          ]);
+        http.get(uri, headers: headers).then((response) {
+          handleResponse(response, cbRef);
         }).catchError((Object e) {
-          writeState('__http_error', e.toString());
-          callbacks.invokeGlobal('onNetworkError', [e.toString()]);
+          handleError(e, cbRef);
         }),
       );
       return 0;
     });
     ls.setField(-2, 'get');
 
-    // network.post(url, body, [contentType]) — 请求体为文本，Content-Type 默认 application/json
+    // network.post(url, body [, contentType | headers | callback, callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.network)) {
-        ls.error2('权限不足: 插件未声明 network 权限');
-        return 0;
-      }
+      checkPermission(ls);
       final url = ls.checkString(1) ?? '';
       final body = ls.checkString(2) ?? '';
-      final contentType = ls.optString(3, 'application/json') ?? 'application/json';
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      int? cbRef;
+
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      } else if (ls.type(3) == LuaType.luaString) {
+        final ct = ls.toStr(3) ?? 'application/json';
+        headers['Content-Type'] = ct;
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      } else if (ls.type(3) == LuaType.luaTable) {
+        headers = parseHeaders(ls, 3);
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      }
+
       final Uri uri;
       try {
         uri = Uri.parse(url);
@@ -66,25 +150,155 @@ class NetworkApi {
         ls.error2('URL 不合法: $e');
         return 0;
       }
-      // .then 内的异常不会被外层 try-catch 捕获，必须自带 catchError 兜底
+
       unawaited(
-        http
-            .post(uri, headers: {'Content-Type': contentType}, body: body)
-            .then((response) {
-          writeState('__http_status', response.statusCode);
-          writeState('__http_body', response.body);
-          callbacks.invokeGlobal('onNetworkResponse', [
-            response.statusCode,
-            response.body,
-          ]);
+        http.post(uri, headers: headers, body: body).then((response) {
+          handleResponse(response, cbRef);
         }).catchError((Object e) {
-          writeState('__http_error', e.toString());
-          callbacks.invokeGlobal('onNetworkError', [e.toString()]);
+          handleError(e, cbRef);
         }),
       );
       return 0;
     });
     ls.setField(-2, 'post');
+
+    // network.put(url, body [, headers, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      final url = ls.checkString(1) ?? '';
+      final body = ls.checkString(2) ?? '';
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      int? cbRef;
+
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      } else if (ls.type(3) == LuaType.luaTable) {
+        headers = parseHeaders(ls, 3);
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      }
+
+      final Uri uri;
+      try {
+        uri = Uri.parse(url);
+      } on FormatException catch (e) {
+        ls.error2('URL 不合法: $e');
+        return 0;
+      }
+
+      unawaited(
+        http.put(uri, headers: headers, body: body).then((response) {
+          handleResponse(response, cbRef);
+        }).catchError((Object e) {
+          handleError(e, cbRef);
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'put');
+
+    // network.delete(url [, headers, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      final url = ls.checkString(1) ?? '';
+      Map<String, String>? headers;
+      int? cbRef;
+
+      if (ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      } else if (ls.type(2) == LuaType.luaTable) {
+        headers = parseHeaders(ls, 2);
+        if (ls.type(3) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(3);
+        }
+      }
+
+      final Uri uri;
+      try {
+        uri = Uri.parse(url);
+      } on FormatException catch (e) {
+        ls.error2('URL 不合法: $e');
+        return 0;
+      }
+
+      unawaited(
+        http.delete(uri, headers: headers).then((response) {
+          handleResponse(response, cbRef);
+        }).catchError((Object e) {
+          handleError(e, cbRef);
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'delete');
+
+    // network.request(configTable [, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      if (ls.type(1) != LuaType.luaTable) {
+        ls.error2('network.request: 第一个参数必须为配置表');
+        return 0;
+      }
+
+      String url = '';
+      String method = 'GET';
+      Map<String, String> headers = {};
+      String? body;
+      int timeoutMs = 15000;
+
+      ls.getField(1, 'url');
+      if (ls.isString(-1)) url = ls.toStr(-1) ?? '';
+      ls.pop(1);
+
+      ls.getField(1, 'method');
+      if (ls.isString(-1)) method = (ls.toStr(-1) ?? 'GET').toUpperCase();
+      ls.pop(1);
+
+      ls.getField(1, 'headers');
+      if (ls.type(-1) == LuaType.luaTable) {
+        headers = parseHeaders(ls, -1);
+      }
+      ls.pop(1);
+
+      ls.getField(1, 'body');
+      if (ls.isString(-1)) body = ls.toStr(-1);
+      ls.pop(1);
+
+      ls.getField(1, 'timeoutMs');
+      if (ls.isInteger(-1)) timeoutMs = ls.toInteger(-1);
+      ls.pop(1);
+
+      final cbRef = callbacks.ref(2);
+
+      final Uri uri;
+      try {
+        uri = Uri.parse(url);
+      } on FormatException catch (e) {
+        ls.error2('URL 不合法: $e');
+        return 0;
+      }
+
+      final req = http.Request(method, uri);
+      req.headers.addAll(headers);
+      if (body != null) {
+        req.body = body;
+      }
+
+      unawaited(
+        http.Client()
+            .send(req)
+            .then(http.Response.fromStream)
+            .timeout(Duration(milliseconds: timeoutMs))
+            .then((res) {
+          handleResponse(res, cbRef);
+        }).catchError((Object e) {
+          handleError(e, cbRef);
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'request');
 
     ls.setGlobal('network');
   }

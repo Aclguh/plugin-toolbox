@@ -10,6 +10,15 @@ import 'api/json_api.dart';
 import 'api/hash_api.dart';
 import 'api/util_api.dart';
 import 'api/system_api.dart';
+import 'api/haptic_api.dart';
+import 'api/ui_api.dart';
+import 'api/timer_api.dart';
+import 'api/share_api.dart';
+import 'api/media_api.dart';
+import 'api/fs_api.dart';
+import 'api/crypto_api.dart';
+import 'api/regex_api.dart';
+import 'api/color_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -31,6 +40,24 @@ abstract class LuaHostDelegate {
 
   /// 弹出带确认与取消选项的二次确认框
   Future<bool> showConfirm(String title, String message);
+
+  /// 收起软键盘
+  void hideKeyboard() {}
+
+  /// 触觉反馈 (light, medium, heavy, selection, vibrate)
+  void hapticFeedback(String type) {}
+
+  /// 系统分享文本
+  Future<void> shareText(String text, {String? subject}) async {}
+
+  /// 打开系统外部浏览器或应用链接
+  Future<bool> openUrl(String url) async => false;
+
+  /// 选取外部文件并安全复制至沙箱（返回沙箱内相对路径）
+  Future<String?> pickFile({List<String>? allowedExtensions}) async => null;
+
+  /// 选取相册图片并安全复制至沙箱（返回沙箱内相对路径）
+  Future<String?> pickImage() async => null;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -46,6 +73,7 @@ class LuaEngine {
 
   late final LuaState _ls;
   LuaCallbackInvoker? _callbacks;
+  TimerApi? _timerApi;
   bool _closed = false;
 
   /// 引擎是否已被关闭
@@ -81,6 +109,9 @@ class LuaEngine {
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);
 
+    _timerApi = TimerApi();
+    _timerApi!.bind(_ls, _callbacks!);
+
     StateApi.bind(_ls, delegate);
     ClipboardApi.bind(_ls, context, _callbacks!, writeState);
     StorageApi.bind(_ls, context, _callbacks!, writeState);
@@ -90,7 +121,15 @@ class LuaEngine {
     JsonApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
-    SystemApi.bind(_ls);
+    SystemApi.bind(_ls, delegate);
+    HapticApi.bind(_ls, delegate);
+    UiApi.bind(_ls, delegate);
+    ShareApi.bind(_ls, delegate);
+    MediaApi.bind(_ls, context, delegate, _callbacks!, writeState);
+    FsApi.bind(_ls, context);
+    CryptoApi.bind(_ls);
+    RegexApi.bind(_ls);
+    ColorApi.bind(_ls);
   }
 
   /// 执行 Lua 源代码字符串
@@ -269,6 +308,7 @@ class LuaEngine {
   void close() {
     if (_closed) return;
     _closed = true;
+    _timerApi?.dispose(_callbacks);
     _callbacks?.clear();
   }
 }

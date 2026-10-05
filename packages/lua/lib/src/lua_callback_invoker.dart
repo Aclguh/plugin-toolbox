@@ -22,13 +22,27 @@ class LuaCallbackInvoker {
     return r;
   }
 
-  /// 调用 [ref] 登记的回调并释放登记，[args] 为可安全跨栈的基础类型值。
+  /// 调用 [ref] 登记的回调并释放登记，[args] 为可安全跨栈的基础类型值或集合。
   /// 回调内部的 Lua 错误被降级吞掉，不允许逃逸到宿主事件循环。
   void invokeAndRelease(int ref, List<Object?> args) {
-    _activeRefs.remove(ref);
+    if (!_activeRefs.remove(ref)) return;
     _ls.rawGetI(luaRegistryIndex, ref);
     _ls.unRef(luaRegistryIndex, ref);
     _invokeTop(args);
+  }
+
+  /// 仅调用 [ref] 登记的回调而不释放登记（适用于 setInterval 等持续周期触发场景）
+  void invoke(int ref, List<Object?> args) {
+    if (!_activeRefs.contains(ref)) return;
+    _ls.rawGetI(luaRegistryIndex, ref);
+    _invokeTop(args);
+  }
+
+  /// 显式注销并释放 [ref] 登记项
+  void release(int ref) {
+    if (_activeRefs.remove(ref)) {
+      _ls.unRef(luaRegistryIndex, ref);
+    }
   }
 
   /// 释放所有注册表中的未完成回调引用，切断 Dart -> Lua 引用链，加速 GC
@@ -61,7 +75,16 @@ class LuaCallbackInvoker {
     }
   }
 
-  void _pushArg(Object? val) {
+  void _pushArg(Object? val, [Set<Object?>? visited]) {
+    if (val is Map || val is List) {
+      final seen = visited ??= <Object?>{};
+      if (seen.contains(val)) {
+        _ls.pushNil();
+        return;
+      }
+      seen.add(val);
+    }
+
     if (val == null) {
       _ls.pushNil();
     } else if (val is bool) {
@@ -70,8 +93,26 @@ class LuaCallbackInvoker {
       _ls.pushInteger(val);
     } else if (val is double) {
       _ls.pushNumber(val);
+    } else if (val is String) {
+      _ls.pushString(val);
+    } else if (val is Map) {
+      _ls.newTable();
+      val.forEach((k, v) {
+        _ls.pushString(k.toString());
+        _pushArg(v, visited);
+        _ls.setTable(-3);
+      });
+    } else if (val is List) {
+      _ls.newTable();
+      for (int i = 0; i < val.length; i++) {
+        _ls.pushInteger(i + 1);
+        _pushArg(val[i], visited);
+        _ls.setTable(-3);
+      }
     } else {
       _ls.pushString(val.toString());
     }
+
+    visited?.remove(val);
   }
 }
