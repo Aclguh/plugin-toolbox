@@ -380,5 +380,63 @@ void main() {
       await tester.pump();
       expect(find.text('from host'), findsOneWidget);
     });
+
+    testWidgets('TextField didUpdateWidget 保留合理光标位置 (P3-5)', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'TextField',
+        'ref': 'text_ref',
+        'props': {},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      await tester.enterText(find.byType(TextField), '12345');
+      await tester.pump();
+
+      // 模拟光标设置在位置 3
+      final textFieldFinder = find.byType(TextField);
+      final editableText = tester.widget<EditableText>(
+        find.descendant(of: textFieldFinder, matching: find.byType(EditableText)),
+      );
+      editableText.controller.selection = const TextSelection.collapsed(offset: 3);
+
+      // 外部更新文本为较长字符串，光标应维持在 3
+      state.set('text_ref', '12345678');
+      await tester.pump();
+      expect(editableText.controller.selection.baseOffset, 3);
+
+      // 外部更新文本为较短字符串，光标应被 clamp 到短字符串长度
+      state.set('text_ref', '12');
+      await tester.pump();
+      expect(editableText.controller.selection.baseOffset, 2);
+    });
+
+    test('DuiState extractKeys 与 key-level 局部通知 (P2-1)', () {
+      final state = DuiState();
+      expect(DuiState.extractKeys('Hello {{state.user}}, count: {{state.count}}'),
+          equals({'user', 'count'}));
+      expect(DuiState.extractKeys('plain text'), isEmpty);
+      expect(DuiState.extractKeys(null), isEmpty);
+
+      int userNotified = 0;
+      int countNotified = 0;
+      state.listenableForKey('user').addListener(() => userNotified++);
+      state.listenableForKey('count').addListener(() => countNotified++);
+
+      state.set('user', 'Alice');
+      expect(userNotified, 1);
+      expect(countNotified, 0);
+
+      state.set('count', 10);
+      expect(userNotified, 1);
+      expect(countNotified, 1);
+
+      // 相同值不触发通知
+      state.set('count', 10);
+      expect(countNotified, 1);
+    });
   });
 }

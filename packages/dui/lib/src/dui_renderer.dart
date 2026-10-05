@@ -164,23 +164,35 @@ class DuiRenderer {
     // ---- 文本类 ----
     registerFactory('Text', (node) {
       final rawText = node.props['text']?.toString() ?? '';
-      return Text(
-        state.interpolate(rawText),
-        style: DuiUtils.parseTextStyle(
-            node.context, node.props['style']?.toString()),
-        maxLines: DuiUtils.tryInt(node.props['maxLines']),
-        overflow: node.props['overflow'] == 'ellipsis'
-            ? TextOverflow.ellipsis
-            : null,
+      final keys = DuiState.extractKeys(rawText);
+      Widget buildText() => Text(
+            state.interpolate(rawText),
+            style: DuiUtils.parseTextStyle(
+                node.context, node.props['style']?.toString()),
+            maxLines: DuiUtils.tryInt(node.props['maxLines']),
+            overflow: node.props['overflow'] == 'ellipsis'
+                ? TextOverflow.ellipsis
+                : null,
+          );
+      if (keys.isEmpty) return buildText();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => buildText(),
       );
     });
 
     registerFactory('SelectableText', (node) {
       final rawText = node.props['text']?.toString() ?? '';
-      return SelectableText(
-        state.interpolate(rawText),
-        style: DuiUtils.parseTextStyle(
-            node.context, node.props['style']?.toString()),
+      final keys = DuiState.extractKeys(rawText);
+      Widget buildText() => SelectableText(
+            state.interpolate(rawText),
+            style: DuiUtils.parseTextStyle(
+                node.context, node.props['style']?.toString()),
+          );
+      if (keys.isEmpty) return buildText();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => buildText(),
       );
     });
 
@@ -249,17 +261,27 @@ class DuiRenderer {
 
     registerFactory('Container', (node) {
       final borderRadiusVal = DuiUtils.tryDouble(node.props['borderRadius']);
-      return Container(
-        padding: DuiUtils.parsePadding(node.props['padding']),
-        width: node.width,
-        height: node.height,
-        decoration: BoxDecoration(
-          // color 支持渲染期状态插值 (如颜色工具的动态色块)
-          color: DuiUtils.parseColor(state.interpolate(node.props['color']?.toString() ?? '')),
-          borderRadius:
-              borderRadiusVal != null ? BorderRadius.circular(borderRadiusVal) : null,
-        ),
-        child: node.children.isNotEmpty ? node.firstChild : null,
+      final colorRaw = node.props['color']?.toString() ?? '';
+      final keys = DuiState.extractKeys(colorRaw);
+
+      Widget buildContainer() => Container(
+            padding: DuiUtils.parsePadding(node.props['padding']),
+            width: node.width,
+            height: node.height,
+            decoration: BoxDecoration(
+              // color 支持渲染期状态插值 (如颜色工具的动态色块)
+              color: DuiUtils.parseColor(state.interpolate(colorRaw)),
+              borderRadius: borderRadiusVal != null
+                  ? BorderRadius.circular(borderRadiusVal)
+                  : null,
+            ),
+            child: node.children.isNotEmpty ? node.firstChild : null,
+          );
+
+      if (keys.isEmpty) return buildContainer();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => buildContainer(),
       );
     });
 
@@ -392,7 +414,12 @@ class _BoundTextFieldState extends State<_BoundTextField> {
   void didUpdateWidget(covariant _BoundTextField oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialText != _controller.text) {
+      final oldSelection = _controller.selection;
       _controller.text = widget.initialText;
+      // 保持光标位置（限制在合法文本区间内），防止外部状态更新时光标跳跃至末尾或丢失
+      final newOffset =
+          oldSelection.baseOffset.clamp(0, widget.initialText.length);
+      _controller.selection = TextSelection.collapsed(offset: newOffset);
     }
   }
 
