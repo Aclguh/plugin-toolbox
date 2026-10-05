@@ -199,6 +199,179 @@ class FsApi {
     });
     ls.setField(-2, 'stat');
 
+    // fs.fileSize(relPath) -> integer | nil, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final f = File(fullPath);
+      if (f.existsSync()) {
+        ls.pushInteger(f.lengthSync());
+        return 1;
+      }
+      ls.pushNil();
+      ls.pushString('文件不存在: $relPath');
+      return 2;
+    });
+    ls.setField(-2, 'fileSize');
+
+    // fs.readHex(relPath [, offset, length]) -> string | nil, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        ls.pushNil();
+        ls.pushString('文件不存在: $relPath');
+        return 2;
+      }
+      try {
+        final bytes = file.readAsBytesSync();
+        final offset = ls.optInteger(2, 0) ?? 0;
+        final length = ls.optInteger(3, bytes.length) ?? bytes.length;
+
+        final start = offset.clamp(0, bytes.length);
+        final end = (start + length).clamp(start, bytes.length);
+        final subBytes = bytes.sublist(start, end);
+
+        final sb = StringBuffer();
+        for (final b in subBytes) {
+          sb.write(b.toRadixString(16).padLeft(2, '0'));
+        }
+        ls.pushString(sb.toString());
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'readHex');
+
+    // fs.writeHex(relPath, hexStr [, append]) -> bool, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final hexStr = ls.checkString(2) ?? '';
+      final append = !ls.isNoneOrNil(3) && ls.toBoolean(3);
+      final fullPath = resolveSafePath(ls, relPath);
+
+      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+        ls.error2('受保护的核心清单禁止覆写');
+        return 0;
+      }
+
+      final cleanHex = hexStr.replaceAll(RegExp(r'\s+'), '');
+      if (cleanHex.length % 2 != 0) {
+        ls.pushBoolean(false);
+        ls.pushString('十六进制长度必须为偶数');
+        return 2;
+      }
+
+      final bytes = <int>[];
+      for (int i = 0; i < cleanHex.length; i += 2) {
+        final byte = int.tryParse(cleanHex.substring(i, i + 2), radix: 16);
+        if (byte == null) {
+          ls.pushBoolean(false);
+          ls.pushString('包含非法十六进制字符: ${cleanHex.substring(i, i + 2)}');
+          return 2;
+        }
+        bytes.add(byte);
+      }
+
+      try {
+        final file = File(fullPath);
+        file.parent.createSync(recursive: true);
+        file.writeAsBytesSync(
+          bytes,
+          mode: append ? FileMode.append : FileMode.write,
+          flush: true,
+        );
+        ls.pushBoolean(true);
+        return 1;
+      } catch (e) {
+        ls.pushBoolean(false);
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'writeHex');
+
+    // fs.copy(srcRel, destRel) -> bool, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final srcRel = ls.checkString(1) ?? '';
+      final destRel = ls.checkString(2) ?? '';
+
+      if (destRel == 'plugin.json' || destRel == 'manifest.json') {
+        ls.error2('受保护的核心清单禁止覆写');
+        return 0;
+      }
+
+      final srcFull = resolveSafePath(ls, srcRel);
+      final destFull = resolveSafePath(ls, destRel);
+
+      final srcFile = File(srcFull);
+      if (!srcFile.existsSync()) {
+        ls.pushBoolean(false);
+        ls.pushString('源文件不存在: $srcRel');
+        return 2;
+      }
+
+      try {
+        final destFile = File(destFull);
+        destFile.parent.createSync(recursive: true);
+        srcFile.copySync(destFull);
+        ls.pushBoolean(true);
+        return 1;
+      } catch (e) {
+        ls.pushBoolean(false);
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'copy');
+
+    // fs.move(srcRel, destRel) -> bool, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final srcRel = ls.checkString(1) ?? '';
+      final destRel = ls.checkString(2) ?? '';
+
+      if (srcRel == 'plugin.json' || srcRel == 'manifest.json') {
+        ls.error2('受保护的核心清单禁止移动');
+        return 0;
+      }
+      if (destRel == 'plugin.json' || destRel == 'manifest.json') {
+        ls.error2('受保护的核心清单禁止覆写');
+        return 0;
+      }
+
+      final srcFull = resolveSafePath(ls, srcRel);
+      final destFull = resolveSafePath(ls, destRel);
+
+      final srcFile = File(srcFull);
+      if (!srcFile.existsSync()) {
+        ls.pushBoolean(false);
+        ls.pushString('源文件不存在: $srcRel');
+        return 2;
+      }
+
+      try {
+        final destFile = File(destFull);
+        destFile.parent.createSync(recursive: true);
+        srcFile.renameSync(destFull);
+        ls.pushBoolean(true);
+        return 1;
+      } catch (e) {
+        ls.pushBoolean(false);
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'move');
+
     ls.setGlobal('fs');
   }
 }

@@ -65,6 +65,17 @@ class MockLuaHostDelegate implements LuaHostDelegate {
 
   @override
   Future<String?> pickImage() async => pickedImageResult;
+
+  bool torchState = false;
+
+  @override
+  Future<bool> setTorch(bool enabled) async {
+    torchState = enabled;
+    return true;
+  }
+
+  @override
+  bool get isTorchOn => torchState;
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -869,6 +880,178 @@ void main() {
       expect(delegate.getState('has_put'), 'function');
       expect(delegate.getState('has_delete'), 'function');
       expect(delegate.getState('has_request'), 'function');
+    });
+
+    test('FsApi 扩展: readHex, writeHex, copy, move 与 fileSize', () {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_fs_ext_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final fsCtx = PluginContext(
+        pluginId: 'fs_ext_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final fsEngine = LuaEngine(context: fsCtx, delegate: delegate);
+
+      fsEngine.loadAndExecute('''
+        -- 写入十六进制数据 (对应 ASCII: "Antigravity")
+        -- "416e746967726176697479"
+        local ok = fs.writeHex("test_bin.dat", "416e746967726176697479")
+        state.set("write_ok", ok)
+        state.set("bin_size", fs.fileSize("test_bin.dat"))
+        state.set("read_hex", fs.readHex("test_bin.dat"))
+        state.set("read_hex_sub", fs.readHex("test_bin.dat", 0, 4))
+
+        -- 测试沙箱内复制与移动
+        fs.copy("test_bin.dat", "copy_bin.dat")
+        state.set("copy_exists", fs.exists("copy_bin.dat"))
+
+        fs.move("copy_bin.dat", "moved_bin.dat")
+        state.set("moved_exists", fs.exists("moved_bin.dat"))
+        state.set("old_exists", fs.exists("copy_bin.dat"))
+      ''');
+
+      expect(delegate.getState('write_ok'), isTrue);
+      expect(delegate.getState('bin_size'), 11);
+      expect(delegate.getState('read_hex'), '416e746967726176697479');
+      expect(delegate.getState('read_hex_sub'), '416e7469');
+      expect(delegate.getState('copy_exists'), isTrue);
+      expect(delegate.getState('moved_exists'), isTrue);
+      expect(delegate.getState('old_exists'), isFalse);
+    });
+
+    test('ArchiveApi: zip, list 与 unzip', () {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_archive_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final arcCtx = PluginContext(
+        pluginId: 'archive_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final arcEngine = LuaEngine(context: arcCtx, delegate: delegate);
+
+      arcEngine.loadAndExecute('''
+        -- 准备测试文件
+        fs.writeFile("sub/f1.txt", "hello")
+        fs.writeFile("sub/f2.txt", "world")
+
+        -- 压缩目录
+        local zipOk = archive.zip("sub", "bundle.zip")
+        state.set("zip_ok", zipOk)
+
+        -- 读取条目列表
+        local list = archive.list("bundle.zip")
+        state.set("list_len", #list)
+
+        -- 解压到新目录
+        local unzipOk = archive.unzip("bundle.zip", "unpacked")
+        state.set("unzip_ok", unzipOk)
+        state.set("f1_content", fs.readFile("unpacked/f1.txt"))
+        state.set("f2_content", fs.readFile("unpacked/f2.txt"))
+      ''');
+
+      expect(delegate.getState('zip_ok'), isTrue);
+      expect(delegate.getState('list_len'), 2);
+      expect(delegate.getState('unzip_ok'), isTrue);
+      expect(delegate.getState('f1_content'), 'hello');
+      expect(delegate.getState('f2_content'), 'world');
+    });
+
+    test('DocumentApi: csvParse 与 csvStringify 往返转换', () {
+      engine.loadAndExecute('''
+        local csv = 'name,score,desc\\nAlice,100,"good, job"\\nBob,90,"said ""hi"""'
+        local rows = document.csvParse(csv)
+        state.set("row_count", #rows)
+        state.set("r1_c1", rows[1][1])
+        state.set("r2_c3", rows[2][3])
+        state.set("r3_c3", rows[3][3])
+
+        local stringified = document.csvStringify(rows)
+        state.set("stringified", stringified)
+        local re_rows = document.csvParse(stringified)
+        state.set("re_row_count", #re_rows)
+        state.set("re_r2_c3", re_rows[2][3])
+      ''');
+
+      expect(delegate.getState('row_count'), 3);
+      expect(delegate.getState('r1_c1'), 'name');
+      expect(delegate.getState('r2_c3'), 'good, job');
+      expect(delegate.getState('r3_c3'), 'said "hi"');
+      expect(delegate.getState('re_row_count'), 3);
+      expect(delegate.getState('re_r2_c3'), 'good, job');
+    });
+
+    test('DocumentApi: markdownToHtml 标题、强调与代码块', () {
+      engine.loadAndExecute('''
+        local md = "# Hello\\n**Bold text** and `inline code`\\n- Item 1\\n- Item 2"
+        local html = document.markdownToHtml(md)
+        state.set("html", html)
+      ''');
+
+      final html = delegate.getState('html') as String;
+      expect(html, contains('<h1>Hello</h1>'));
+      expect(html, contains('<strong>Bold text</strong>'));
+      expect(html, contains('<code>inline code</code>'));
+      expect(html, contains('<li>Item 1</li>'));
+      expect(html, contains('<li>Item 2</li>'));
+    });
+
+    test('TorchApi: 权限控制与开关状态', () {
+      // 未声明权限报错
+      expect(
+        () => engine.loadAndExecute('torch.on()'),
+        throwsA(isA<Exception>()),
+      );
+
+      // 声明权限后测试
+      final torchCtx = PluginContext(
+        pluginId: 'torch_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.torch},
+      );
+      final torchEngine = LuaEngine(context: torchCtx, delegate: delegate);
+
+      torchEngine.loadAndExecute('''
+        state.set("init_torch", torch.isOn())
+        torch.on()
+      ''');
+      expect(delegate.getState('init_torch'), isFalse);
+      expect(delegate.torchState, isTrue);
+
+      torchEngine.loadAndExecute('''
+        torch.off()
+      ''');
+      expect(delegate.torchState, isFalse);
+    });
+
+    test('QrcodeApi: 生成二维码矩阵与尺寸', () {
+      engine.loadAndExecute('''
+        local res = qrcode.matrix("https://github.com")
+        state.set("qr_cols", res.cols)
+        state.set("qr_rows", res.rows)
+        state.set("qr_len", string.len(res.data))
+      ''');
+
+      final cols = delegate.getState('qr_cols') as int;
+      final rows = delegate.getState('qr_rows') as int;
+      final len = delegate.getState('qr_len') as int;
+
+      expect(cols, greaterThan(0));
+      expect(rows, cols);
+      expect(len, cols * rows);
     });
   });
 }

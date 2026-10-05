@@ -19,6 +19,10 @@ import 'api/fs_api.dart';
 import 'api/crypto_api.dart';
 import 'api/regex_api.dart';
 import 'api/color_api.dart';
+import 'api/archive_api.dart';
+import 'api/document_api.dart';
+import 'api/torch_api.dart';
+import 'api/qrcode_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -58,6 +62,12 @@ abstract class LuaHostDelegate {
 
   /// 选取相册图片并安全复制至沙箱（返回沙箱内相对路径）
   Future<String?> pickImage() async => null;
+
+  /// 控制设备手电筒/闪光灯开关 (返回是否操作成功)
+  Future<bool> setTorch(bool enabled) async => false;
+
+  /// 查询手电筒当前开关状态
+  bool get isTorchOn => false;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -130,6 +140,10 @@ class LuaEngine {
     CryptoApi.bind(_ls);
     RegexApi.bind(_ls);
     ColorApi.bind(_ls);
+    ArchiveApi.bind(_ls, context);
+    DocumentApi.bind(_ls);
+    TorchApi.bind(_ls, context, delegate, _callbacks!);
+    QrcodeApi.bind(_ls);
   }
 
   /// 执行 Lua 源代码字符串
