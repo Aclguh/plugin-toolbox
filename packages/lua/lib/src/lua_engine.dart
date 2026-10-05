@@ -6,6 +6,7 @@ import 'api/storage_api.dart';
 import 'api/network_api.dart';
 import 'api/dialog_api.dart';
 import 'api/codec_api.dart';
+import 'api/json_api.dart';
 import 'api/hash_api.dart';
 import 'api/util_api.dart';
 import 'api/system_api.dart';
@@ -86,6 +87,7 @@ class LuaEngine {
     NetworkApi.bind(_ls, context, _callbacks!, writeState);
     DialogApi.bind(_ls, delegate, _callbacks!);
     CodecApi.bind(_ls);
+    JsonApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
     SystemApi.bind(_ls);

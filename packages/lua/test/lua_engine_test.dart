@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
@@ -425,6 +426,176 @@ void main() {
         () => engine.callFunction('non_existent'),
         throwsA(isA<StateError>()),
       );
+    });
+  });
+
+  group('JSON 宿主 API', () {
+    late MockLuaHostDelegate delegate;
+    late PluginContext context;
+    late LuaEngine engine;
+
+    setUp(() {
+      delegate = MockLuaHostDelegate();
+      context = PluginContext(
+        pluginId: 'test_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+      );
+      engine = LuaEngine(context: context, delegate: delegate);
+    });
+
+    tearDown(() {
+      engine.close();
+    });
+
+    test('json 全局表以绑定形式注入 (仅验证绑定, 不验证业务数据)', () {
+      engine.loadAndExecute('''
+        state.set("json_type", type(json))
+        state.set("json_encode_fn", type(json.encode))
+        state.set("json_decode_fn", type(json.decode))
+      ''');
+
+      expect(delegate.getState('json_type'), 'table');
+      expect(delegate.getState('json_encode_fn'), 'function');
+      expect(delegate.getState('json_decode_fn'), 'function');
+    });
+
+    test('json.encode 将 Lua 表结构序列化为 JSON 字符串', () {
+      engine.loadAndExecute('''
+        function enc()
+          return json.encode({
+            hello = "world",
+            n = 3,
+            arr = {1, 2, 3},
+            flag = true,
+            nested = { inner = {1, 2} },
+          })
+        end
+      ''');
+
+      final out = engine.callFunction('enc') as String;
+      final parsed = jsonDecode(out) as Map<String, dynamic>;
+      expect(parsed['hello'], 'world');
+      expect(parsed['n'], 3);
+      expect(parsed['arr'], [1, 2, 3]);
+      expect(parsed['flag'], true);
+      expect(parsed['nested'], {'inner': [1, 2]});
+    });
+
+    test('json.encode 标量与空表', () {
+      engine.loadAndExecute('''
+        function enc_scalar()
+          return json.encode(42)
+        end
+        function enc_str()
+          return json.encode("hi")
+        end
+        function enc_empty()
+          return json.encode({})
+        end
+      ''');
+
+      expect(engine.callFunction('enc_scalar'), '42');
+      expect(engine.callFunction('enc_str'), '"hi"');
+      // 空表无 1..N 数组特征, 统一按对象序列化
+      expect(engine.callFunction('enc_empty'), '{}');
+    });
+
+    test('json.decode 将 JSON 文本还原为 Lua 表结构', () {
+      engine.loadAndExecute('''
+        function dec(s)
+          return json.decode(s)
+        end
+      ''');
+
+      // null 值依 Lua 表语义表现为键缺失 (赋 nil 即删除键)
+      final obj = engine.callFunction('dec',
+          ['{"a":[1,2,{"b":null}],"s":"x","f":1.5,"ok":true}']);
+      expect(obj, {
+        'a': [1, 2, {}],
+        's': 'x',
+        'f': 1.5,
+        'ok': true,
+      });
+      expect(engine.callFunction('dec', ['[10,20]']), [10, 20]);
+      expect(engine.callFunction('dec', ['null']), isNull);
+    });
+
+    test('json.decode 后再 encode 与压缩输入保持结构等价', () {
+      engine.loadAndExecute('''
+        function roundtrip(s)
+          return json.encode(json.decode(s))
+        end
+      ''');
+
+      expect(
+        engine.callFunction('roundtrip', ['{ "a" : [1, 2], "b" : "x" }']),
+        '{"a":[1,2],"b":"x"}',
+      );
+    });
+
+    test('json.encode 循环引用表降级为 Lua 执行错误 (不逃逸宿主)', () {
+      engine.loadAndExecute('''
+        function makeCyclic()
+          local t = {}
+          t.self = t
+          return json.encode(t)
+        end
+      ''');
+
+      expect(
+        () => engine.callFunction('makeCyclic'),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('循环引用'),
+        )),
+      );
+    });
+
+    test('json.encode 不可序列化类型与 json.decode 非法输入均被 pcall 隔离', () {
+      engine.loadAndExecute('''
+        function tryEncodeFn()
+          local ok, err = pcall(json.encode, {f = print})
+          state.set("enc_ok", ok)
+        end
+        function tryDecodeBad()
+          local ok, err = pcall(json.decode, "{bad json")
+          state.set("dec_ok", ok)
+        end
+      ''');
+
+      engine.callFunction('tryEncodeFn');
+      expect(delegate.getState('enc_ok'), false);
+      engine.callFunction('tryDecodeBad');
+      expect(delegate.getState('dec_ok'), false);
+    });
+
+    test('超深嵌套 JSON 在解析前被深度预检拦截', () {
+      final deep = ('[' * 100) + (']' * 100);
+      engine.loadAndExecute('''
+        function tryDeep(s)
+          local ok = pcall(json.decode, s)
+          state.set("deep_ok", ok)
+        end
+      ''');
+
+      engine.callFunction('tryDeep', [deep]);
+      expect(delegate.getState('deep_ok'), false);
+    });
+
+    test('未声明 network 权限时 network.post 直接报错', () {
+      expect(
+        () => engine.loadAndExecute('network.post("http://example.com", "{}")'),
+        throwsException,
+      );
+    });
+
+    test('network.post 以绑定形式注入 (仅验证绑定)', () {
+      engine.loadAndExecute('state.set("post_fn", type(network.post))');
+      expect(delegate.getState('post_fn'), 'function');
     });
   });
 }
