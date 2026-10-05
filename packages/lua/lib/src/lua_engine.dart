@@ -68,6 +68,38 @@ abstract class LuaHostDelegate {
 
   /// 查询手电筒当前开关状态
   bool get isTorchOn => false;
+
+  /// 系统分享沙箱文件
+  Future<bool> shareFile(
+    String filePath, {
+    String? mimeType,
+    String? subject,
+  }) async =>
+      false;
+
+  /// 保存沙箱图片至系统相册 (返回是否保存成功)
+  Future<bool> saveToGallery(String filePath) async => false;
+
+  /// 导出沙箱文件至系统公共下载目录 (返回是否导出成功)
+  Future<bool> exportFile(
+    String filePath, {
+    String? defaultName,
+  }) async =>
+      false;
+
+  /// 弹出原生日期选择器 (返回 YYYY-MM-DD 格式，取消返回 null)
+  Future<String?> pickDate({
+    String? initialDate,
+    String? firstDate,
+    String? lastDate,
+  }) async =>
+      null;
+
+  /// 弹出原生时间选择器 (返回 24小时制 HH:mm 格式，取消返回 null)
+  Future<String?> pickTime({
+    String? initialTime,
+  }) async =>
+      null;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -134,9 +166,9 @@ class LuaEngine {
     SystemApi.bind(_ls, delegate);
     HapticApi.bind(_ls, delegate);
     UiApi.bind(_ls, delegate);
-    ShareApi.bind(_ls, delegate);
+    ShareApi.bind(_ls, delegate, context, _callbacks!);
     MediaApi.bind(_ls, context, delegate, _callbacks!, writeState);
-    FsApi.bind(_ls, context);
+    FsApi.bind(_ls, context, delegate, _callbacks!);
     CryptoApi.bind(_ls);
     RegexApi.bind(_ls);
     ColorApi.bind(_ls);

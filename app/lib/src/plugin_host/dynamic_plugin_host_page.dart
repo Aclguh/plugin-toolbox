@@ -291,6 +291,110 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   bool get isTorchOn => _torchOn;
 
   @override
+  Future<bool> shareFile(
+    String filePath, {
+    String? mimeType,
+    String? subject,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('shareFile', {
+        'path': filePath,
+        'mimeType': mimeType,
+        'subject': subject,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> saveToGallery(String filePath) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('saveToGallery', {
+        'path': filePath,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> exportFile(String filePath, {String? defaultName}) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('exportFile', {
+        'path': filePath,
+        'defaultName': defaultName,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> pickDate({
+    String? initialDate,
+    String? firstDate,
+    String? lastDate,
+  }) async {
+    if (!mounted) return null;
+    DateTime parseDate(String? s, DateTime fallback) {
+      if (s == null || s.isEmpty) return fallback;
+      try {
+        return DateTime.parse(s);
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    final now = DateTime.now();
+    final first = parseDate(firstDate, DateTime(1900, 1, 1));
+    final last = parseDate(lastDate, DateTime(2100, 12, 31));
+    var init = parseDate(initialDate, now);
+    if (init.isBefore(first)) init = first;
+    if (init.isAfter(last)) init = last;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: init,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked == null) return null;
+    final y = picked.year.toString().padLeft(4, '0');
+    final m = picked.month.toString().padLeft(2, '0');
+    final d = picked.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  @override
+  Future<String?> pickTime({String? initialTime}) async {
+    if (!mounted) return null;
+    TimeOfDay parseTime(String? s) {
+      if (s != null && s.contains(':')) {
+        final parts = s.split(':');
+        final h = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        if (h != null && m != null) {
+          return TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
+        }
+      }
+      return TimeOfDay.now();
+    }
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: parseTime(initialTime),
+    );
+    if (picked == null) return null;
+    final h = picked.hour.toString().padLeft(2, '0');
+    final m = picked.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PluginPageScaffold(
       title: widget.plugin.name,

@@ -1,13 +1,21 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import '../lua_callback_invoker.dart';
+import '../lua_engine.dart';
 
 /// `fs` — 沙箱文件系统 API。
 ///
 /// 严格受限于插件独立沙箱目录（`app_data/plugins/<id>/`），
 /// 所有路径操作经 [SandboxPath.isSafeSubpath] 校验，绝不发生路径穿越。
 class FsApi {
-  static void bind(LuaState ls, PluginContext context) {
+  static void bind(
+    LuaState ls,
+    PluginContext context,
+    LuaHostDelegate delegate,
+    LuaCallbackInvoker callbacks,
+  ) {
     ls.newTable();
 
     void checkStoragePermission(LuaState ls) {
@@ -371,6 +379,91 @@ class FsApi {
       }
     });
     ls.setField(-2, 'move');
+
+    // fs.saveToGallery(relPath [, callback])
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        ls.error2('文件不存在: $relPath');
+        return 0;
+      }
+
+      final lower = relPath.toLowerCase();
+      final isImage = lower.endsWith('.png') ||
+          lower.endsWith('.jpg') ||
+          lower.endsWith('.jpeg') ||
+          lower.endsWith('.webp') ||
+          lower.endsWith('.gif') ||
+          lower.endsWith('.bmp');
+      if (!isImage) {
+        ls.error2('类型不支持: 仅支持将图片文件保存至系统相册 ($relPath)');
+        return 0;
+      }
+
+      final cbRef = callbacks.ref(2);
+      unawaited(
+        delegate.saveToGallery(fullPath).then((success) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [success]);
+          } else {
+            delegate.onStateChanged('__fs_save_gallery', success);
+          }
+        }).catchError((Object err) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [false, err.toString()]);
+          } else {
+            delegate.onStateChanged('__fs_save_gallery', false);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'saveToGallery');
+
+    // fs.exportFile(relPath [, defaultName, callback])
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        ls.error2('文件不存在: $relPath');
+        return 0;
+      }
+
+      String? defaultName;
+      int? cbRef;
+
+      if (ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      } else {
+        if (!ls.isNoneOrNil(2)) defaultName = ls.toStr(2);
+        if (ls.type(3) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(3);
+        }
+      }
+
+      unawaited(
+        delegate.exportFile(fullPath, defaultName: defaultName).then((success) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [success]);
+          } else {
+            delegate.onStateChanged('__fs_export_file', success);
+          }
+        }).catchError((Object err) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [false, err.toString()]);
+          } else {
+            delegate.onStateChanged('__fs_export_file', false);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'exportFile');
 
     ls.setGlobal('fs');
   }

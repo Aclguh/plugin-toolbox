@@ -67,6 +67,14 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   Future<String?> pickImage() async => pickedImageResult;
 
   bool torchState = false;
+  String? sharedFilePath;
+  String? sharedFileMimeType;
+  String? sharedFileSubject;
+  String? savedGalleryPath;
+  String? exportedFilePath;
+  String? exportedFileDefaultName;
+  String? mockPickedDate = '2025-06-15';
+  String? mockPickedTime = '15:45';
 
   @override
   Future<bool> setTorch(bool enabled) async {
@@ -76,6 +84,48 @@ class MockLuaHostDelegate implements LuaHostDelegate {
 
   @override
   bool get isTorchOn => torchState;
+
+  @override
+  Future<bool> shareFile(
+    String filePath, {
+    String? mimeType,
+    String? subject,
+  }) async {
+    sharedFilePath = filePath;
+    sharedFileMimeType = mimeType;
+    sharedFileSubject = subject;
+    return true;
+  }
+
+  @override
+  Future<bool> saveToGallery(String filePath) async {
+    savedGalleryPath = filePath;
+    return true;
+  }
+
+  @override
+  Future<bool> exportFile(
+    String filePath, {
+    String? defaultName,
+  }) async {
+    exportedFilePath = filePath;
+    exportedFileDefaultName = defaultName;
+    return true;
+  }
+
+  @override
+  Future<String?> pickDate({
+    String? initialDate,
+    String? firstDate,
+    String? lastDate,
+  }) async =>
+      mockPickedDate;
+
+  @override
+  Future<String?> pickTime({
+    String? initialTime,
+  }) async =>
+      mockPickedTime;
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -411,6 +461,25 @@ void main() {
       expect(delegate.getState('confirmed'), true);
     });
 
+    test('dialog.pickDate 与 dialog.pickTime 支持回调与状态写入', () async {
+      engine.loadAndExecute('''
+        dialog.pickDate(function(d)
+          state.set("cb_date", d)
+        end)
+        dialog.pickTime(function(t)
+          state.set("cb_time", t)
+        end)
+        dialog.pickDate("2024-01-01")
+        dialog.pickTime("12:00")
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('cb_date'), '2025-06-15');
+      expect(delegate.getState('cb_time'), '15:45');
+      expect(delegate.getState('__dialog_date'), '2025-06-15');
+      expect(delegate.getState('__dialog_time'), '15:45');
+    });
+
     test('未声明 network 权限时 network.get 直接报错', () {
       expect(
         () => engine.loadAndExecute('network.get("http://example.com")'),
@@ -669,6 +738,44 @@ void main() {
       expect(delegate.sharedText, '分享文本内容');
     });
 
+    test('ShareApi 文件分享防路径穿越并委派宿主', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_share_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      final testFile = File('${tempDir.path}/report.csv')
+        ..writeAsStringSync('a,b,c');
+
+      final shareCtx = PluginContext(
+        pluginId: 'share_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final shareEngine = LuaEngine(context: shareCtx, delegate: delegate);
+
+      // 1. 越界分享拦截
+      expect(
+        () => shareEngine.loadAndExecute('share.file("../secret.txt")'),
+        throwsException,
+      );
+
+      // 2. 正常合法文件分享
+      shareEngine.loadAndExecute('''
+        share.file("report.csv", "text/csv", "分享报表", function(ok)
+          state.set("share_ok", ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.sharedFilePath, testFile.path);
+      expect(delegate.sharedFileMimeType, 'text/csv');
+      expect(delegate.sharedFileSubject, '分享报表');
+      expect(delegate.getState('share_ok'), true);
+    });
+
     test('SystemApi.openUrl 外部链接跳转委派给宿主', () {
       engine.loadAndExecute('system.openUrl("https://example.com")');
       expect(delegate.openedUrl, 'https://example.com');
@@ -784,6 +891,54 @@ void main() {
       expect(delegate.getState('list_len'), 1);
       expect(delegate.getState('list_first'), 'test.txt');
       expect(delegate.getState('after_remove_exists'), false);
+    });
+
+    test('FsApi saveToGallery 与 exportFile 保存与导出', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_fs_export_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      final imgFile = File('${tempDir.path}/pic.png')
+        ..writeAsStringSync('fake-png-data');
+      final docFile = File('${tempDir.path}/data.csv')
+        ..writeAsStringSync('col1,col2');
+
+      final fsCtx = PluginContext(
+        pluginId: 'fs_export_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final fsEngine = LuaEngine(context: fsCtx, delegate: delegate);
+
+      // 1. 非图片格式拒绝存入相册
+      expect(
+        () => fsEngine.loadAndExecute('fs.saveToGallery("data.csv")'),
+        throwsException,
+      );
+
+      // 2. 正常保存图片到相册
+      fsEngine.loadAndExecute('''
+        fs.saveToGallery("pic.png", function(ok)
+          state.set("gallery_saved", ok)
+        end)
+      ''');
+
+      // 3. 导出文件到系统
+      fsEngine.loadAndExecute('''
+        fs.exportFile("data.csv", "my_export.csv", function(ok)
+          state.set("exported_ok", ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.savedGalleryPath, imgFile.path);
+      expect(delegate.getState('gallery_saved'), true);
+      expect(delegate.exportedFilePath, docFile.path);
+      expect(delegate.exportedFileDefaultName, 'my_export.csv');
+      expect(delegate.getState('exported_ok'), true);
     });
 
     test('CryptoApi HMAC 与 SHA512 计算', () {
