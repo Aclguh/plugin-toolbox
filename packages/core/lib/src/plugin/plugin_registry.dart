@@ -135,12 +135,13 @@ class PluginRegistry {
     if (cached != null) return cached;
 
     final list = <ToolPlugin>[];
+    final orderedSet = _orderController.order.toSet();
     for (final id in _orderController.order) {
       final p = _plugins[id];
       if (p != null) list.add(p);
     }
     for (final entry in _plugins.entries) {
-      if (!_orderController.order.contains(entry.key)) {
+      if (!orderedSet.contains(entry.key)) {
         list.add(entry.value);
       }
     }

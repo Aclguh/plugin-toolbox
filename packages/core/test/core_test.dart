@@ -64,9 +64,45 @@ void main() {
       expect(json['category'], 'calculator');
       expect(json['permissions'], ['clipboard']);
     });
+
+    test('AppEvent 具有正确的 Equatable 值对象等价语义 (P3-1)', () {
+      final now = DateTime.now();
+      final event1 = PluginInstalledEvent('p1', timestamp: now);
+      final event2 = PluginInstalledEvent('p1', timestamp: now.add(const Duration(seconds: 1)));
+      final event3 = PluginInstalledEvent('p2');
+
+      // 相同业务载荷 (pluginId) 判等为 true，即使发生时刻 timestamp 不同
+      expect(event1, equals(event2));
+      expect(event1 == event2, isTrue);
+      expect(event1 == event3, isFalse);
+
+      final state1 = PluginStateChangedEvent('p1', true);
+      final state2 = PluginStateChangedEvent('p1', true);
+      final state3 = PluginStateChangedEvent('p1', false);
+      expect(state1, equals(state2));
+      expect(state1 == state3, isFalse);
+    });
   });
 
   group('PluginRegistry & EventBus Tests', () {
+    test('EventBusImpl 错误隔离与背压丢弃机制 (P2-4)', () async {
+      final bus = EventBusImpl(maxQueueDepth: 2);
+      final received = <AppEvent>[];
+      final sub = bus.on<AppEvent>().listen(received.add);
+
+      bus.fire(PluginInstalledEvent('p1'));
+      bus.fire(PluginInstalledEvent('p2'));
+      // 超限触发背压
+      bus.fire(PluginInstalledEvent('p3'));
+
+      await Future.delayed(const Duration(milliseconds: 30));
+      expect(received.length, lessThanOrEqualTo(2));
+
+      // 已关闭安全分发不抛异常
+      bus.dispose();
+      expect(() => bus.fire(PluginInstalledEvent('p4')), returnsNormally);
+      await sub.cancel();
+    });
     test('registers, enables, disables and unregisters plugins', () async {
       final eventBus = EventBusImpl();
       const storageFactory = PluginStorageFactory();
