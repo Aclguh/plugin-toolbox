@@ -126,6 +126,38 @@ class MockLuaHostDelegate implements LuaHostDelegate {
     String? initialTime,
   }) async =>
       mockPickedTime;
+
+  String? mockScannedCode = 'https://example.com/mock-qr';
+  String? mockDecodedCode = 'mock-decoded-barcode-123';
+  final Map<String, Map<String, dynamic>> mockSensors = {
+    'accelerometer': {'x': 1.0, 'y': 2.0, 'z': 9.8},
+    'gyroscope': {'x': 0.1, 'y': 0.2, 'z': 0.3},
+    'compass': {'heading': 180.0},
+  };
+  final List<String> startedSensors = [];
+  final List<String> stoppedSensors = [];
+
+  @override
+  Future<String?> scanBarcode({String? prompt}) async => mockScannedCode;
+
+  @override
+  Future<String?> decodeBarcodeFromImage(String filePath) async => mockDecodedCode;
+
+  @override
+  Future<bool> startSensor(String type) async {
+    startedSensors.add(type);
+    return true;
+  }
+
+  @override
+  Future<bool> stopSensor(String type) async {
+    stoppedSensors.add(type);
+    return true;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getSensorData(String type) async =>
+      mockSensors[type];
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -1208,5 +1240,148 @@ void main() {
       expect(rows, cols);
       expect(len, cols * rows);
     });
+
+    test('CameraApi: 权限控制与扫码识别', () async {
+      // 1. 未声明 camera 权限时拦截
+      expect(
+        () => engine.loadAndExecute('camera.scan()'),
+        throwsA(isA<Exception>()),
+      );
+
+      // 2. 声明 camera 权限
+      final camCtx = PluginContext(
+        pluginId: 'camera_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.camera, PluginPermission.storage},
+      );
+      final camEngine = LuaEngine(context: camCtx, delegate: delegate);
+
+      // 回调方式
+      camEngine.loadAndExecute('''
+        camera.scan("请对准二维码", function(code)
+          state.set("scanned_via_cb", code)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('scanned_via_cb'), 'https://example.com/mock-qr');
+
+      // 默认状态写入方式
+      camEngine.loadAndExecute('camera.scan()');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('__scanned_code'), 'https://example.com/mock-qr');
+    });
+
+    test('CameraApi & VisionApi: 离线图片条码解码与沙箱防护', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_vision_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      File('${tempDir.path}/qr.png').writeAsStringSync('fake-qr');
+
+      final visionCtx = PluginContext(
+        pluginId: 'vision_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage, PluginPermission.camera},
+        rootDir: tempDir,
+      );
+      final visionEngine = LuaEngine(context: visionCtx, delegate: delegate);
+
+      // 1. 路径穿越拦截
+      expect(
+        () => visionEngine.loadAndExecute('vision.decodeBarcode("../../secret.png")'),
+        throwsException,
+      );
+      expect(
+        () => visionEngine.loadAndExecute('camera.decodeImage("../../secret.png")'),
+        throwsException,
+      );
+
+      // 2. 合法沙箱图片解码 (vision.decodeBarcode)
+      visionEngine.loadAndExecute('''
+        vision.decodeBarcode("qr.png", function(res)
+          state.set("vision_decoded", res)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('vision_decoded'), 'mock-decoded-barcode-123');
+
+      // 3. camera.decodeImage 无回调写入 __decoded_code
+      visionEngine.loadAndExecute('camera.decodeImage("qr.png")');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('__decoded_code'), 'mock-decoded-barcode-123');
+    });
+
+    test('SensorApi: 权限控制、可用性查询与传感器数据周期流转', () async {
+      // 1. 未声明 sensor 权限时报错
+      expect(
+        () => engine.loadAndExecute('sensor.isAvailable("accelerometer")'),
+        throwsA(isA<Exception>()),
+      );
+
+      // 2. 声明 sensor 权限
+      final sensorCtx = PluginContext(
+        pluginId: 'sensor_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.sensor},
+      );
+      final sensorEngine = LuaEngine(context: sensorCtx, delegate: delegate);
+
+      // 3. 可用性判断
+      sensorEngine.loadAndExecute('''
+        state.set("has_acc", sensor.isAvailable("accelerometer"))
+        state.set("has_gyro", sensor.isAvailable("gyroscope"))
+        state.set("has_comp", sensor.isAvailable("compass"))
+        state.set("has_mag", sensor.isAvailable("magnetometer"))
+        state.set("has_foo", sensor.isAvailable("unknown_sensor"))
+      ''');
+      expect(delegate.getState('has_acc'), isTrue);
+      expect(delegate.getState('has_gyro'), isTrue);
+      expect(delegate.getState('has_comp'), isTrue);
+      expect(delegate.getState('has_mag'), isTrue);
+      expect(delegate.getState('has_foo'), isFalse);
+
+      // 4. 启动监听并接收周期回调与状态自动写入
+      sensorEngine.loadAndExecute('''
+        sensor.start("accelerometer", function(data)
+          state.set("acc_x", data.x)
+          state.set("acc_y", data.y)
+          state.set("acc_z", data.z)
+        end)
+      ''');
+
+      // 等待 150ms 触发至少一次周期轮询
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.startedSensors.contains('accelerometer'), isTrue);
+      expect(delegate.getState('acc_x'), 1.0);
+      expect(delegate.getState('acc_y'), 2.0);
+      expect(delegate.getState('acc_z'), 9.8);
+      expect(delegate.getState('__sensor_accelerometer'), isNotNull);
+
+      // 5. 即时读取最新缓存值
+      sensorEngine.loadAndExecute('''
+        local cur = sensor.get("accelerometer")
+        state.set("cache_x", cur.x)
+        local curAcc = sensor.getAccelerometer()
+        state.set("acc_func_y", curAcc.y)
+      ''');
+      expect(delegate.getState('cache_x'), 1.0);
+      expect(delegate.getState('acc_func_y'), 2.0);
+
+      // 6. 停止监听单个传感器
+      sensorEngine.loadAndExecute('sensor.stop("accelerometer")');
+      expect(delegate.stoppedSensors.contains('accelerometer'), isTrue);
+
+      // 7. 关闭引擎自动释放全部传感器监听
+      sensorEngine.close();
+      expect(delegate.stoppedSensors.contains('all'), isTrue);
+    });
   });
 }
+

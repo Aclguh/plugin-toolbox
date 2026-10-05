@@ -22,3 +22,7 @@ export 'src/api/fs_api.dart';
 export 'src/api/crypto_api.dart';
 export 'src/api/regex_api.dart';
 export 'src/api/color_api.dart';
+export 'src/api/camera_api.dart';
+export 'src/api/vision_api.dart';
+export 'src/api/sensor_api.dart';
+

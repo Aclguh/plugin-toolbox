@@ -23,6 +23,9 @@ import 'api/archive_api.dart';
 import 'api/document_api.dart';
 import 'api/torch_api.dart';
 import 'api/qrcode_api.dart';
+import 'api/camera_api.dart';
+import 'api/vision_api.dart';
+import 'api/sensor_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -100,6 +103,21 @@ abstract class LuaHostDelegate {
     String? initialTime,
   }) async =>
       null;
+
+  /// 调起摄像头扫码，返回识别出的文本内容（取消或识别失败返回 null）
+  Future<String?> scanBarcode({String? prompt}) async => null;
+
+  /// 对沙箱内的图片进行条形码/二维码解码，返回识别出的文本（未识别出返回 null）
+  Future<String?> decodeBarcodeFromImage(String filePath) async => null;
+
+  /// 启动指定类型的传感器监听 (accelerometer, gyroscope, magnetometer, compass)
+  Future<bool> startSensor(String type) async => false;
+
+  /// 停止指定类型的传感器监听
+  Future<bool> stopSensor(String type) async => false;
+
+  /// 获取指定传感器的最新数据
+  Future<Map<String, dynamic>?> getSensorData(String type) async => null;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -116,6 +134,7 @@ class LuaEngine {
   late final LuaState _ls;
   LuaCallbackInvoker? _callbacks;
   TimerApi? _timerApi;
+  SensorApi? _sensorApi;
   bool _closed = false;
 
   /// 引擎是否已被关闭
@@ -176,6 +195,10 @@ class LuaEngine {
     DocumentApi.bind(_ls);
     TorchApi.bind(_ls, context, delegate, _callbacks!);
     QrcodeApi.bind(_ls);
+    CameraApi.bind(_ls, context, delegate, _callbacks!);
+    VisionApi.bind(_ls, context, delegate, _callbacks!);
+    _sensorApi = SensorApi();
+    _sensorApi!.bind(_ls, context, delegate, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串
@@ -354,6 +377,7 @@ class LuaEngine {
   void close() {
     if (_closed) return;
     _closed = true;
+    _sensorApi?.dispose(delegate, _callbacks!);
     _timerApi?.dispose(_callbacks);
     _callbacks?.clear();
   }

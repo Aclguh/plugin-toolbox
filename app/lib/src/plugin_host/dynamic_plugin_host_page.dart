@@ -53,6 +53,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       _runner?.onResume();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+      stopSensor('all');
       _runner?.onPause();
     }
   }
@@ -94,6 +95,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     if (_torchOn) {
       setTorch(false);
     }
+    stopSensor('all');
     _runner?.dispose();
     _duiState.dispose();
     super.dispose();
@@ -392,6 +394,73 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     final h = picked.hour.toString().padLeft(2, '0');
     final m = picked.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  @override
+  Future<String?> scanBarcode({String? prompt}) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<String>('scanBarcode', {
+        'prompt': prompt,
+      });
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> decodeBarcodeFromImage(String filePath) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<String>(
+        'decodeBarcodeFromImage',
+        {'path': filePath},
+      );
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final Map<String, Map<String, dynamic>> _sensorCache = {};
+
+  @override
+  Future<bool> startSensor(String type) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('startSensor', {
+        'type': type,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopSensor(String type) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('stopSensor', {
+        'type': type,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getSensorData(String type) async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
+        'getSensorData',
+        {'type': type},
+      );
+      if (res != null) {
+        _sensorCache[type] = res;
+      }
+      return res ?? _sensorCache[type];
+    } catch (_) {
+      return _sensorCache[type];
+    }
   }
 
   @override
