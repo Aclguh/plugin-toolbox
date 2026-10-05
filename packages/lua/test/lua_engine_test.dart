@@ -370,5 +370,61 @@ void main() {
         throwsException,
       );
     });
+
+    test('Lua 表连续整数索引被识别为 List 数组 (P2-2)', () {
+      engine.loadAndExecute('''
+        function get_array()
+          return {10, 20, 30}
+        end
+        function get_nested_array()
+          return { {1, 2}, {3, 4} }
+        end
+        function get_map()
+          return { a = 1, b = 2 }
+        end
+        function get_sparse()
+          return { [1] = "first", [3] = "third" }
+        end
+      ''');
+
+      final arrayResult = engine.callFunction('get_array');
+      expect(arrayResult, isA<List>());
+      expect(arrayResult, [10, 20, 30]);
+
+      final nestedResult = engine.callFunction('get_nested_array');
+      expect(nestedResult, isA<List>());
+      expect(nestedResult, [
+        [1, 2],
+        [3, 4],
+      ]);
+
+      final mapResult = engine.callFunction('get_map');
+      expect(mapResult, isA<Map>());
+      expect(mapResult, {'a': 1, 'b': 2});
+
+      // 稀疏表（非连续 1..N）降级为 Map
+      final sparseResult = engine.callFunction('get_sparse');
+      expect(sparseResult, isA<Map>());
+      expect(sparseResult, {'1': 'first', '3': 'third'});
+    });
+
+    test('LuaEngine.close() 幂等且禁止在关闭后继续调用 (P2-5)', () {
+      expect(engine.isClosed, isFalse);
+      engine.close();
+      expect(engine.isClosed, isTrue);
+
+      // 再次调用 close 幂等不崩溃
+      expect(() => engine.close(), returnsNormally);
+
+      // 关闭后调用执行方法抛出 StateError
+      expect(
+        () => engine.loadAndExecute('print("hello")'),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        () => engine.callFunction('non_existent'),
+        throwsA(isA<StateError>()),
+      );
+    });
   });
 }

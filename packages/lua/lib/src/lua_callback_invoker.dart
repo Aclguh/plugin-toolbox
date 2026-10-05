@@ -9,6 +9,7 @@ import 'package:lua_dardo/lua.dart';
 class LuaCallbackInvoker {
   final LuaState _ls;
   final int _instructionBudget;
+  final Set<int> _activeRefs = {};
 
   LuaCallbackInvoker(this._ls, this._instructionBudget);
 
@@ -16,15 +17,26 @@ class LuaCallbackInvoker {
   int? ref(int stackIdx) {
     if (_ls.type(stackIdx) != LuaType.luaFunction) return null;
     _ls.pushValue(stackIdx);
-    return _ls.ref(luaRegistryIndex);
+    final r = _ls.ref(luaRegistryIndex);
+    _activeRefs.add(r);
+    return r;
   }
 
   /// 调用 [ref] 登记的回调并释放登记，[args] 为可安全跨栈的基础类型值。
   /// 回调内部的 Lua 错误被降级吞掉，不允许逃逸到宿主事件循环。
   void invokeAndRelease(int ref, List<Object?> args) {
+    _activeRefs.remove(ref);
     _ls.rawGetI(luaRegistryIndex, ref);
     _ls.unRef(luaRegistryIndex, ref);
     _invokeTop(args);
+  }
+
+  /// 释放所有注册表中的未完成回调引用，切断 Dart -> Lua 引用链，加速 GC
+  void clear() {
+    for (final r in _activeRefs) {
+      _ls.unRef(luaRegistryIndex, r);
+    }
+    _activeRefs.clear();
   }
 
   /// 调用 Lua 全局函数 [funcName]（若脚本未定义则静默跳过）

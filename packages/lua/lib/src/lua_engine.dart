@@ -11,16 +11,28 @@ import 'api/util_api.dart';
 import 'api/system_api.dart';
 import 'lua_callback_invoker.dart';
 
-/// 插件与宿主 UI 的双向交互委托
+/// 插件与宿主 UI 的双向交互委托契约
 abstract class LuaHostDelegate {
+  /// 状态变更通知回调
   void onStateChanged(String key, dynamic value);
+
+  /// 获取指定键的当前状态值
   dynamic getState(String key);
+
+  /// 获取当前所有状态键值对映射
   Map<String, dynamic> getAllStates();
+
+  /// 弹出 Toast 提示
   void showToast(String message);
+
+  /// 弹出对话框提示
   Future<void> showAlert(String title, String message);
+
+  /// 弹出带确认与取消选项的二次确认框
   Future<bool> showConfirm(String title, String message);
 }
 
+/// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
 class LuaEngine {
   final PluginContext context;
   final LuaHostDelegate delegate;
@@ -32,6 +44,11 @@ class LuaEngine {
   final int instructionBudget;
 
   late final LuaState _ls;
+  LuaCallbackInvoker? _callbacks;
+  bool _closed = false;
+
+  /// 引擎是否已被关闭
+  bool get isClosed => _closed;
 
   LuaEngine({
     required this.context,
@@ -59,15 +76,15 @@ class LuaEngine {
 
   /// 注册所有受白名单权限控制的宿主 API
   void _registerHostApis() {
-    final callbacks = LuaCallbackInvoker(_ls, instructionBudget);
+    _callbacks = LuaCallbackInvoker(_ls, instructionBudget);
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);
 
     StateApi.bind(_ls, delegate);
-    ClipboardApi.bind(_ls, context, callbacks, writeState);
-    StorageApi.bind(_ls, context, callbacks, writeState);
-    NetworkApi.bind(_ls, context, callbacks, writeState);
-    DialogApi.bind(_ls, delegate, callbacks);
+    ClipboardApi.bind(_ls, context, _callbacks!, writeState);
+    StorageApi.bind(_ls, context, _callbacks!, writeState);
+    NetworkApi.bind(_ls, context, _callbacks!, writeState);
+    DialogApi.bind(_ls, delegate, _callbacks!);
     CodecApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
@@ -76,6 +93,9 @@ class LuaEngine {
 
   /// 执行 Lua 源代码字符串
   void loadAndExecute(String scriptContent) {
+    if (_closed) {
+      throw StateError('Cannot use closed LuaEngine');
+    }
     _ls.setInstructionBudget(instructionBudget);
     final status = _ls.loadString(scriptContent);
     if (status != ThreadStatus.luaOk) {
@@ -91,6 +111,9 @@ class LuaEngine {
 
   /// 调用 Lua 全局函数
   dynamic callFunction(String funcName, [List<dynamic> args = const []]) {
+    if (_closed) {
+      throw StateError('Cannot use closed LuaEngine');
+    }
     final type = _ls.getGlobal(funcName);
     if (type != LuaType.luaFunction) {
       _ls.pop(1);
@@ -180,14 +203,43 @@ class LuaEngine {
     return result;
   }
 
-  Map<String, dynamic> _readTable(int idx) {
-    final map = <String, dynamic>{};
+  dynamic _readTable(int idx) {
+    final rawEntries = <dynamic, dynamic>{};
     _ls.pushNil();
     while (_ls.next(idx < 0 ? idx - 1 : idx)) {
-      final key = _ls.toStr(-2) ?? _ls.toInteger(-2).toString();
+      final dynamic key = _ls.isInteger(-2)
+          ? _ls.toInteger(-2)
+          : (_ls.toStr(-2) ?? _ls.toInteger(-2).toString());
       final val = _readCurrentValue();
-      map[key] = val;
+      rawEntries[key] = val;
       _ls.pop(1);
+    }
+
+    if (rawEntries.isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    // 检查是否为从 1 开始、连续到 N 的纯整数索引表（Lua 数组特征）
+    bool isSequentialArray = true;
+    for (int i = 1; i <= rawEntries.length; i++) {
+      if (!rawEntries.containsKey(i)) {
+        isSequentialArray = false;
+        break;
+      }
+    }
+
+    if (isSequentialArray) {
+      final list = List<dynamic>.filled(rawEntries.length, null, growable: true);
+      for (int i = 1; i <= rawEntries.length; i++) {
+        list[i - 1] = rawEntries[i];
+      }
+      return list;
+    }
+
+    // 否则作为 Map<String, dynamic> 返回
+    final map = <String, dynamic>{};
+    for (final entry in rawEntries.entries) {
+      map[entry.key.toString()] = entry.value;
     }
     return map;
   }
@@ -203,12 +255,18 @@ class LuaEngine {
         return _ls.isInteger(-1) ? _ls.toInteger(-1) : _ls.toNumber(-1);
       case LuaType.luaString:
         return _ls.toStr(-1);
+      case LuaType.luaTable:
+        return _readTable(-1);
       default:
         return null;
     }
   }
 
+  /// 关闭引擎并释放所持有的注册表回调引用与资源。
+  /// 关闭后再调用执行操作将抛出 [StateError]。
   void close() {
-    // LuaState in lua_dardo is managed by Dart GC
+    if (_closed) return;
+    _closed = true;
+    _callbacks?.clear();
   }
 }
