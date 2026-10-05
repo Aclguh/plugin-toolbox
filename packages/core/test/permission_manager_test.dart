@@ -82,5 +82,13 @@ void main() {
 
       expect(() => perms.add(PluginPermission.network), throwsUnsupportedError);
     });
+
+    test('PluginPermission 字符串解析支持新增的系统权限 (torch, sensor, notification)', () {
+      expect(PluginPermission.fromString('torch'), PluginPermission.torch);
+      expect(PluginPermission.fromString('TORCH'), PluginPermission.torch);
+      expect(PluginPermission.fromString('sensor'), PluginPermission.sensor);
+      expect(PluginPermission.fromString('notification'), PluginPermission.notification);
+      expect(PluginPermission.fromString('unknown_perm'), isNull);
+    });
   });
 }
