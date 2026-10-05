@@ -86,9 +86,14 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
+  bool _torchOn = false;
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (_torchOn) {
+      setTorch(false);
+    }
     _runner?.dispose();
     _duiState.dispose();
     super.dispose();
@@ -272,6 +277,18 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       return null;
     }
   }
+
+  @override
+  Future<bool> setTorch(bool enabled) async {
+    _torchOn = enabled;
+    try {
+      await _nativeChannel.invokeMethod<bool>('setTorch', {'enabled': enabled});
+    } catch (_) {}
+    return true;
+  }
+
+  @override
+  bool get isTorchOn => _torchOn;
 
   @override
   Widget build(BuildContext context) {
