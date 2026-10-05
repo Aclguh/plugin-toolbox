@@ -22,6 +22,12 @@ scripts:
     packageFilters:
       dirExists: test
 
+  test:coverage:
+    exec: flutter test --coverage
+    description: 运行各包测试并采集代码覆盖率 (生成 coverage/lcov.info)
+    packageFilters:
+      dirExists: test
+
   format:
     exec: dart format .
     description: 格式化

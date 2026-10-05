@@ -1,15 +1,24 @@
 import 'package:flutter/services.dart';
 import 'dui_state.dart';
 
+/// DUI 动作执行接口，连接 DUI 事件与底层宿主逻辑或脚本引擎
 abstract class DuiActionExecutor {
+  /// 调用指定名称的 Lua 函数，传递参数列表 [args]
   void callLua(String functionName, [List<dynamic> args = const []]);
+
+  /// 在界面上弹出轻量 Toast 提示
   void showToast(String message);
 }
 
+/// DUI 事件处理器：负责将组件树中的事件定义路由派发至对应执行器或状态存储
 class DuiEventHandler {
+  /// 动态 UI 状态机
   final DuiState state;
+
+  /// 外部动作执行器
   final DuiActionExecutor executor;
 
+  /// 创建事件处理器
   DuiEventHandler({
     required this.state,
     required this.executor,

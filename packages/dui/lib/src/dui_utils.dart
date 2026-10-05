@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// 动态 UI (DUI) 辅助解析工具集，提供类型安全容错的图标、文本样式、颜色与数值解析
 class DuiUtils {
   /// 图标名称查找表：插件 JSON 中的图标名 -> Material IconData
   static const Map<String, IconData> _iconTable = {
