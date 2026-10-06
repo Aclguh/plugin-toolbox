@@ -16,6 +16,18 @@ class DuiUtils {
     'delete_outline': Icons.delete_outline,
     'search': Icons.search,
     'check': Icons.check,
+    'brush': Icons.brush,
+    'draw': Icons.draw,
+    'clear': Icons.clear,
+    'refresh': Icons.refresh,
+    'save': Icons.save,
+    'share': Icons.share,
+    'folder_open': Icons.folder_open,
+    'file_present': Icons.file_present,
+    'camera_alt': Icons.camera_alt,
+    'compare_arrows': Icons.compare_arrows,
+    'image': Icons.image,
+    'fingerprint': Icons.fingerprint,
   };
 
   /// M3 TextStyle 查找表（样式名 -> TextTheme 取值闭包），

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import 'dui_canvas.dart';
+import 'dui_drawing_pad.dart';
 import 'dui_event_handler.dart';
 import 'dui_markdown.dart';
 import 'dui_pixel_grid.dart';
@@ -361,6 +362,65 @@ class DuiRenderer {
         commands: rawCommands,
       );
     });
+
+    // ---- 手绘板 / 签名板 (DrawingPad / SignaturePad) ----
+    Widget buildDrawingPad(DuiNodeContext node) {
+      final width = node.width;
+      final height = node.height ?? 240.0;
+      final bg = DuiUtils.parseColor(
+        state.interpolate(node.props['backgroundColor']?.toString() ?? ''),
+      );
+      final strokeColor = DuiUtils.parseColor(
+            state.interpolate(node.props['strokeColor']?.toString() ?? ''),
+          ) ??
+          const Color(0xFF000000);
+      final strokeWidth = DuiUtils.tryDouble(
+            state.interpolate(node.props['strokeWidth']?.toString() ?? ''),
+          ) ??
+          3.0;
+      final borderRadius =
+          DuiUtils.tryDouble(node.props['borderRadius']) ?? 12.0;
+
+      final clearTrigger = node.props['clearTrigger'] != null
+          ? state.interpolate(node.props['clearTrigger'].toString())
+          : null;
+      final exportTrigger = node.props['exportTrigger'] != null
+          ? state.interpolate(node.props['exportTrigger'].toString())
+          : null;
+
+      final outputKey = node.props['outputKey']?.toString();
+
+      void onExport(String base64) {
+        if (node.events.containsKey('onExport')) {
+          eventHandler.handleEvent(node.events['onExport'], base64);
+        }
+      }
+
+      void onChanged() {
+        if (node.events.containsKey('onChanged')) {
+          eventHandler.handleEvent(node.events['onChanged']);
+        }
+      }
+
+      return DuiDrawingPad(
+        width: width,
+        height: height,
+        backgroundColor: bg,
+        strokeColor: strokeColor,
+        strokeWidth: strokeWidth,
+        borderRadius: borderRadius,
+        refKey: node.ref,
+        outputKey: outputKey,
+        clearTrigger: clearTrigger,
+        exportTrigger: exportTrigger,
+        state: state,
+        onExport: onExport,
+        onChanged: onChanged,
+      );
+    }
+
+    registerFactory('DrawingPad', buildDrawingPad);
+    registerFactory('SignaturePad', buildDrawingPad);
 
     // ---- 流式布局 (Wrap) ----
     registerFactory('Wrap', (node) => Wrap(

@@ -403,10 +403,16 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       final res = await _nativeChannel.invokeMethod<String>('scanBarcode', {
         'prompt': prompt,
       });
-      return res;
-    } catch (_) {
-      return null;
+      if (res != null) return res;
+    } catch (_) {}
+    if (!mounted) return null;
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return await showPrompt(
+        title: prompt ?? '扫码识别 (桌面模拟)',
+        hint: '请输入或粘贴条形码/二维码扫描内容',
+      );
     }
+    return null;
   }
 
   @override
@@ -416,10 +422,16 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
         'decodeBarcodeFromImage',
         {'path': filePath},
       );
-      return res;
-    } catch (_) {
-      return null;
+      if (res != null) return res;
+    } catch (_) {}
+    if (!mounted) return null;
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return await showPrompt(
+        title: '图片二维码识别 (桌面模拟)',
+        hint: '未检测到原生条码识别器，可手动输入模拟识别结果',
+      );
     }
+    return null;
   }
 
   final Map<String, Map<String, dynamic>> _sensorCache = {};

@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
@@ -481,6 +484,195 @@ class FsApi {
       return 0;
     });
     ls.setField(-2, 'exportFile');
+
+    // fs.pickFile([options, callback])
+    // 选取外部文件并安全复制至插件沙箱 data/ 目录
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      List<String>? allowedExtensions;
+      int? cbRef;
+
+      if (ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      } else if (ls.type(1) == LuaType.luaTable) {
+        ls.getField(1, 'allowedExtensions');
+        if (ls.type(-1) == LuaType.luaTable) {
+          final len = ls.rawLen(-1);
+          final exts = <String>[];
+          for (int i = 1; i <= len; i++) {
+            ls.rawGetI(-1, i);
+            if (ls.type(-1) == LuaType.luaString) {
+              exts.add(ls.toStr(-1)!);
+            }
+            ls.pop(1);
+          }
+          if (exts.isNotEmpty) allowedExtensions = exts;
+        }
+        ls.pop(1);
+        if (ls.type(2) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(2);
+        }
+      } else if (ls.type(1) == LuaType.luaString) {
+        allowedExtensions = [ls.toStr(1)!];
+        if (ls.type(2) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(2);
+        }
+      }
+
+      unawaited(
+        delegate.pickFile(allowedExtensions: allowedExtensions).then((relPath) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [relPath]);
+          } else if (relPath != null) {
+            delegate.onStateChanged('__picked_file', relPath);
+          }
+        }).catchError((Object e) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [null]);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'pickFile');
+
+    // fs.writeBase64(relPath, base64Content) -> bool, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      var b64 = ls.checkString(2) ?? '';
+      if (b64.startsWith('data:')) {
+        final comma = b64.indexOf(',');
+        if (comma >= 0) {
+          b64 = b64.substring(comma + 1);
+        }
+      }
+      final fullPath = resolveSafePath(ls, relPath);
+      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+        ls.error2('受保护的核心清单禁止覆写');
+        return 0;
+      }
+      try {
+        final bytes = base64Decode(b64.replaceAll(RegExp(r'\s+'), ''));
+        if (!context.checkStorageQuota(bytes.length)) {
+          ls.pushBoolean(false);
+          ls.pushString('存储配额超限: 写入将超出插件沙箱配额');
+          return 2;
+        }
+        final file = File(fullPath);
+        file.parent.createSync(recursive: true);
+        file.writeAsBytesSync(bytes, flush: true);
+        ls.pushBoolean(true);
+        return 1;
+      } catch (e) {
+        ls.pushBoolean(false);
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'writeBase64');
+
+    // fs.readBase64(relPath) -> string | nil, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        ls.pushNil();
+        ls.pushString('文件不存在: $relPath');
+        return 2;
+      }
+      try {
+        final bytes = file.readAsBytesSync();
+        ls.pushString(base64Encode(bytes));
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'readBase64');
+
+    // fs.hash(relPath [, algo]) -> table | string | nil, error
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        ls.pushNil();
+        ls.pushString('文件不存在: $relPath');
+        return 2;
+      }
+      try {
+        final bytes = file.readAsBytesSync();
+        final algo = ls.type(2) == LuaType.luaString ? ls.toStr(2)?.toLowerCase() : null;
+        if (algo == 'md5') {
+          ls.pushString(md5.convert(bytes).toString());
+          return 1;
+        } else if (algo == 'sha1') {
+          ls.pushString(sha1.convert(bytes).toString());
+          return 1;
+        } else if (algo == 'sha256') {
+          ls.pushString(sha256.convert(bytes).toString());
+          return 1;
+        } else if (algo == 'crc32') {
+          final crc = getCrc32(bytes);
+          ls.pushString(crc.toRadixString(16).padLeft(8, '0').toUpperCase());
+          return 1;
+        } else {
+          final stat = file.statSync();
+          final fileName = relPath.contains('/')
+              ? relPath.substring(relPath.lastIndexOf('/') + 1)
+              : relPath;
+          final dotIdx = fileName.lastIndexOf('.');
+          final ext = dotIdx >= 0 ? fileName.substring(dotIdx + 1) : '';
+
+          ls.newTable();
+          ls.pushString('name');
+          ls.pushString(fileName);
+          ls.setTable(-3);
+
+          ls.pushString('size');
+          ls.pushInteger(bytes.length);
+          ls.setTable(-3);
+
+          ls.pushString('extension');
+          ls.pushString(ext);
+          ls.setTable(-3);
+
+          ls.pushString('modifiedMs');
+          ls.pushInteger(stat.modified.millisecondsSinceEpoch);
+          ls.setTable(-3);
+
+          ls.pushString('md5');
+          ls.pushString(md5.convert(bytes).toString());
+          ls.setTable(-3);
+
+          ls.pushString('sha1');
+          ls.pushString(sha1.convert(bytes).toString());
+          ls.setTable(-3);
+
+          ls.pushString('sha256');
+          ls.pushString(sha256.convert(bytes).toString());
+          ls.setTable(-3);
+
+          final crc = getCrc32(bytes);
+          ls.pushString('crc32');
+          ls.pushString(crc.toRadixString(16).padLeft(8, '0').toUpperCase());
+          ls.setTable(-3);
+
+          return 1;
+        }
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'hash');
 
     ls.setGlobal('fs');
   }

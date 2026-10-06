@@ -1358,6 +1358,68 @@ void main() {
       expect(delegate.getState('old_exists'), isFalse);
     });
 
+    test('FsApi 扩展: pickFile, writeBase64, readBase64 与 hash', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_fs_hash_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final fsCtx = PluginContext(
+        pluginId: 'fs_hash_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      delegate.pickedFileResult = 'data/mock_file.txt';
+      final fsEngine = LuaEngine(context: fsCtx, delegate: delegate);
+
+      fsEngine.loadAndExecute('''
+        -- 写入 Base64 (对应 ASCII: "Hello PluginToolbox")
+        -- SGVsbG8gUGx1Z2luVG9vbGJveA==
+        local ok = fs.writeBase64("hello.txt", "SGVsbG8gUGx1Z2luVG9vbGJveA==")
+        state.set("b64_write_ok", ok)
+        state.set("b64_read", fs.readBase64("hello.txt"))
+
+        -- 计算各种哈希
+        local md5_val = fs.hash("hello.txt", "md5")
+        local sha1_val = fs.hash("hello.txt", "sha1")
+        local sha256_val = fs.hash("hello.txt", "sha256")
+        local crc_val = fs.hash("hello.txt", "crc32")
+        state.set("file_md5", md5_val)
+        state.set("file_sha1", sha1_val)
+        state.set("file_sha256", sha256_val)
+        state.set("file_crc32", crc_val)
+
+        -- 全量信息表
+        local meta = fs.hash("hello.txt")
+        state.set("meta_name", meta.name)
+        state.set("meta_size", meta.size)
+        state.set("meta_ext", meta.extension)
+        state.set("meta_md5", meta.md5)
+
+        -- pickFile 回调
+        fs.pickFile(function(path)
+          state.set("picked_path", path)
+        end)
+      ''');
+
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      expect(delegate.getState('b64_write_ok'), isTrue);
+      expect(delegate.getState('b64_read'), 'SGVsbG8gUGx1Z2luVG9vbGJveA==');
+      expect(delegate.getState('file_md5'), isNotEmpty);
+      expect(delegate.getState('file_sha1'), isNotEmpty);
+      expect(delegate.getState('file_sha256'), isNotEmpty);
+      expect(delegate.getState('file_crc32'), isNotEmpty);
+      expect(delegate.getState('meta_name'), 'hello.txt');
+      expect(delegate.getState('meta_size'), 19);
+      expect(delegate.getState('meta_ext'), 'txt');
+      expect(delegate.getState('meta_md5'), delegate.getState('file_md5'));
+      expect(delegate.getState('picked_path'), 'data/mock_file.txt');
+    });
+
     test('ArchiveApi: zip, list 与 unzip', () {
       final tempDir = Directory.systemTemp.createTempSync('ptx_archive_');
       addTearDown(() {

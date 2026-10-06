@@ -639,5 +639,63 @@ void main() {
       await tester.pump();
       expect(find.byType(DuiCanvas), findsOneWidget);
     });
+
+    testWidgets('DuiRenderer 渲染 SignaturePad 并支持手势绘制与清空触发', (tester) async {
+      final state = DuiState();
+      state.set('clear_tick', 0);
+      final executor = MockActionExecutor();
+      final eventHandler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: eventHandler);
+
+      final node = {
+        'type': 'SignaturePad',
+        'ref': 'my_sign',
+        'props': {
+          'width': 300.0,
+          'height': 200.0,
+          'strokeWidth': 4.0,
+          'strokeColor': '#000000',
+          'clearTrigger': '{{state.clear_tick}}',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiDrawingPad), findsOneWidget);
+      expect(state.get('my_sign_has_drawing'), false);
+
+      // 模拟手势绘制一条线
+      final gesture = await tester.startGesture(tester.getCenter(find.byType(DuiDrawingPad)));
+      await gesture.moveBy(const Offset(50, 50));
+      await gesture.up();
+      await tester.pump();
+
+      expect(state.get('my_sign_has_drawing'), true);
+      expect(state.get('my_sign_count'), 1);
+
+      // 触发清空
+      state.set('clear_tick', 1);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(state.get('my_sign_has_drawing'), false);
+      expect(state.get('my_sign_count'), 0);
+    });
   });
 }
