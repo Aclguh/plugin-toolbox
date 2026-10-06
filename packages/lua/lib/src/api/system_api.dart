@@ -9,7 +9,11 @@ import '../lua_engine.dart';
 /// 仅暴露非敏感的公开信息（系统版本 / CPU 核数 / 语言区域 / 屏幕尺寸等），
 /// 支撑"设备信息查看"类插件；文件系统、传感器、通话等敏感能力不在此面。
 class SystemApi {
-  static void bind(LuaState ls, [LuaHostDelegate? delegate]) {
+  static void bind(
+    LuaState ls, [
+    LuaHostDelegate? delegate,
+    dynamic callbacks,
+  ]) {
     ls.newTable();
 
     // system.platform()
@@ -87,6 +91,66 @@ class SystemApi {
       return 1;
     });
     ls.setField(-2, 'brightness');
+
+    // system.batteryLevel([callback]) -> int (0 ~ 100)
+    ls.pushDartFunction((ls) {
+      if (ls.type(1) == LuaType.luaFunction && callbacks != null) {
+        final cbRef = callbacks.ref(1);
+        if (delegate != null) {
+          delegate.getBatteryLevel().then((lvl) {
+            callbacks.invokeAndRelease(cbRef, [lvl]);
+          }).catchError((Object _) {
+            callbacks.invokeAndRelease(cbRef, [delegate.batteryLevel]);
+          });
+        } else {
+          callbacks.invokeAndRelease(cbRef, [100]);
+        }
+        return 0;
+      }
+      ls.pushInteger(delegate?.batteryLevel ?? 100);
+      return 1;
+    });
+    ls.setField(-2, 'batteryLevel');
+
+    // system.isCharging([callback]) -> bool
+    ls.pushDartFunction((ls) {
+      if (ls.type(1) == LuaType.luaFunction && callbacks != null) {
+        final cbRef = callbacks.ref(1);
+        if (delegate != null) {
+          delegate.checkIsCharging().then((charging) {
+            callbacks.invokeAndRelease(cbRef, [charging]);
+          }).catchError((Object _) {
+            callbacks.invokeAndRelease(cbRef, [delegate.isCharging]);
+          });
+        } else {
+          callbacks.invokeAndRelease(cbRef, [false]);
+        }
+        return 0;
+      }
+      ls.pushBoolean(delegate?.isCharging ?? false);
+      return 1;
+    });
+    ls.setField(-2, 'isCharging');
+
+    // system.networkType([callback]) -> 'wifi' | 'cellular' | 'none' | 'unknown'
+    ls.pushDartFunction((ls) {
+      if (ls.type(1) == LuaType.luaFunction && callbacks != null) {
+        final cbRef = callbacks.ref(1);
+        if (delegate != null) {
+          delegate.fetchNetworkType().then((net) {
+            callbacks.invokeAndRelease(cbRef, [net]);
+          }).catchError((Object _) {
+            callbacks.invokeAndRelease(cbRef, [delegate.networkType]);
+          });
+        } else {
+          callbacks.invokeAndRelease(cbRef, ['unknown']);
+        }
+        return 0;
+      }
+      ls.pushString(delegate?.networkType ?? 'unknown');
+      return 1;
+    });
+    ls.setField(-2, 'networkType');
 
     // system.openUrl(url)
     ls.pushDartFunction((ls) {

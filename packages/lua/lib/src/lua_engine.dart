@@ -26,6 +26,9 @@ import 'api/qrcode_api.dart';
 import 'api/camera_api.dart';
 import 'api/vision_api.dart';
 import 'api/sensor_api.dart';
+import 'api/image_api.dart';
+import 'api/notification_api.dart';
+import 'api/audio_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -118,6 +121,110 @@ abstract class LuaHostDelegate {
 
   /// 获取指定传感器的最新数据
   Future<Map<String, dynamic>?> getSensorData(String type) async => null;
+
+  // ---- 媒体图像处理 (P2) ----
+  /// 获取沙箱图片的元数据 (width, height, format, size)
+  Future<Map<String, dynamic>?> imageInfo(String filePath) async => null;
+
+  /// 压缩图片并写入目标路径 (返回是否成功)
+  Future<bool> compressImage(
+    String srcPath,
+    String destPath, {
+    int quality = 80,
+  }) async =>
+      false;
+
+  /// 裁剪图片并写入目标路径 (返回是否成功)
+  Future<bool> cropImage(
+    String srcPath,
+    String destPath, {
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+  }) async =>
+      false;
+
+  /// 转换图片格式并写入目标路径 (返回是否成功)
+  Future<bool> convertImage(
+    String srcPath,
+    String destPath, {
+    required String format,
+  }) async =>
+      false;
+
+  /// 擦除图片 EXIF 元数据并重写保存 (返回是否成功)
+  Future<bool> stripExifImage(String srcPath, String destPath) async => false;
+
+  // ---- 系统通知与定时调度 (P2) ----
+  /// 发送即时本地系统通知 (返回通知 ID)
+  Future<int> showNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async =>
+      -1;
+
+  /// 安排定时本地系统通知 (返回通知 ID)
+  Future<int> scheduleNotification({
+    required String title,
+    required String body,
+    required int delaySeconds,
+    String? payload,
+  }) async =>
+      -1;
+
+  /// 取消指定 ID 的本地系统通知
+  Future<bool> cancelNotification(int id) async => false;
+
+  /// 取消当前插件产生的所有系统通知
+  Future<bool> cancelAllNotifications() async => false;
+
+  // ---- 音频播放与频率发生器 (P2) ----
+  /// 播放沙箱内音频文件
+  Future<bool> playAudio(String filePath) async => false;
+
+  /// 停止音频播放
+  Future<bool> stopAudio() async => false;
+
+  /// 播放指定频率与时长的合成音 (正弦波)
+  Future<bool> playTone(double frequencyHz, int durationMs) async => false;
+
+  // ---- 高级交互弹窗 (P3) ----
+  /// 弹出文本输入提示弹窗 (返回输入文本，取消返回 null)
+  Future<String?> showPrompt({
+    required String title,
+    String? hint,
+    String? defaultValue,
+  }) async =>
+      null;
+
+  /// 弹出单选列表弹窗 (返回选中项 Map: {'index': int, 'text': String}，取消返回 null)
+  Future<Map<String, dynamic>?> showPickItem({
+    required String title,
+    required List<String> items,
+    int initialIndex = 0,
+  }) async =>
+      null;
+
+  // ---- 硬件与系统深度状态感知 (P3) ----
+  /// 获取当前电池电量百分比 (0 ~ 100)
+  int get batteryLevel => 100;
+
+  /// 查询当前是否处于充电状态
+  bool get isCharging => false;
+
+  /// 查询当前网络连接类型 ('wifi', 'cellular', 'none', 'unknown')
+  String get networkType => 'unknown';
+
+  /// 异步获取电池电量百分比
+  Future<int> getBatteryLevel() async => batteryLevel;
+
+  /// 异步查询充电状态
+  Future<bool> checkIsCharging() async => isCharging;
+
+  /// 异步查询网络连接类型
+  Future<String> fetchNetworkType() async => networkType;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -182,7 +289,7 @@ class LuaEngine {
     JsonApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
-    SystemApi.bind(_ls, delegate);
+    SystemApi.bind(_ls, delegate, _callbacks!);
     HapticApi.bind(_ls, delegate);
     UiApi.bind(_ls, delegate);
     ShareApi.bind(_ls, delegate, context, _callbacks!);
@@ -199,6 +306,9 @@ class LuaEngine {
     VisionApi.bind(_ls, context, delegate, _callbacks!);
     _sensorApi = SensorApi();
     _sensorApi!.bind(_ls, context, delegate, _callbacks!);
+    ImageApi.bind(_ls, context, delegate, _callbacks!);
+    NotificationApi.bind(_ls, context, delegate, _callbacks!);
+    AudioApi.bind(_ls, context, delegate, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串
@@ -377,6 +487,7 @@ class LuaEngine {
   void close() {
     if (_closed) return;
     _closed = true;
+    delegate.stopAudio();
     _sensorApi?.dispose(delegate, _callbacks!);
     _timerApi?.dispose(_callbacks);
     _callbacks?.clear();

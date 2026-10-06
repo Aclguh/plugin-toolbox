@@ -1,19 +1,32 @@
 package com.plugintoolbox.plugin_toolbox
 
 import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.camera2.CameraManager
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
+import android.media.MediaPlayer
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
+import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
@@ -41,6 +54,13 @@ class MainActivity : FlutterActivity() {
     private var scanCaptureFile: File? = null
     private val RC_SCAN_IMAGE = 1001
     private val RC_SCAN_INTENT = 1002
+
+    // 通知与媒体调度
+    private val NOTIFICATION_CHANNEL_ID = "plugin_toolbox_notifications"
+    private var nextNotificationId = 1000
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val scheduledRunnables = mutableMapOf<Int, Runnable>()
+    private var activeMediaPlayer: MediaPlayer? = null
 
     private fun getOrCreateSensorManager(): SensorManager {
         if (sensorManager == null) {
@@ -338,6 +358,267 @@ class MainActivity : FlutterActivity() {
                 "scanBarcode" -> {
                     startScanBarcode(result)
                 }
+                "imageInfo" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    val file = File(path)
+                    if (!file.exists()) {
+                        result.success(null)
+                    } else {
+                        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(path, opts)
+                        val format = opts.outMimeType ?: when {
+                            path.endsWith(".png", true) -> "image/png"
+                            path.endsWith(".webp", true) -> "image/webp"
+                            else -> "image/jpeg"
+                        }
+                        result.success(mapOf(
+                            "width" to opts.outWidth,
+                            "height" to opts.outHeight,
+                            "format" to format,
+                            "size" to file.length().toInt()
+                        ))
+                    }
+                }
+                "compressImage" -> {
+                    val src = call.argument<String>("src") ?: ""
+                    val dest = call.argument<String>("dest") ?: ""
+                    val quality = call.argument<Int>("quality") ?: 80
+                    val bitmap = BitmapFactory.decodeFile(src)
+                    if (bitmap == null) {
+                        result.success(false)
+                    } else {
+                        val destFile = File(dest)
+                        destFile.parentFile?.mkdirs()
+                        val format = if (dest.endsWith(".png", true)) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+                        val ok = destFile.outputStream().use { out ->
+                            bitmap.compress(format, quality, out)
+                        }
+                        bitmap.recycle()
+                        result.success(ok)
+                    }
+                }
+                "cropImage" -> {
+                    val src = call.argument<String>("src") ?: ""
+                    val dest = call.argument<String>("dest") ?: ""
+                    val x = call.argument<Int>("x") ?: 0
+                    val y = call.argument<Int>("y") ?: 0
+                    val width = call.argument<Int>("width") ?: 0
+                    val height = call.argument<Int>("height") ?: 0
+                    val bitmap = BitmapFactory.decodeFile(src)
+                    if (bitmap == null) {
+                        result.success(false)
+                    } else {
+                        val safeX = x.coerceIn(0, bitmap.width - 1)
+                        val safeY = y.coerceIn(0, bitmap.height - 1)
+                        val safeW = width.coerceIn(1, bitmap.width - safeX)
+                        val safeH = height.coerceIn(1, bitmap.height - safeY)
+                        val cropped = Bitmap.createBitmap(bitmap, safeX, safeY, safeW, safeH)
+                        val destFile = File(dest)
+                        destFile.parentFile?.mkdirs()
+                        val format = if (dest.endsWith(".png", true)) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+                        val ok = destFile.outputStream().use { out ->
+                            cropped.compress(format, 90, out)
+                        }
+                        cropped.recycle()
+                        bitmap.recycle()
+                        result.success(ok)
+                    }
+                }
+                "convertImage" -> {
+                    val src = call.argument<String>("src") ?: ""
+                    val dest = call.argument<String>("dest") ?: ""
+                    val formatStr = (call.argument<String>("format") ?: "png").lowercase()
+                    val bitmap = BitmapFactory.decodeFile(src)
+                    if (bitmap == null) {
+                        result.success(false)
+                    } else {
+                        val destFile = File(dest)
+                        destFile.parentFile?.mkdirs()
+                        val format = when (formatStr) {
+                            "png" -> Bitmap.CompressFormat.PNG
+                            "webp" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP
+                            else -> Bitmap.CompressFormat.JPEG
+                        }
+                        val ok = destFile.outputStream().use { out ->
+                            bitmap.compress(format, 90, out)
+                        }
+                        bitmap.recycle()
+                        result.success(ok)
+                    }
+                }
+                "stripExifImage" -> {
+                    val src = call.argument<String>("src") ?: ""
+                    val dest = call.argument<String>("dest") ?: ""
+                    val bitmap = BitmapFactory.decodeFile(src)
+                    if (bitmap == null) {
+                        result.success(false)
+                    } else {
+                        val destFile = File(dest)
+                        destFile.parentFile?.mkdirs()
+                        val format = if (dest.endsWith(".png", true)) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+                        val ok = destFile.outputStream().use { out ->
+                            bitmap.compress(format, 95, out)
+                        }
+                        bitmap.recycle()
+                        result.success(ok)
+                    }
+                }
+                "showNotification" -> {
+                    val title = call.argument<String>("title") ?: "通知"
+                    val body = call.argument<String>("body") ?: ""
+                    val id = nextNotificationId++
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    ensureNotificationChannel(nm)
+                    val notif = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                        .setContentTitle(title)
+                        .setContentText(body)
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .setAutoCancel(true)
+                        .build()
+                    nm.notify(id, notif)
+                    result.success(id)
+                }
+                "scheduleNotification" -> {
+                    val title = call.argument<String>("title") ?: "定时提醒"
+                    val body = call.argument<String>("body") ?: ""
+                    val delaySeconds = call.argument<Int>("delaySeconds") ?: 0
+                    val id = nextNotificationId++
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    ensureNotificationChannel(nm)
+                    val runnable = Runnable {
+                        val notif = NotificationCompat.Builder(this@MainActivity, NOTIFICATION_CHANNEL_ID)
+                            .setContentTitle(title)
+                            .setContentText(body)
+                            .setSmallIcon(R.mipmap.ic_launcher)
+                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .setAutoCancel(true)
+                            .build()
+                        nm.notify(id, notif)
+                        scheduledRunnables.remove(id)
+                    }
+                    scheduledRunnables[id] = runnable
+                    mainHandler.postDelayed(runnable, delaySeconds * 1000L)
+                    result.success(id)
+                }
+                "cancelNotification" -> {
+                    val id = call.argument<Int>("id") ?: -1
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(id)
+                    scheduledRunnables.remove(id)?.let { mainHandler.removeCallbacks(it) }
+                    result.success(true)
+                }
+                "cancelAllNotifications" -> {
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancelAll()
+                    scheduledRunnables.values.forEach { mainHandler.removeCallbacks(it) }
+                    scheduledRunnables.clear()
+                    result.success(true)
+                }
+                "playAudio" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    try {
+                        activeMediaPlayer?.release()
+                        activeMediaPlayer = MediaPlayer().apply {
+                            setDataSource(path)
+                            prepare()
+                            start()
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "stopAudio" -> {
+                    try {
+                        activeMediaPlayer?.let {
+                            if (it.isPlaying) it.stop()
+                            it.release()
+                        }
+                        activeMediaPlayer = null
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "playTone" -> {
+                    val freq = call.argument<Double>("frequency") ?: 440.0
+                    val duration = call.argument<Int>("durationMs") ?: 200
+                    Thread {
+                        try {
+                            val sampleRate = 44100
+                            val numSamples = (duration * sampleRate / 1000)
+                            val buffer = ShortArray(numSamples)
+                            for (i in 0 until numSamples) {
+                                val angle = 2.0 * Math.PI * i * freq / sampleRate
+                                buffer[i] = (Math.sin(angle) * 32767).toInt().toShort()
+                            }
+                            val minSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                            @Suppress("DEPRECATION")
+                            val track = AudioTrack(
+                                AudioManager.STREAM_MUSIC,
+                                sampleRate,
+                                AudioFormat.CHANNEL_OUT_MONO,
+                                AudioFormat.ENCODING_PCM_16BIT,
+                                Math.max(minSize, numSamples * 2),
+                                AudioTrack.MODE_STREAM
+                            )
+                            track.play()
+                            track.write(buffer, 0, numSamples)
+                            track.stop()
+                            track.release()
+                        } catch (e: Exception) {}
+                    }.start()
+                    result.success(true)
+                }
+                "getBatteryLevel" -> {
+                    try {
+                        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                        val level = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                        result.success(level)
+                    } catch (e: Exception) {
+                        result.success(100)
+                    }
+                }
+                "isCharging" -> {
+                    try {
+                        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                        val status = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
+                        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+                        result.success(isCharging)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "getNetworkType" -> {
+                    try {
+                        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val net = cm.activeNetwork
+                            val caps = cm.getNetworkCapabilities(net)
+                            val type = when {
+                                caps == null -> "none"
+                                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+                                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                                else -> "unknown"
+                            }
+                            result.success(type)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            val info = cm.activeNetworkInfo
+                            val type = when {
+                                info == null || !info.isConnected -> "none"
+                                info.type == ConnectivityManager.TYPE_WIFI -> "wifi"
+                                info.type == ConnectivityManager.TYPE_MOBILE -> "cellular"
+                                else -> "unknown"
+                            }
+                            result.success(type)
+                        }
+                    } catch (e: Exception) {
+                        result.success("unknown")
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -418,5 +699,29 @@ class MainActivity : FlutterActivity() {
         sensorManager?.let { sm ->
             sensorListeners.values.forEach { sm.unregisterListener(it) }
         }
+    }
+
+    private fun ensureNotificationChannel(nm: NotificationManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val existing = nm.getNotificationChannel(NOTIFICATION_CHANNEL_ID)
+            if (existing == null) {
+                val channel = NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "PluginToolbox 插件通知",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "展示来自 PluginToolbox 动态插件的提醒与通知"
+                }
+                nm.createNotificationChannel(channel)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activeMediaPlayer?.release()
+        activeMediaPlayer = null
+        scheduledRunnables.values.forEach { mainHandler.removeCallbacks(it) }
+        scheduledRunnables.clear()
     }
 }

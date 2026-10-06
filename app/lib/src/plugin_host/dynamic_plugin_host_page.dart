@@ -96,6 +96,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       setTorch(false);
     }
     stopSensor('all');
+    stopAudio();
     _runner?.dispose();
     _duiState.dispose();
     super.dispose();
@@ -460,6 +461,301 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       return res ?? _sensorCache[type];
     } catch (_) {
       return _sensorCache[type];
+    }
+  }
+
+  // ---- 媒体图像处理 (P2) ----
+  @override
+  Future<Map<String, dynamic>?> imageInfo(String filePath) async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
+        'imageInfo',
+        {'path': filePath},
+      );
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> compressImage(
+    String srcPath,
+    String destPath, {
+    int quality = 80,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('compressImage', {
+        'src': srcPath,
+        'dest': destPath,
+        'quality': quality,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> cropImage(
+    String srcPath,
+    String destPath, {
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('cropImage', {
+        'src': srcPath,
+        'dest': destPath,
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> convertImage(
+    String srcPath,
+    String destPath, {
+    required String format,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('convertImage', {
+        'src': srcPath,
+        'dest': destPath,
+        'format': format,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stripExifImage(String srcPath, String destPath) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('stripExifImage', {
+        'src': srcPath,
+        'dest': destPath,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 系统通知与定时调度 (P2) ----
+  @override
+  Future<int> showNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<int>('showNotification', {
+        'title': title,
+        'body': body,
+        'payload': payload,
+      });
+      return res ?? -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  @override
+  Future<int> scheduleNotification({
+    required String title,
+    required String body,
+    required int delaySeconds,
+    String? payload,
+  }) async {
+    try {
+      final res =
+          await _nativeChannel.invokeMethod<int>('scheduleNotification', {
+        'title': title,
+        'body': body,
+        'delaySeconds': delaySeconds,
+        'payload': payload,
+      });
+      return res ?? -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  @override
+  Future<bool> cancelNotification(int id) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('cancelNotification', {
+        'id': id,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> cancelAllNotifications() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('cancelAllNotifications');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 音频播放与频率发生器 (P2) ----
+  @override
+  Future<bool> playAudio(String filePath) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('playAudio', {
+        'path': filePath,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopAudio() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('stopAudio');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> playTone(double frequencyHz, int durationMs) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('playTone', {
+        'frequency': frequencyHz,
+        'durationMs': durationMs,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 高级交互弹窗 (P3) ----
+  @override
+  Future<String?> showPrompt({
+    required String title,
+    String? hint,
+    String? defaultValue,
+  }) async {
+    if (!mounted) return null;
+    final controller = TextEditingController(text: defaultValue ?? '');
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: hint),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>?> showPickItem({
+    required String title,
+    required List<String> items,
+    int initialIndex = 0,
+  }) async {
+    if (!mounted) return null;
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (int i = 0; i < items.length; i++)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, {'index': i, 'text': items[i]}),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  items[i],
+                  style: TextStyle(
+                    fontWeight: i == initialIndex ? FontWeight.bold : FontWeight.normal,
+                    color: i == initialIndex ? Theme.of(ctx).colorScheme.primary : null,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ---- 硬件与系统深度状态感知 (P3) ----
+  int _cachedBattery = 100;
+  bool _cachedIsCharging = false;
+  String _cachedNetType = 'unknown';
+
+  @override
+  int get batteryLevel => _cachedBattery;
+
+  @override
+  bool get isCharging => _cachedIsCharging;
+
+  @override
+  String get networkType => _cachedNetType;
+
+  @override
+  Future<int> getBatteryLevel() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<int>('getBatteryLevel');
+      if (res != null) _cachedBattery = res;
+      return res ?? _cachedBattery;
+    } catch (_) {
+      return _cachedBattery;
+    }
+  }
+
+  @override
+  Future<bool> checkIsCharging() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isCharging');
+      if (res != null) _cachedIsCharging = res;
+      return res ?? _cachedIsCharging;
+    } catch (_) {
+      return _cachedIsCharging;
+    }
+  }
+
+  @override
+  Future<String> fetchNetworkType() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<String>('getNetworkType');
+      if (res != null) _cachedNetType = res;
+      return res ?? _cachedNetType;
+    } catch (_) {
+      return _cachedNetType;
     }
   }
 

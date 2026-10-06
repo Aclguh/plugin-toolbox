@@ -158,6 +158,186 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   @override
   Future<Map<String, dynamic>?> getSensorData(String type) async =>
       mockSensors[type];
+
+  // P2 Mock implementations
+  final Map<String, dynamic> mockImageInfo = {
+    'width': 800,
+    'height': 600,
+    'format': 'image/jpeg',
+    'size': 102400,
+  };
+  String? compressedSrc;
+  String? compressedDest;
+  int? compressedQuality;
+  String? croppedSrc;
+  String? croppedDest;
+  String? convertedSrc;
+  String? convertedDest;
+  String? convertedFormat;
+  String? stripExifSrc;
+  String? stripExifDest;
+
+  @override
+  Future<Map<String, dynamic>?> imageInfo(String filePath) async =>
+      mockImageInfo;
+
+  @override
+  Future<bool> compressImage(
+    String srcPath,
+    String destPath, {
+    int quality = 80,
+  }) async {
+    compressedSrc = srcPath;
+    compressedDest = destPath;
+    compressedQuality = quality;
+    return true;
+  }
+
+  @override
+  Future<bool> cropImage(
+    String srcPath,
+    String destPath, {
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+  }) async {
+    croppedSrc = srcPath;
+    croppedDest = destPath;
+    return true;
+  }
+
+  @override
+  Future<bool> convertImage(
+    String srcPath,
+    String destPath, {
+    required String format,
+  }) async {
+    convertedSrc = srcPath;
+    convertedDest = destPath;
+    convertedFormat = format;
+    return true;
+  }
+
+  @override
+  Future<bool> stripExifImage(String srcPath, String destPath) async {
+    stripExifSrc = srcPath;
+    stripExifDest = destPath;
+    return true;
+  }
+
+  final List<Map<String, dynamic>> sentNotifications = [];
+  final List<int> cancelledNotificationIds = [];
+  bool cancelledAllNotifs = false;
+  int notifIdCounter = 100;
+
+  @override
+  Future<int> showNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    final id = ++notifIdCounter;
+    sentNotifications
+        .add({'id': id, 'title': title, 'body': body, 'payload': payload});
+    return id;
+  }
+
+  @override
+  Future<int> scheduleNotification({
+    required String title,
+    required String body,
+    required int delaySeconds,
+    String? payload,
+  }) async {
+    final id = ++notifIdCounter;
+    sentNotifications.add({
+      'id': id,
+      'title': title,
+      'body': body,
+      'delaySeconds': delaySeconds,
+      'payload': payload,
+    });
+    return id;
+  }
+
+  @override
+  Future<bool> cancelNotification(int id) async {
+    cancelledNotificationIds.add(id);
+    return true;
+  }
+
+  @override
+  Future<bool> cancelAllNotifications() async {
+    cancelledAllNotifs = true;
+    return true;
+  }
+
+  String? playedAudioPath;
+  bool audioStopped = false;
+  double? playedToneFreq;
+  int? playedToneDuration;
+
+  @override
+  Future<bool> playAudio(String filePath) async {
+    playedAudioPath = filePath;
+    return true;
+  }
+
+  @override
+  Future<bool> stopAudio() async {
+    audioStopped = true;
+    return true;
+  }
+
+  @override
+  Future<bool> playTone(double frequencyHz, int durationMs) async {
+    playedToneFreq = frequencyHz;
+    playedToneDuration = durationMs;
+    return true;
+  }
+
+  // P3 Mock implementations
+  String? mockPromptResult = 'user-inputted-text';
+  Map<String, dynamic>? mockPickItemResult = {'index': 1, 'text': 'Option 2'};
+
+  @override
+  Future<String?> showPrompt({
+    required String title,
+    String? hint,
+    String? defaultValue,
+  }) async =>
+      mockPromptResult;
+
+  @override
+  Future<Map<String, dynamic>?> showPickItem({
+    required String title,
+    required List<String> items,
+    int initialIndex = 0,
+  }) async =>
+      mockPickItemResult;
+
+  int mockBatteryLevel = 85;
+  bool mockIsCharging = true;
+  String mockNetworkType = 'wifi';
+
+  @override
+  int get batteryLevel => mockBatteryLevel;
+
+  @override
+  bool get isCharging => mockIsCharging;
+
+  @override
+  String get networkType => mockNetworkType;
+
+  @override
+  Future<int> getBatteryLevel() async => mockBatteryLevel;
+
+  @override
+  Future<bool> checkIsCharging() async => mockIsCharging;
+
+  @override
+  Future<String> fetchNetworkType() async => mockNetworkType;
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -1381,6 +1561,244 @@ void main() {
       // 7. 关闭引擎自动释放全部传感器监听
       sensorEngine.close();
       expect(delegate.stoppedSensors.contains('all'), isTrue);
+    });
+
+    test('ImageApi: 权限控制、沙箱防护与图像处理能力', () async {
+      // 1. 未声明 storage 权限时拦截
+      final noStorageCtx = PluginContext(
+        pluginId: 'img_no_perm',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      final noStorageEngine =
+          LuaEngine(context: noStorageCtx, delegate: delegate);
+      expect(
+        () => noStorageEngine.loadAndExecute('image.info("pic.jpg")'),
+        throwsA(isA<Exception>()),
+      );
+
+      // 2. 声明 storage 权限
+      final tempDir = Directory.systemTemp.createTempSync('ptx_image_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      File('${tempDir.path}/pic.jpg').writeAsStringSync('fake-jpeg');
+
+      final imgCtx = PluginContext(
+        pluginId: 'img_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final imgEngine = LuaEngine(context: imgCtx, delegate: delegate);
+
+      // 3. 越界沙箱路径拦截
+      expect(
+        () => imgEngine.loadAndExecute('image.compress("../../evil.jpg", 50)'),
+        throwsException,
+      );
+
+      // 4. image.info 读取信息
+      imgEngine.loadAndExecute('''
+        image.info("pic.jpg", function(info)
+          state.set("info_w", info.width)
+          state.set("info_h", info.height)
+          state.set("info_fmt", info.format)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('info_w'), 800);
+      expect(delegate.getState('info_h'), 600);
+      expect(delegate.getState('info_fmt'), 'image/jpeg');
+
+      // 5. image.compress
+      imgEngine.loadAndExecute('''
+        image.compress("pic.jpg", 70, function(target)
+          state.set("comp_dest", target)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.compressedQuality, 70);
+      expect(delegate.getState('comp_dest'), contains('compressed.jpg'));
+
+      // 6. image.crop
+      imgEngine.loadAndExecute('''
+        image.crop("pic.jpg", 10, 20, 100, 150, function(target)
+          state.set("crop_dest", target)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('crop_dest'), contains('cropped.png'));
+
+      // 7. image.convert
+      imgEngine.loadAndExecute('''
+        image.convert("pic.jpg", "webp", function(target)
+          state.set("conv_dest", target)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.convertedFormat, 'webp');
+      expect(delegate.getState('conv_dest'), contains('.webp'));
+
+      // 8. image.stripExif
+      imgEngine.loadAndExecute('''
+        image.stripExif("pic.jpg", function(target)
+          state.set("exif_dest", target)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('exif_dest'), contains('clean.jpg'));
+    });
+
+    test('NotificationApi: 权限控制与通知调度流转', () async {
+      // 1. 未声明 notification 权限时报错
+      expect(
+        () => engine.loadAndExecute('notification.show("测试", "内容")'),
+        throwsA(isA<Exception>()),
+      );
+
+      // 2. 声明 notification 权限
+      final notifCtx = PluginContext(
+        pluginId: 'notif_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.notification},
+      );
+      final notifEngine = LuaEngine(context: notifCtx, delegate: delegate);
+
+      // 3. 即时通知
+      notifEngine.loadAndExecute('''
+        notification.show("即时提醒", "喝水时间到了", function(id)
+          state.set("shown_id", id)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.sentNotifications.length, 1);
+      expect(delegate.sentNotifications.first['title'], '即时提醒');
+      expect(delegate.getState('shown_id'), isNotNull);
+
+      // 4. 定时调度通知
+      notifEngine.loadAndExecute('''
+        notification.schedule("番茄钟", "专注结束", 1500, function(id)
+          state.set("sched_id", id)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.sentNotifications.length, 2);
+      expect(delegate.sentNotifications.last['delaySeconds'], 1500);
+
+      // 5. 取消指定通知与全部取消
+      notifEngine.loadAndExecute('''
+        notification.cancel(101)
+        notification.cancelAll()
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.cancelledNotificationIds.contains(101), isTrue);
+      expect(delegate.cancelledAllNotifs, isTrue);
+    });
+
+    test('AudioApi: 音频播放、停止与频率合成器', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_audio_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      File('${tempDir.path}/bell.mp3').writeAsStringSync('fake-audio');
+
+      final audioCtx = PluginContext(
+        pluginId: 'audio_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final audioEngine = LuaEngine(context: audioCtx, delegate: delegate);
+
+      // 1. 越界播放拦截
+      expect(
+        () => audioEngine.loadAndExecute('audio.play("../escape.mp3")'),
+        throwsException,
+      );
+
+      // 2. 正常播放与停止
+      audioEngine.loadAndExecute('''
+        audio.play("bell.mp3", function(ok)
+          state.set("audio_ok", ok)
+        end)
+        audio.stop()
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.playedAudioPath, contains('bell.mp3'));
+      expect(delegate.getState('audio_ok'), isTrue);
+      expect(delegate.audioStopped, isTrue);
+
+      // 3. playTone 正弦波合成音
+      audioEngine.loadAndExecute('''
+        audio.playTone(440, 300, function(ok)
+          state.set("tone_ok", ok)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.playedToneFreq, 440.0);
+      expect(delegate.playedToneDuration, 300);
+      expect(delegate.getState('tone_ok'), isTrue);
+
+      // 4. close 释放
+      delegate.audioStopped = false;
+      audioEngine.close();
+      expect(delegate.audioStopped, isTrue);
+    });
+
+    test('DialogApi: prompt 与 pickItem 高级弹窗交互', () async {
+      engine.loadAndExecute('''
+        dialog.prompt("输入密码", "请输入8位字符", function(text)
+          state.set("pwd_input", text)
+        end)
+
+        dialog.pickItem("选择进制", {"二进制", "八进制", "十六进制"}, 1, function(item, idx)
+          state.set("picked_item", item)
+          state.set("picked_idx", idx)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('pwd_input'), 'user-inputted-text');
+      expect(delegate.getState('picked_item'), 'Option 2');
+      expect(delegate.getState('picked_idx'), 2);
+    });
+
+    test('SystemApi: 电池电量与网络感知', () async {
+      // 1. 同步读取
+      engine.loadAndExecute('''
+        state.set("batt_sync", system.batteryLevel())
+        state.set("charge_sync", system.isCharging())
+        state.set("net_sync", system.networkType())
+      ''');
+      expect(delegate.getState('batt_sync'), 85);
+      expect(delegate.getState('charge_sync'), isTrue);
+      expect(delegate.getState('net_sync'), 'wifi');
+
+      // 2. 异步回调读取
+      engine.loadAndExecute('''
+        system.batteryLevel(function(lvl)
+          state.set("batt_async", lvl)
+        end)
+        system.isCharging(function(chg)
+          state.set("charge_async", chg)
+        end)
+        system.networkType(function(net)
+          state.set("net_async", net)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(delegate.getState('batt_async'), 85);
+      expect(delegate.getState('charge_async'), isTrue);
+      expect(delegate.getState('net_async'), 'wifi');
     });
   });
 }

@@ -520,5 +520,87 @@ void main() {
       await tester.pump();
       expect(state.get('switch_val'), isTrue);
     });
+
+    testWidgets('DuiRenderer 渲染 Tabs 分段标签页并响应切换', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('tab_idx', 0);
+
+      final node = {
+        'type': 'Tabs',
+        'ref': 'tab_idx',
+        'props': {
+          'tabs': ['第一页', '第二页'],
+          'initialIndex': 0,
+        },
+        'children': [
+          {
+            'type': 'Text',
+            'props': {'text': '内容一'},
+          },
+          {
+            'type': 'Text',
+            'props': {'text': '内容二'},
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('第一页'), findsOneWidget);
+      expect(find.text('第二页'), findsOneWidget);
+      expect(find.text('内容一'), findsOneWidget);
+      expect(find.text('内容二'), findsNothing);
+
+      // 切换至第二页
+      await tester.tap(find.text('第二页'));
+      await tester.pump();
+
+      expect(state.get('tab_idx'), 1);
+      expect(find.text('内容一'), findsNothing);
+      expect(find.text('内容二'), findsOneWidget);
+    });
+
+    testWidgets('DuiRenderer 渲染 MarkdownView 与状态插值', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('md_text', '# 标题一\n> 引用说明\n- 列表项\n```dart\nvoid main() {}\n```');
+
+      final node = {
+        'type': 'MarkdownView',
+        'props': {
+          'text': '{{state.md_text}}',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiMarkdownView), findsOneWidget);
+      expect(find.text('标题一'), findsOneWidget);
+      expect(find.text('引用说明'), findsOneWidget);
+      expect(find.text('void main() {}'), findsOneWidget);
+    });
   });
 }

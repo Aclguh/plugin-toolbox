@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import 'dui_event_handler.dart';
+import 'dui_markdown.dart';
 import 'dui_pixel_grid.dart';
 import 'dui_state.dart';
 import 'dui_utils.dart';
@@ -507,6 +508,53 @@ class DuiRenderer {
       }
       return buildDropdown();
     });
+
+    // ---- 标签页容器 (Tabs / TabBar) ----
+    Widget buildTabs(DuiNodeContext node) {
+      final rawTabs = node.props['tabs'] as List<dynamic>? ?? const [];
+      final tabs = rawTabs.map((e) => state.interpolate(e.toString())).toList();
+      final ref = node.ref;
+      final initialIndex = DuiUtils.tryInt(node.props['initialIndex']) ?? 0;
+      final children = node.childrenWidgets;
+
+      return _DuiTabs(
+        tabTitles: tabs,
+        initialIndex: initialIndex,
+        refKey: ref,
+        state: state,
+        onChanged: (idx) {
+          if (node.events.containsKey('onChanged')) {
+            eventHandler.handleEvent(node.events['onChanged'], idx);
+          }
+        },
+        children: children,
+      );
+    }
+    registerFactory('Tabs', buildTabs);
+    registerFactory('TabBar', buildTabs);
+
+    // ---- Markdown 渲染组件 (MarkdownView / Markdown) ----
+    Widget buildMarkdown(DuiNodeContext node) {
+      final rawText = node.props['text']?.toString() ??
+          node.props['data']?.toString() ??
+          '';
+      final selectable =
+          DuiUtils.tryBool(node.props['selectable'], fallback: true);
+      final keys = DuiState.extractKeys(rawText);
+
+      Widget renderMd() => DuiMarkdownView(
+            data: state.interpolate(rawText),
+            selectable: selectable,
+          );
+
+      if (keys.isEmpty) return renderMd();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => renderMd(),
+      );
+    }
+    registerFactory('MarkdownView', buildMarkdown);
+    registerFactory('Markdown', buildMarkdown);
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，
@@ -636,3 +684,130 @@ class _BoundTextFieldState extends State<_BoundTextField> {
     );
   }
 }
+
+class _DuiTabs extends StatefulWidget {
+  final List<String> tabTitles;
+  final List<Widget> children;
+  final int initialIndex;
+  final String? refKey;
+  final DuiState state;
+  final ValueChanged<int>? onChanged;
+
+  const _DuiTabs({
+    required this.tabTitles,
+    required this.children,
+    this.initialIndex = 0,
+    this.refKey,
+    required this.state,
+    this.onChanged,
+  });
+
+  @override
+  State<_DuiTabs> createState() => _DuiTabsState();
+}
+
+class _DuiTabsState extends State<_DuiTabs> {
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = _resolveCurrentIndex();
+  }
+
+  int _resolveCurrentIndex() {
+    if (widget.refKey != null) {
+      final val = widget.state.get(widget.refKey!);
+      final parsed = DuiUtils.tryInt(val);
+      if (parsed != null && parsed >= 0 && parsed < widget.children.length) {
+        return parsed;
+      }
+    }
+    return widget.initialIndex
+        .clamp(0, widget.children.isNotEmpty ? widget.children.length - 1 : 0);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DuiTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextIndex = _resolveCurrentIndex();
+    if (nextIndex != _currentIndex) {
+      setState(() {
+        _currentIndex = nextIndex;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final titles = widget.tabTitles.isNotEmpty
+        ? widget.tabTitles
+        : List.generate(widget.children.length, (i) => 'Tab ${i + 1}');
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (titles.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                for (int i = 0; i < titles.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (_currentIndex != i) {
+                          setState(() {
+                            _currentIndex = i;
+                          });
+                          if (widget.refKey != null) {
+                            widget.state.set(widget.refKey!, i);
+                          }
+                          widget.onChanged?.call(i);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _currentIndex == i
+                              ? colorScheme.primary
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          titles[i],
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: _currentIndex == i
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _currentIndex == i
+                                ? colorScheme.onPrimary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (widget.children.isNotEmpty &&
+            _currentIndex < widget.children.length)
+          widget.children[_currentIndex]
+        else
+          const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
