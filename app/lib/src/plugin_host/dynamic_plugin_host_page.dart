@@ -649,6 +649,94 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
+  // ---- 生物认证与端侧交互 ----
+  @override
+  Future<bool> isBiometricsAvailable() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isBiometricsAvailable');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
+        'authenticateBiometrics',
+        {'reason': reason},
+      );
+      return res ?? {'success': false, 'error': 'failed'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ---- 麦克风录音与声音分贝感知 ----
+  @override
+  Future<bool> startAudioRecording(String destPath) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('startAudioRecording', {
+        'path': destPath,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> stopAudioRecording() async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('stopAudioRecording');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<double> getAudioDecibel() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<double>('getAudioDecibel');
+      return res ?? 0.0;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  // ---- 语音合成 (TTS) ----
+  @override
+  Future<bool> speakText(
+    String text, {
+    String? language,
+    double? pitch,
+    double? rate,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('speakText', {
+        'text': text,
+        'language': language,
+        'pitch': pitch,
+        'rate': rate,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopSpeaking() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('stopSpeaking');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ---- 高级交互弹窗 (P3) ----
   @override
   Future<String?> showPrompt({

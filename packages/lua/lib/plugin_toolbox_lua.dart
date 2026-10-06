@@ -28,4 +28,6 @@ export 'src/api/sensor_api.dart';
 export 'src/api/image_api.dart';
 export 'src/api/notification_api.dart';
 export 'src/api/audio_api.dart';
-
+export 'src/api/socket_api.dart';
+export 'src/api/websocket_api.dart';
+export 'src/api/biometrics_api.dart';

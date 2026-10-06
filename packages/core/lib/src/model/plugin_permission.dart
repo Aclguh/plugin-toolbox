@@ -7,7 +7,9 @@ enum PluginPermission {
   photoLibrary('相册', '允许读取设备相册图片'),
   torch('手电筒', '允许控制设备闪光灯与手电筒'),
   sensor('传感器', '允许读取设备运动与方向传感器数据'),
-  notification('本地通知', '允许发送本地系统通知');
+  notification('本地通知', '允许发送本地系统通知'),
+  biometrics('生物认证', '允许调用系统指纹或面容识别进行身份核验'),
+  microphone('麦克风录音', '允许使用设备麦克风录音与实时声音分贝感知');
 
   const PluginPermission(this.label, this.description);
 
@@ -33,6 +35,10 @@ enum PluginPermission {
         return PluginPermission.sensor;
       case 'notification':
         return PluginPermission.notification;
+      case 'biometrics':
+        return PluginPermission.biometrics;
+      case 'microphone':
+        return PluginPermission.microphone;
       default:
         return null;
     }

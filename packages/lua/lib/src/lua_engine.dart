@@ -31,6 +31,7 @@ import 'api/notification_api.dart';
 import 'api/audio_api.dart';
 import 'api/socket_api.dart';
 import 'api/websocket_api.dart';
+import 'api/biometrics_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -234,6 +235,37 @@ abstract class LuaHostDelegate {
 
   /// 异步查询网络连接类型
   Future<String> fetchNetworkType() async => networkType;
+
+  // ---- 生物认证与端侧交互 ----
+  /// 查询当前设备是否支持生物认证且已录入凭据
+  Future<bool> isBiometricsAvailable() async => false;
+
+  /// 发起生物认证核验 (返回 Map: {'success': bool, 'error': String?})
+  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) async =>
+      {'success': false, 'error': 'not_supported'};
+
+  // ---- 麦克风录音与声音分贝感知 ----
+  /// 开始录音至沙箱目标路径 (返回是否成功)
+  Future<bool> startAudioRecording(String destPath) async => false;
+
+  /// 停止录音并返回录音文件信息 (Map: {'ok': bool, 'path': String, 'durationMs': int})
+  Future<Map<String, dynamic>?> stopAudioRecording() async => null;
+
+  /// 获取当前环境实时声音分贝值 (0.0 ~ 120.0 dB)
+  Future<double> getAudioDecibel() async => 0.0;
+
+  // ---- 语音合成 (TTS) ----
+  /// 朗读文本 (返回是否成功发起)
+  Future<bool> speakText(
+    String text, {
+    String? language,
+    double? pitch,
+    double? rate,
+  }) async =>
+      false;
+
+  /// 停止当前语音朗读
+  Future<bool> stopSpeaking() async => false;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -324,6 +356,7 @@ class LuaEngine {
     _socketApi!.bind(_ls, context, _callbacks!);
     _webSocketApi = WebSocketApi();
     _webSocketApi!.bind(_ls, context, _callbacks!);
+    BiometricsApi.bind(_ls, context, delegate, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串

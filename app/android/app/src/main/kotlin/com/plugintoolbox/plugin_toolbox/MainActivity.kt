@@ -1,6 +1,7 @@
 package com.plugintoolbox.plugin_toolbox
 
 import android.app.Activity
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ContentValues
@@ -17,6 +18,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -26,6 +28,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import com.google.zxing.BinaryBitmap
@@ -36,6 +39,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.plugintoolbox/host_native"
@@ -48,6 +52,15 @@ class MainActivity : FlutterActivity() {
     private val geomagneticValues = FloatArray(3)
     private var hasGravity = false
     private var hasGeomagnetic = false
+
+    // 录音与音频感知
+    private var activeMediaRecorder: MediaRecorder? = null
+    private var recordingStartTime = 0L
+    private var recordingFilePath: String? = null
+
+    // TTS 语音合成
+    private var textToSpeech: TextToSpeech? = null
+    private var ttsReady = false
 
     // 扫码状态
     private var pendingScanResult: MethodChannel.Result? = null
@@ -619,6 +632,132 @@ class MainActivity : FlutterActivity() {
                         result.success("unknown")
                     }
                 }
+                "isBiometricsAvailable" -> {
+                    try {
+                        val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                        val isSecure = km?.isDeviceSecure ?: false
+                        result.success(isSecure)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "authenticateBiometrics" -> {
+                    try {
+                        val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                        if (km == null || !km.isDeviceSecure) {
+                            result.success(mapOf("success" to false, "error" to "Device credentials not set or insecure"))
+                        } else {
+                            result.success(mapOf("success" to true))
+                        }
+                    } catch (e: Exception) {
+                        result.success(mapOf("success" to false, "error" to e.message))
+                    }
+                }
+                "startAudioRecording" -> {
+                    val destPath = call.argument<String>("path") ?: ""
+                    try {
+                        activeMediaRecorder?.release()
+                        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            MediaRecorder(this)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            MediaRecorder()
+                        }
+                        recorder.apply {
+                            setAudioSource(MediaRecorder.AudioSource.MIC)
+                            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                            setOutputFile(destPath)
+                            prepare()
+                            start()
+                        }
+                        activeMediaRecorder = recorder
+                        recordingStartTime = System.currentTimeMillis()
+                        recordingFilePath = destPath
+                        result.success(true)
+                    } catch (e: Exception) {
+                        activeMediaRecorder = null
+                        result.success(false)
+                    }
+                }
+                "stopAudioRecording" -> {
+                    try {
+                        val durationMs = (System.currentTimeMillis() - recordingStartTime).toInt()
+                        val path = recordingFilePath
+                        activeMediaRecorder?.let {
+                            try { it.stop() } catch (_: Exception) {}
+                            it.release()
+                        }
+                        activeMediaRecorder = null
+                        recordingFilePath = null
+                        if (path != null) {
+                            val f = File(path)
+                            val size = if (f.exists()) f.length().toInt() else 0
+                            result.success(mapOf(
+                                "path" to path,
+                                "durationMs" to durationMs,
+                                "size" to size
+                            ))
+                        } else {
+                            result.success(null)
+                        }
+                    } catch (e: Exception) {
+                        activeMediaRecorder?.release()
+                        activeMediaRecorder = null
+                        result.success(null)
+                    }
+                }
+                "getAudioDecibel" -> {
+                    try {
+                        val maxAmp = activeMediaRecorder?.maxAmplitude ?: 0
+                        if (maxAmp > 0) {
+                            val db = 20 * Math.log10(maxAmp.toDouble())
+                            result.success(db)
+                        } else {
+                            result.success(0.0)
+                        }
+                    } catch (e: Exception) {
+                        result.success(0.0)
+                    }
+                }
+                "speakText" -> {
+                    val text = call.argument<String>("text") ?: ""
+                    val lang = call.argument<String?>("language")
+                    val pitch = call.argument<Double?>("pitch")?.toFloat() ?: 1.0f
+                    val rate = call.argument<Double?>("rate")?.toFloat() ?: 1.0f
+
+                    fun doSpeak() {
+                        textToSpeech?.apply {
+                            setPitch(pitch)
+                            setSpeechRate(rate)
+                            if (!lang.isNullOrEmpty()) {
+                                language = Locale.forLanguageTag(lang)
+                            }
+                            speak(text, TextToSpeech.QUEUE_FLUSH, null, "tts_${System.currentTimeMillis()}")
+                        }
+                    }
+
+                    if (textToSpeech == null) {
+                        textToSpeech = TextToSpeech(this) { status ->
+                            if (status == TextToSpeech.SUCCESS) {
+                                ttsReady = true
+                                doSpeak()
+                            }
+                        }
+                        result.success(true)
+                    } else {
+                        doSpeak()
+                        result.success(true)
+                    }
+                }
+                "stopSpeaking" -> {
+                    try {
+                        textToSpeech?.stop()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -721,6 +860,13 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
         activeMediaPlayer?.release()
         activeMediaPlayer = null
+        activeMediaRecorder?.let {
+            try { it.stop() } catch (_: Exception) {}
+            it.release()
+        }
+        activeMediaRecorder = null
+        textToSpeech?.shutdown()
+        textToSpeech = null
         scheduledRunnables.values.forEach { mainHandler.removeCallbacks(it) }
         scheduledRunnables.clear()
     }

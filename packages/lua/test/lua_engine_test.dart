@@ -347,6 +347,63 @@ class MockLuaHostDelegate implements LuaHostDelegate {
 
   @override
   Future<String> fetchNetworkType() async => mockNetworkType;
+
+  bool mockBiometricsAvailable = true;
+  Map<String, dynamic> mockBiometricsAuth = {'success': true};
+  String? recordedAudioPath;
+  bool audioRecordingStopped = false;
+  double mockDecibel = 65.5;
+  String? spokenText;
+  String? spokenLanguage;
+  double? spokenPitch;
+  double? spokenRate;
+  bool speechStopped = false;
+
+  @override
+  Future<bool> isBiometricsAvailable() async => mockBiometricsAvailable;
+
+  @override
+  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) async =>
+      mockBiometricsAuth;
+
+  @override
+  Future<bool> startAudioRecording(String destPath) async {
+    recordedAudioPath = destPath;
+    return true;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> stopAudioRecording() async {
+    audioRecordingStopped = true;
+    return {
+      'path': recordedAudioPath ?? 'data/rec.m4a',
+      'durationMs': 1500,
+      'size': 12345,
+    };
+  }
+
+  @override
+  Future<double> getAudioDecibel() async => mockDecibel;
+
+  @override
+  Future<bool> speakText(
+    String text, {
+    String? language,
+    double? pitch,
+    double? rate,
+  }) async {
+    spokenText = text;
+    spokenLanguage = language;
+    spokenPitch = pitch;
+    spokenRate = rate;
+    return true;
+  }
+
+  @override
+  Future<bool> stopSpeaking() async {
+    speechStopped = true;
+    return true;
+  }
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -1957,6 +2014,118 @@ void main() {
       expect(delegate.getState('scan_open'), isFalse);
 
       netEngine.close();
+    });
+
+    test('BiometricsApi: 权限拦截与生物识别核验绑定', () async {
+      // 1. 无权限时报错
+      final noPermEngine = LuaEngine(context: context, delegate: delegate);
+      expect(
+        () => noPermEngine.loadAndExecute('biometrics.isAvailable()'),
+        throwsException,
+      );
+      noPermEngine.close();
+
+      // 2. 有权限时调用
+      final bioCtx = PluginContext(
+        pluginId: 'bio_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.biometrics},
+      );
+      final bioEngine = LuaEngine(context: bioCtx, delegate: delegate);
+
+      bioEngine.loadAndExecute('''
+        biometrics.isAvailable(function(avail)
+          state.set("bio_avail", avail)
+        end)
+        biometrics.authenticate("请验证指纹", function(res)
+          state.set("bio_success", res.success)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('bio_avail'), isTrue);
+      expect(delegate.getState('bio_success'), isTrue);
+
+      bioEngine.close();
+    });
+
+    test('AudioApi: 录音与分贝感知 (权限校验、防路径穿越与回调)', () async {
+      // 1. 无权限时报错
+      final noPermEngine = LuaEngine(context: context, delegate: delegate);
+      expect(
+        () => noPermEngine.loadAndExecute('audio.startRecord("data/test.m4a")'),
+        throwsException,
+      );
+      expect(
+        () => noPermEngine.loadAndExecute('audio.getDecibel()'),
+        throwsException,
+      );
+      noPermEngine.close();
+
+      // 2. 有权限但路径逃逸沙箱
+      final tempDir = await Directory.systemTemp.createTemp('ptx_audio_test');
+      final audioCtx = PluginContext(
+        pluginId: 'audio_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {
+          PluginPermission.microphone,
+          PluginPermission.storage,
+        },
+      );
+      final audioEngine = LuaEngine(context: audioCtx, delegate: delegate);
+
+      expect(
+        () => audioEngine.loadAndExecute('audio.startRecord("../escape.m4a")'),
+        throwsException,
+      );
+
+      // 3. 正常录音流程与分贝检测
+      audioEngine.loadAndExecute('''
+        audio.startRecord("data/rec.m4a", function(ok)
+          state.set("rec_started", ok)
+        end)
+        audio.getDecibel(function(db)
+          state.set("rec_db", db)
+        end)
+        audio.stopRecord(function(info)
+          state.set("rec_stopped", true)
+          state.set("rec_path", info.path)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('rec_started'), isTrue);
+      expect(delegate.getState('rec_db'), 65.5);
+      expect(delegate.getState('rec_stopped'), isTrue);
+      expect(delegate.getState('rec_path'), contains('rec.m4a'));
+
+      audioEngine.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('SystemApi: speak 与 stopSpeak 语音合成调用', () async {
+      engine.loadAndExecute('''
+        system.speak("Hello Toolbox", { language = "zh-CN", pitch = 1.2, rate = 0.9 }, function(ok)
+          state.set("speak_ok", ok)
+        end)
+        system.stopSpeak(function(ok)
+          state.set("stop_speak_ok", ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('speak_ok'), isTrue);
+      expect(delegate.spokenText, 'Hello Toolbox');
+      expect(delegate.spokenLanguage, 'zh-CN');
+      expect(delegate.spokenPitch, 1.2);
+      expect(delegate.spokenRate, 0.9);
+      expect(delegate.getState('stop_speak_ok'), isTrue);
+      expect(delegate.speechStopped, isTrue);
     });
   });
 }

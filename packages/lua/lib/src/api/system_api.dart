@@ -162,6 +162,74 @@ class SystemApi {
     });
     ls.setField(-2, 'openUrl');
 
+    // system.speak(text [, optionsTable | callback, callback])
+    ls.pushDartFunction((ls) {
+      final text = ls.checkString(1) ?? '';
+      String? language;
+      double? pitch;
+      double? rate;
+      int? cbRef;
+
+      if (callbacks != null) {
+        if (ls.type(2) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(2);
+        } else if (ls.type(2) == LuaType.luaTable) {
+          ls.getField(2, 'language');
+          if (ls.isString(-1)) language = ls.toStr(-1);
+          ls.pop(1);
+
+          ls.getField(2, 'pitch');
+          if (ls.isNumber(-1)) pitch = ls.toNumber(-1);
+          ls.pop(1);
+
+          ls.getField(2, 'rate');
+          if (ls.isNumber(-1)) rate = ls.toNumber(-1);
+          ls.pop(1);
+
+          if (ls.type(3) == LuaType.luaFunction) {
+            cbRef = callbacks.ref(3);
+          }
+        }
+      }
+
+      if (delegate != null) {
+        delegate
+            .speakText(text, language: language, pitch: pitch, rate: rate)
+            .then((ok) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [ok]);
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [false]);
+          }
+        });
+      }
+      return 0;
+    });
+    ls.setField(-2, 'speak');
+
+    // system.stopSpeak([callback])
+    ls.pushDartFunction((ls) {
+      int? cbRef;
+      if (callbacks != null && ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      }
+      if (delegate != null) {
+        delegate.stopSpeaking().then((ok) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [ok]);
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [false]);
+          }
+        });
+      }
+      return 0;
+    });
+    ls.setField(-2, 'stopSpeak');
+
     ls.setGlobal('system');
   }
 
