@@ -209,6 +209,13 @@ abstract class LuaHostDelegate {
   }) async =>
       null;
 
+  /// 弹出底部动作面板 (Modal Bottom Sheet)，返回选中项 Map: {'index': int, 'text': String}，取消返回 null
+  Future<Map<String, dynamic>?> showBottomSheet({
+    required String title,
+    required List<String> items,
+  }) async =>
+      null;
+
   // ---- 硬件与系统深度状态感知 (P3) ----
   /// 获取当前电池电量百分比 (0 ~ 100)
   int get batteryLevel => 100;

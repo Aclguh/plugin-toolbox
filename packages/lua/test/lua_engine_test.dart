@@ -317,6 +317,15 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   }) async =>
       mockPickItemResult;
 
+  Map<String, dynamic>? mockBottomSheetResult = {'index': 0, 'text': 'Item 1'};
+
+  @override
+  Future<Map<String, dynamic>?> showBottomSheet({
+    required String title,
+    required List<String> items,
+  }) async =>
+      mockBottomSheetResult;
+
   int mockBatteryLevel = 85;
   bool mockIsCharging = true;
   String mockNetworkType = 'wifi';
@@ -1764,12 +1773,19 @@ void main() {
           state.set("picked_item", item)
           state.set("picked_idx", idx)
         end)
+
+        dialog.bottomSheet("快捷菜单", {"选项A", "选项B"}, function(item, idx)
+          state.set("sheet_item", item)
+          state.set("sheet_idx", idx)
+        end)
       ''');
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(delegate.getState('pwd_input'), 'user-inputted-text');
       expect(delegate.getState('picked_item'), 'Option 2');
       expect(delegate.getState('picked_idx'), 2);
+      expect(delegate.getState('sheet_item'), 'Item 1');
+      expect(delegate.getState('sheet_idx'), 1);
     });
 
     test('SystemApi: 电池电量与网络感知', () async {

@@ -262,6 +262,57 @@ class DialogApi {
     });
     ls.setField(-2, 'pickItem');
 
+    // dialog.bottomSheet(title, items [, callback])
+    // 弹出底部动作面板，callback(text, index)
+    ls.pushDartFunction((ls) {
+      final title = ls.checkString(1) ?? '';
+      final items = <String>[];
+      if (ls.type(2) == LuaType.luaTable) {
+        final len = ls.rawLen(2);
+        for (int i = 1; i <= len; i++) {
+          ls.rawGetI(2, i);
+          items.add(ls.toStr(-1) ?? '');
+          ls.pop(1);
+        }
+      }
+
+      int? cbRef;
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      }
+
+      unawaited(
+        delegate.showBottomSheet(title: title, items: items).then((result) {
+          if (cbRef != null) {
+            if (result != null) {
+              final text = result['text']?.toString();
+              final idx = (result['index'] as int? ?? 0) + 1;
+              callbacks.invokeAndRelease(cbRef, [text, idx]);
+            } else {
+              callbacks.invokeAndRelease(cbRef, [null, null]);
+            }
+          } else {
+            if (result != null) {
+              delegate.onStateChanged('__dialog_sheet_item', result['text']);
+              delegate.onStateChanged(
+                '__dialog_sheet_index',
+                (result['index'] as int? ?? 0) + 1,
+              );
+            } else {
+              delegate.onStateChanged('__dialog_sheet_item', null);
+              delegate.onStateChanged('__dialog_sheet_index', null);
+            }
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [null, null]);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'bottomSheet');
+
     ls.setGlobal('dialog');
 
   }

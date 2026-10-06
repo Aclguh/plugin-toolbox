@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
+import 'dui_canvas.dart';
 import 'dui_event_handler.dart';
 import 'dui_markdown.dart';
 import 'dui_pixel_grid.dart';
@@ -324,6 +325,40 @@ class DuiRenderer {
             DuiUtils.parseColor(node.props['darkColor']) ?? const Color(0xFF000000),
         lightColor: DuiUtils.parseColor(node.props['lightColor']) ??
             const Color(0xFFFFFFFF),
+      );
+    });
+
+    // ---- 动态指令画板 (Canvas) ----
+    registerFactory('Canvas', (node) {
+      final width = node.width ?? 300.0;
+      final height = node.height ?? 200.0;
+      final bgColor = DuiUtils.parseColor(
+        state.interpolate(node.props['backgroundColor']?.toString() ?? ''),
+      );
+      final rawCommands = node.props['commands'];
+      if (rawCommands is String) {
+        final keys = DuiState.extractKeys(rawCommands);
+        Widget buildCanvas() {
+          final interpolated = state.interpolate(rawCommands);
+          return DuiCanvas(
+            width: width,
+            height: height,
+            backgroundColor: bgColor,
+            commands: interpolated,
+          );
+        }
+
+        if (keys.isEmpty) return buildCanvas();
+        return ListenableBuilder(
+          listenable: state.listenableForKeys(keys),
+          builder: (_, __) => buildCanvas(),
+        );
+      }
+      return DuiCanvas(
+        width: width,
+        height: height,
+        backgroundColor: bgColor,
+        commands: rawCommands,
       );
     });
 

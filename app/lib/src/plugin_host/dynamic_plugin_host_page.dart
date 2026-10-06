@@ -712,6 +712,53 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     );
   }
 
+  @override
+  Future<Map<String, dynamic>?> showBottomSheet({
+    required String title,
+    required List<String> items,
+  }) async {
+    if (!mounted) return null;
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (title.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    title,
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  itemBuilder: (ctx, idx) {
+                    return ListTile(
+                      title: Text(items[idx]),
+                      onTap: () => Navigator.of(ctx).pop({
+                        'index': idx,
+                        'text': items[idx],
+                      }),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // ---- 硬件与系统深度状态感知 (P3) ----
   int _cachedBattery = 100;
   bool _cachedIsCharging = false;

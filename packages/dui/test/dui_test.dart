@@ -602,5 +602,42 @@ void main() {
       expect(find.text('引用说明'), findsOneWidget);
       expect(find.text('void main() {}'), findsOneWidget);
     });
+
+    testWidgets('DuiRenderer 渲染 Canvas 动态画板并支持状态指令响应刷新', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('canvas_cmds', '[{"type":"line","x1":0,"y1":0,"x2":50,"y2":50,"color":"#788CFF"}]');
+
+      final node = {
+        'type': 'Canvas',
+        'props': {
+          'width': 200,
+          'height': 150,
+          'backgroundColor': '#1B2445',
+          'commands': '{{state.canvas_cmds}}',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiCanvas), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+
+      // 更新画板指令
+      state.set('canvas_cmds', '[{"type":"circle","cx":20,"cy":20,"radius":10,"color":"#FF0000"}]');
+      await tester.pump();
+      expect(find.byType(DuiCanvas), findsOneWidget);
+    });
   });
 }
