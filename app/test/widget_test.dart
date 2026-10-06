@@ -281,8 +281,8 @@ void main() {
     expect(find.text('动态取色 (Material You)'), findsOneWidget);
     expect(find.text('品牌深色（默认）'), findsOneWidget);
 
-    // 版本号第三处同步断言: 与 pubspec.yaml (0.1.0+1) 保持一致
-    expect(find.textContaining('版本 0.1.0'), findsOneWidget);
+    // 版本号第三处同步断言: 与 pubspec.yaml (0.2.0+2) 保持一致
+    expect(find.textContaining('版本 0.2.0'), findsOneWidget);
   });
 
   testWidgets('DynamicPluginHostPage handles missing UI file with graceful ErrorView',

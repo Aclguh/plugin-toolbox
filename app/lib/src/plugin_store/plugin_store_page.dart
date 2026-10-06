@@ -13,7 +13,8 @@ import 'store_service.dart';
 ///
 /// 与 `app/pubspec.yaml`、设置页关于项、`app/test/widget_test.dart` 三处保持同步，
 /// 由 `tool/verify.dart` 的版本号一致性断言守护。
-const String kHostAppVersion = '0.1.0';
+/// 商店用它校验插件清单声明的 `minAppVersion`，因此必须与 pubspec 的版本号一致。
+const String kHostAppVersion = '0.2.0';
 
 /// 插件分类的中文展示名（未知分类回落到 PluginCategory.other 的标签）。
 String pluginCategoryLabel(String categoryName) =>

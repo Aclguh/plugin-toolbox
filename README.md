@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#架构设计)
 [![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/Release-v0.1.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.2.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 
 **简体中文** · [English](README.en.md)
 
@@ -24,7 +24,7 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) 页面获取最新版本 **v0.1.0**，按设备架构选择对应 APK 安装：
+前往 [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) 页面获取最新版本 **v0.2.0**，按设备架构选择对应 APK 安装：
 
 | 架构 | 适用设备 | 安装包 |
 |---|---|---|
@@ -266,6 +266,7 @@ melos run build:apk      # 构建发布 APK
   - [GoRouter](https://pub.dev/packages/go_router) —— 声明式路由导航
   - [Archive](https://pub.dev/packages/archive) —— 高性能跨平台解压缩引擎
   - [ReorderableGridView](https://pub.dev/packages/reorderable_grid_view) —— 流畅的网格拖拽排序支持
+
 
 
 

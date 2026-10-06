@@ -78,7 +78,7 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             title: const Text('PluginToolbox'),
-            subtitle: const Text('版本 0.1.0 • 万物皆插件'),
+            subtitle: const Text('版本 0.2.0 • 万物皆插件'),
           ),
         ],
       ),

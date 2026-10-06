@@ -14,7 +14,7 @@ A deeply decoupled and hot-pluggable Android toolbox application. Users can eith
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#architecture)
 [![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/Release-v0.1.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.2.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 
 [简体中文](README.md) · **English**
 
@@ -24,7 +24,7 @@ A deeply decoupled and hot-pluggable Android toolbox application. Users can eith
 
 ## Download
 
-Head to the [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) page for the latest version **v0.1.0** and pick the APK matching your device ABI:
+Head to the [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) page for the latest version **v0.2.0** and pick the APK matching your device ABI:
 
 | ABI | Target devices | Artifact |
 |---|---|---|
@@ -269,6 +269,7 @@ melos run build:apk      # Build release APKs (split-per-abi)
   - [GoRouter](https://pub.dev/packages/go_router) — declarative routing and navigation
   - [Archive](https://pub.dev/packages/archive) — high-performance cross-platform archive engine
   - [ReorderableGridView](https://pub.dev/packages/reorderable_grid_view) — smooth grid drag-and-drop reordering
+
 
 
 
