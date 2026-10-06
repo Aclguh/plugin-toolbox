@@ -24,6 +24,9 @@ class PluginContext {
   /// 插件专属沙箱根目录（用于动态插件沙箱文件系统隔离）
   final Directory? rootDir;
 
+  /// 插件专属沙箱存储配额上限 (MB)，默认 50MB
+  final int storageQuotaMb;
+
   /// 创建插件运行上下文
   const PluginContext({
     required this.pluginId,
@@ -32,8 +35,26 @@ class PluginContext {
     required this.logger,
     required this.grantedPermissions,
     this.rootDir,
+    this.storageQuotaMb = 50,
   });
 
   /// 检查插件是否已被授予指定权限 [perm]
   bool hasPermission(PluginPermission perm) => grantedPermissions.contains(perm);
+
+  /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
+  bool checkStorageQuota(int additionalBytes) {
+    if (rootDir == null) return true;
+    final maxBytes = storageQuotaMb * 1024 * 1024;
+    int currentBytes = 0;
+    try {
+      if (rootDir!.existsSync()) {
+        for (final entity in rootDir!.listSync(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            currentBytes += entity.lengthSync();
+          }
+        }
+      }
+    } catch (_) {}
+    return (currentBytes + additionalBytes) <= maxBytes;
+  }
 }

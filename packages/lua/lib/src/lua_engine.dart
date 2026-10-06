@@ -32,7 +32,9 @@ import 'api/audio_api.dart';
 import 'api/socket_api.dart';
 import 'api/websocket_api.dart';
 import 'api/biometrics_api.dart';
+import 'api/task_api.dart';
 import 'lua_callback_invoker.dart';
+import 'lua_value_codec.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
 abstract class LuaHostDelegate {
@@ -357,6 +359,7 @@ class LuaEngine {
     _webSocketApi = WebSocketApi();
     _webSocketApi!.bind(_ls, context, _callbacks!);
     BiometricsApi.bind(_ls, context, delegate, _callbacks!);
+    TaskApi.bind(_ls, context, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串
@@ -404,131 +407,10 @@ class LuaEngine {
     return res;
   }
 
-  void _pushValue(dynamic val, [Set<Object?>? visited]) {
-    // 循环引用检测：自引用集合若不拦截将在递归压栈时栈溢出
-    if (val is Map || val is List) {
-      final seen = visited ??= <Object?>{};
-      if (seen.contains(val)) {
-        throw Exception('不支持将包含循环引用的集合转换为 Lua 值');
-      }
-      seen.add(val);
-    }
+  void _pushValue(dynamic val, [Set<Object?>? visited]) =>
+      LuaValueCodec.push(_ls, val, visited);
 
-    if (val == null) {
-      _ls.pushNil();
-    } else if (val is bool) {
-      _ls.pushBoolean(val);
-    } else if (val is int) {
-      _ls.pushInteger(val);
-    } else if (val is double) {
-      _ls.pushNumber(val);
-    } else if (val is String) {
-      _ls.pushString(val);
-    } else if (val is Map) {
-      _ls.newTable();
-      val.forEach((k, v) {
-        _ls.pushString(k.toString());
-        _pushValue(v, visited);
-        _ls.setTable(-3);
-      });
-    } else if (val is List) {
-      _ls.newTable();
-      for (int i = 0; i < val.length; i++) {
-        _ls.pushInteger(i + 1);
-        _pushValue(val[i], visited);
-        _ls.setTable(-3);
-      }
-    } else {
-      _ls.pushString(val.toString());
-    }
-
-    visited?.remove(val);
-  }
-
-  dynamic _popValue() {
-    final type = _ls.type(-1);
-    dynamic result;
-    switch (type) {
-      case LuaType.luaNil:
-        result = null;
-        break;
-      case LuaType.luaBoolean:
-        result = _ls.toBoolean(-1);
-        break;
-      case LuaType.luaNumber:
-        result = _ls.isInteger(-1) ? _ls.toInteger(-1) : _ls.toNumber(-1);
-        break;
-      case LuaType.luaString:
-        result = _ls.toStr(-1);
-        break;
-      case LuaType.luaTable:
-        result = _readTable(-1);
-        break;
-      default:
-        result = null;
-    }
-    _ls.pop(1);
-    return result;
-  }
-
-  dynamic _readTable(int idx) {
-    final rawEntries = <dynamic, dynamic>{};
-    _ls.pushNil();
-    while (_ls.next(idx < 0 ? idx - 1 : idx)) {
-      final dynamic key = _ls.isInteger(-2)
-          ? _ls.toInteger(-2)
-          : (_ls.toStr(-2) ?? _ls.toInteger(-2).toString());
-      final val = _readCurrentValue();
-      rawEntries[key] = val;
-      _ls.pop(1);
-    }
-
-    if (rawEntries.isEmpty) {
-      return <String, dynamic>{};
-    }
-
-    // 检查是否为从 1 开始、连续到 N 的纯整数索引表（Lua 数组特征）
-    bool isSequentialArray = true;
-    for (int i = 1; i <= rawEntries.length; i++) {
-      if (!rawEntries.containsKey(i)) {
-        isSequentialArray = false;
-        break;
-      }
-    }
-
-    if (isSequentialArray) {
-      final list = List<dynamic>.filled(rawEntries.length, null, growable: true);
-      for (int i = 1; i <= rawEntries.length; i++) {
-        list[i - 1] = rawEntries[i];
-      }
-      return list;
-    }
-
-    // 否则作为 Map<String, dynamic> 返回
-    final map = <String, dynamic>{};
-    for (final entry in rawEntries.entries) {
-      map[entry.key.toString()] = entry.value;
-    }
-    return map;
-  }
-
-  dynamic _readCurrentValue() {
-    final type = _ls.type(-1);
-    switch (type) {
-      case LuaType.luaNil:
-        return null;
-      case LuaType.luaBoolean:
-        return _ls.toBoolean(-1);
-      case LuaType.luaNumber:
-        return _ls.isInteger(-1) ? _ls.toInteger(-1) : _ls.toNumber(-1);
-      case LuaType.luaString:
-        return _ls.toStr(-1);
-      case LuaType.luaTable:
-        return _readTable(-1);
-      default:
-        return null;
-    }
-  }
+  dynamic _popValue() => LuaValueCodec.pop(_ls);
 
   /// 关闭引擎并释放所持有的注册表回调引用与资源。
   /// 关闭后再调用执行操作将抛出 [StateError]。

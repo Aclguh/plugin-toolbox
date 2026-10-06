@@ -31,3 +31,5 @@ export 'src/api/audio_api.dart';
 export 'src/api/socket_api.dart';
 export 'src/api/websocket_api.dart';
 export 'src/api/biometrics_api.dart';
+export 'src/api/task_api.dart';
+export 'src/lua_value_codec.dart';

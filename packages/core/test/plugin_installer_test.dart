@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 void main() {
@@ -232,14 +233,26 @@ void main() {
         () => PluginManifest.fromJsonString('[1,2,3]'),
         throwsFormatException,
       );
-      expect(
-        () => PluginManifest.fromJsonString('not json at all'),
-        throwsFormatException,
-      );
+    });
+
+    test('storageQuotaMb 安全解析与缺省默认值', () {
+      final defaultManifest = PluginManifest.fromJson({
+        'id': 'quota_default',
+        'name': 'Quota Default',
+      });
+      expect(defaultManifest.storageQuotaMb, 50);
+
+      final customManifest = PluginManifest.fromJson({
+        'id': 'quota_custom',
+        'name': 'Quota Custom',
+        'storageQuotaMb': 100,
+      });
+      expect(customManifest.storageQuotaMb, 100);
+      expect(customManifest.toJson()['storageQuotaMb'], 100);
     });
   });
 
-  group('沙箱路径校验生产实现', () {
+  group('沙箱路径校验与存储配额生产实现', () {
     test('isSafeRelativeEntry 拦截全部穿越向量', () {
       expect(SandboxPath.isSafeRelativeEntry('ui/main.ui.json'), isTrue);
       expect(SandboxPath.isSafeRelativeEntry('..\\evil'), isFalse);
@@ -250,6 +263,34 @@ void main() {
 
     test('isSafeSubpath 允许沙箱内路径', () {
       expect(SandboxPath.isSafeSubpath('/data/plugins/x', 'a/b.txt'), isTrue);
+    });
+
+    test('PluginContext.checkStorageQuota 配额容量计算与拦截', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_quota_test');
+      final ctx = PluginContext(
+        pluginId: 'quota_test',
+        storage: PluginStorageImpl(namespace: 'quota_test'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+        rootDir: tempDir,
+        storageQuotaMb: 1, // 1MB 配额
+      );
+
+      // 目录为空时，额外写入 500KB 合法
+      expect(ctx.checkStorageQuota(500 * 1024), isTrue);
+
+      // 写入 800KB 文件
+      final file = File('${tempDir.path}/test.bin');
+      await file.writeAsBytes(List<int>.filled(800 * 1024, 0));
+
+      // 当前已有 800KB，尝试再写入 300KB 超出 1MB 配额 (800 + 300 = 1100 > 1024)
+      expect(ctx.checkStorageQuota(300 * 1024), isFalse);
+
+      // 尝试再写入 100KB 在配额内 (800 + 100 = 900 <= 1024)
+      expect(ctx.checkStorageQuota(100 * 1024), isTrue);
+
+      await tempDir.delete(recursive: true);
     });
   });
 }

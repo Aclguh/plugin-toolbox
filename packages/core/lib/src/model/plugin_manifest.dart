@@ -17,6 +17,7 @@ class PluginManifest {
   final String entry; // e.g. "main.lua"
   final String ui;    // e.g. "ui/main.ui.json"
   final List<Map<String, dynamic>> settings;
+  final int storageQuotaMb;
 
   const PluginManifest({
     required this.id,
@@ -32,6 +33,7 @@ class PluginManifest {
     required this.entry,
     required this.ui,
     this.settings = const [],
+    this.storageQuotaMb = 50,
   });
 
   /// 安全解析清单。
@@ -75,6 +77,9 @@ class PluginManifest {
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList(),
+      storageQuotaMb: (json['storageQuotaMb'] is num)
+          ? (json['storageQuotaMb'] as num).toInt()
+          : 50,
     );
   }
 
@@ -92,6 +97,7 @@ class PluginManifest {
         'entry': entry,
         'ui': ui,
         'settings': settings,
+        'storageQuotaMb': storageQuotaMb,
       };
 
   static PluginManifest fromJsonString(String source) {

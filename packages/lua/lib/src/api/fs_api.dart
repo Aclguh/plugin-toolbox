@@ -74,6 +74,11 @@ class FsApi {
         return 0;
       }
 
+      if (!context.checkStorageQuota(content.length)) {
+        ls.error2('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
+        return 0;
+      }
+
       final file = File(fullPath);
       file.parent.createSync(recursive: true);
       file.writeAsStringSync(
@@ -288,6 +293,12 @@ class FsApi {
         bytes.add(byte);
       }
 
+      if (!context.checkStorageQuota(bytes.length)) {
+        ls.pushBoolean(false);
+        ls.pushString('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
+        return 2;
+      }
+
       try {
         final file = File(fullPath);
         file.parent.createSync(recursive: true);
@@ -324,6 +335,12 @@ class FsApi {
       if (!srcFile.existsSync()) {
         ls.pushBoolean(false);
         ls.pushString('源文件不存在: $srcRel');
+        return 2;
+      }
+
+      if (!context.checkStorageQuota(srcFile.lengthSync())) {
+        ls.pushBoolean(false);
+        ls.pushString('存储配额超限: 复制将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
         return 2;
       }
 

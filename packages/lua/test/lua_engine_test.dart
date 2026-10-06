@@ -2127,6 +2127,86 @@ void main() {
       expect(delegate.getState('stop_speak_ok'), isTrue);
       expect(delegate.speechStopped, isTrue);
     });
+
+    test('TaskApi: task.run 后台 Worker 并发计算与回调通知', () async {
+      engine.loadAndExecute('''
+        -- 1. 携带 main(args) 函数的 Worker 计算
+        task.run([[
+          function main(args)
+            return args.a + args.b
+          end
+        ]], { a = 12, b = 30 }, function(res)
+          state.set("task_sum_ok", res.ok)
+          state.set("task_sum_val", res.result)
+        end)
+
+        -- 2. 直接 return 表达式的轻量 Worker 计算
+        task.run("return string.upper('hello worker')", function(res)
+          state.set("task_upper_ok", res.ok)
+          state.set("task_upper_val", res.result)
+        end)
+
+        -- 3. 语法错误时返回 ok=false 并捕获错误原因
+        task.run("syntax error !!!", function(res)
+          state.set("task_err_ok", res.ok)
+          state.set("task_err_has_msg", res.error ~= nil)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(delegate.getState('task_sum_ok'), isTrue);
+      expect(delegate.getState('task_sum_val'), 42);
+      expect(delegate.getState('task_upper_ok'), isTrue);
+      expect(delegate.getState('task_upper_val'), 'HELLO WORKER');
+      expect(delegate.getState('task_err_ok'), isFalse);
+      expect(delegate.getState('task_err_has_msg'), isTrue);
+    });
+
+    test('TaskApi: task.parallel 并发执行多任务聚合', () async {
+      engine.loadAndExecute('''
+        local tasks = {
+          { script = "return 10 * 2" },
+          { script = "function main(x) return x .. ' world' end", args = "hello" },
+          { script = "return hash.md5('toolbox')" }
+        }
+
+        task.parallel(tasks, function(res)
+          state.set("parallel_ok", res.ok)
+          state.set("parallel_res1", res.results[1].result)
+          state.set("parallel_res2", res.results[2].result)
+          state.set("parallel_res3", res.results[3].result)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(delegate.getState('parallel_ok'), isTrue);
+      expect(delegate.getState('parallel_res1'), 20);
+      expect(delegate.getState('parallel_res2'), 'hello world');
+      expect(delegate.getState('parallel_res3'), isNotEmpty);
+    });
+
+    test('FsApi: 沙箱存储配额检测超限拒绝写入', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_lua_quota_test');
+      // 配额设为 0MB，任何写入均被拒绝
+      final quotaCtx = PluginContext(
+        pluginId: 'quota_fs_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        storageQuotaMb: 0,
+        grantedPermissions: {PluginPermission.storage},
+      );
+      final quotaEngine = LuaEngine(context: quotaCtx, delegate: delegate);
+
+      expect(
+        () => quotaEngine.loadAndExecute('fs.writeFile("test.txt", "hello")'),
+        throwsException,
+      );
+
+      quotaEngine.close();
+      await tempDir.delete(recursive: true);
+    });
   });
 }
 

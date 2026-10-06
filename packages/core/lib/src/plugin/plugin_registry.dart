@@ -123,6 +123,9 @@ class PluginRegistry {
             ? plugin.manifest.permissions.toSet()
             : {},
         rootDir: plugin is DynamicPlugin ? plugin.rootDir : null,
+        storageQuotaMb: plugin is DynamicPlugin
+            ? plugin.manifest.storageQuotaMb
+            : 50,
       );
       await plugin.initialize(context);
       _initializedPlugins.add(plugin.id);
