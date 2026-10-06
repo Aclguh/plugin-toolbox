@@ -5,6 +5,7 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../home/home_page.dart';
 import '../plugin_manager/plugin_manager_page.dart';
+import '../plugin_store/plugin_store_page.dart';
 import '../plugin_host/dynamic_plugin_host_page.dart';
 import '../settings/settings_page.dart';
 import '../providers/app_providers.dart';
@@ -22,6 +23,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/manager',
         builder: (context, state) => const PluginManagerPage(),
+      ),
+      GoRoute(
+        path: '/store',
+        builder: (context, state) => const PluginStorePage(),
       ),
       GoRoute(
         path: '/settings',

@@ -6,7 +6,7 @@
 
 **PluginToolbox —— 基于轻量沙箱与动态声明式 UI 的 Android 插件工具箱**
 
-一个高度解耦、完全离线、支持热插拔的现代化 Android 工具箱应用。无需重新编译宿主，用户只需导入一个 `.ptx` 插件包，即可即时运行全新功能。
+一个高度解耦、支持热插拔的现代化 Android 工具箱应用。用户既可以导入本地 `.ptx` 插件包，也可以直接在应用内的插件商店在线安装与更新插件，无需重新编译宿主即可即时运行全新功能。
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.29+-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.7+-0175C2?logo=dart)](https://dart.dev)
@@ -32,12 +32,16 @@
 | armeabi-v7a | 老旧 32 位机型 | `app-armeabi-v7a-release.apk` |
 | x86_64 | 模拟器 | `app-x86_64-release.apk` |
 
-安装后在「插件管理中心」导入 `.ptx` 插件包即可启用新功能。
+安装后可在「插件商店」在线浏览并一键安装/更新插件（元数据取自 [Aclguh/PTX-plugins](https://github.com/Aclguh/PTX-plugins) 的 `plugin-source` 清单），也可在「插件管理中心」导入本地 `.ptx` 插件包。
 
 ---
 
 ## 核心特性
 
+- **内置插件商店（在线安装与更新）**：
+  - 从插件仓库的 Contents API 拉取 `plugin-source/<id>/plugin.json` 获取**版本号、简介、作者、分类与权限**，从 `dist/<id>.ptx` 下载安装包。
+  - 逐条展示"未安装 / 可更新 / 已是最新"，安装前确认体积与权限，同 ID 覆盖即插件更新，安装完成立即出现在首页。
+  - 安装包下载后先落盘再交给安装器校验解压，临时文件无条件清理，绝不留下残留产物。
 - **动态热插拔插件生态**：
   - 基于标准 Zip 归档格式的 `.ptx` (Plugin Toolbox Extension) 插件包，支持一键安装、即刻启用与安全卸载。
   - 每个动态插件拥有独立沙箱存储空间，防止插件间数据污染与越权访问。
@@ -59,9 +63,11 @@
 plugin-toolbox/
 ├── app/                  # Android 宿主主工程（Flutter App）
 │   ├── lib/              # 页面、路由 (go_router)、全局状态 (Riverpod)
+│   │   └── src/plugin_store/  # 插件商店页与安装编排服务
 │   └── test/             # 宿主 Widget 测试与组件交互测试
 ├── packages/
 │   ├── core/             # 领域核心：插件模型、注册中心、安装器与沙箱安全（纯 Dart）
+│   │   └── src/store/    # 插件商店目录客户端与版本语义（GitHub Contents API）
 │   ├── lua/              # 脚本执行层：Lua 脚本引擎与沙箱 API 绑定（含指令数预算防护）
 │   ├── dui/              # 声明式 UI 引擎：JSON AST -> Flutter Widget 动态渲染
 │   ├── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
@@ -100,6 +106,37 @@ sequenceDiagram
     DUI-->>User: 局部刷新视图结果
 ```
 
+### 插件商店安装流程
+
+商店把「远端元数据」与「本地已安装态」分离：版本号、简介、作者、分类与权限全部来自
+插件仓库 `plugin-source/<id>/plugin.json`，安装包则来自 `dist/<id>.ptx`；安装包在
+落盘后仍走与本地导入完全相同的 `PluginInstaller` 校验与沙箱解压链路。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 用户
+    participant Store as 插件商店页 (app)
+    participant Svc as 商店服务 (app)
+    participant Core as 核心层 (packages/core)
+    participant GH as GitHub Contents API
+
+    User->>Store: 打开插件商店
+    Store->>Core: GithubPluginStoreClient.fetchCatalog()
+    Core->>GH: 列出 plugin-source 与 dist 目录
+    GH-->>Core: plugin.json (base64) + .ptx 元数据
+    Core-->>Store: 条目(版本/简介/权限) + 快照 revision
+    Store->>Svc: buildItems(本地已安装插件)
+    Svc-->>User: 展示 未安装 / 可更新 / 已是最新
+    User->>Store: 点击安装并确认体积与权限
+    Store->>Svc: install(entry)
+    Svc->>GH: 下载 .ptx (按 revision 锚定)
+    Svc->>Svc: 写入临时文件并调用 PluginInstaller
+    Svc->>Svc: 无条件删除临时安装包
+    Svc-->>Store: 安装结果与版本一致性提示
+    Store->>Core: 注册进 PluginRegistry 并持久化排序
+```
+
 ---
 
 ## `.ptx` 插件规范与编写指南
@@ -119,6 +156,32 @@ python sample_plugins/pack.py
 # 或打包指定插件
 python sample_plugins/pack.py base64_tool
 ```
+
+---
+
+## 插件商店配置
+
+商店默认指向插件开发仓库 [Aclguh/PTX-plugins](https://github.com/Aclguh/PTX-plugins)，
+坐标集中声明在 `app/lib/src/plugin_store/store_providers.dart`：
+
+| 配置项 | 默认值 | 说明 |
+|---|---|---|
+| `kPluginStoreOwner` | `Aclguh` | 仓库所属用户/组织 |
+| `kPluginStoreRepository` | `PTX-plugins` | 仓库名 |
+| 首选分支 | `master` | 分支不存在时自动回退到仓库默认分支 |
+| 元数据目录 | `plugin-source/<id>/plugin.json` | 版本号、简介、作者、分类、权限 |
+| 产物目录 | `dist/<id>.ptx` | 安装包（上限 10MB，与 `PluginInstaller` 一致） |
+
+设计要点：
+
+- **只依赖 GitHub Contents API**：`raw.githubusercontent.com` 在部分网络环境下不可达，
+  而 Contents API 返回的 base64 正文既能解析清单也能直接落盘为安装包。
+- **快照一致**：目录列表返回的 `sha` 作为 revision 锚定后续的清单与安装包请求，
+  避免"列表来自旧快照、下载却拿到新产物"。
+- **脏数据隔离**：单个插件的 `plugin.json` 损坏或缺字段只跳过该条目并在页头提示，
+  不会阻断整个目录；限流、超时、断网均给出可读中文提示。
+- **安装态判定**：`PluginStoreSemantics` 提供纯函数的版本比较（缺失段补零、允许
+  `v` 前缀与 `+build` 后缀、非数字段归零），据此区分未安装/可更新/已是最新。
 
 ---
 
@@ -166,10 +229,11 @@ flutter build apk --release --split-per-abi
 # 1. 静态代码分析（保持 0 错误 0 警告）
 dart analyze
 
-# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，83 项断言全通过）
+# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，117 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 119 用例）
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 186 用例）
+#    packages/core 54 / packages/lua 68 / packages/dui 28 / packages/ui 6 / app 30
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
@@ -202,3 +266,6 @@ melos run build:apk      # 构建发布 APK
   - [GoRouter](https://pub.dev/packages/go_router) —— 声明式路由导航
   - [Archive](https://pub.dev/packages/archive) —— 高性能跨平台解压缩引擎
   - [ReorderableGridView](https://pub.dev/packages/reorderable_grid_view) —— 流畅的网格拖拽排序支持
+
+
+

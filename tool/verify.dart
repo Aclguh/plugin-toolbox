@@ -7,6 +7,8 @@ import 'dart:math';
 // M-14: 直接导入 packages/core 的生产沙箱路径校验器,
 // 断言的是真正运行在用户设备上的安全算法 (该文件为纯 Dart 实现, 无 Flutter 依赖)
 import '../packages/core/lib/src/sandbox/sandbox_path.dart';
+// 插件商店的版本语义同样直接断言生产实现 (纯 Dart, 无 Flutter 依赖)
+import '../packages/core/lib/src/store/plugin_store_semantics.dart';
 
 int _pass = 0;
 int _fail = 0;
@@ -351,6 +353,154 @@ void main() {
   } else {
     expect(agentsFile.existsSync(), '本地存在开发规范指南 AGENTS.md');
   }
+
+  // 9. 插件商店: 远端目录契约、版本语义与安装编排约束
+  print('\n--- 9. 插件商店目录契约与版本语义断言 ---');
+  final storeEntryFile = File('packages/core/lib/src/store/plugin_store_entry.dart');
+  expect(storeEntryFile.existsSync(), '插件商店条目模型 plugin_store_entry.dart 存在');
+  final storeEntryCode = storeEntryFile.readAsStringSync();
+  expect(
+    storeEntryCode.contains('packageSizeBytes'),
+    '商店条目携带 .ptx 体积信息 (安装前向用户展示)',
+  );
+
+  final storeClientFile = File('packages/core/lib/src/store/jsdelivr_plugin_store_source.dart');
+  expect(storeClientFile.existsSync(), '插件商店目录客户端 jsdelivr_plugin_store_source.dart 存在');
+  final storeClientCode = storeClientFile.readAsStringSync();
+  expect(
+    storeClientCode.contains('https://data.jsdelivr.com/v1'),
+    '商店目录走 jsDelivr 文件清单接口 (一次请求返回整仓文件列表)',
+  );
+  expect(
+    storeClientCode.contains('cdn.jsdelivr.net/gh'),
+    '安装包按 jsDelivr CDN 地址下载',
+  );
+  expect(
+    !storeClientCode.contains('api.github.com'),
+    '不再依赖 GitHub Contents API: 未认证配额仅 60 次/小时, 一次刷新即会触顶',
+  );
+  expect(
+    storeClientCode.contains('maxPackageBytes'),
+    '客户端内置安装包体积上限校验',
+  );
+  expect(
+    storeClientCode.contains('过于频繁'),
+    '限流场景给出可展示的中文提示而非静默失败',
+  );
+  expect(
+    storeClientCode.contains('_manifestCache') &&
+        storeClientCode.contains('preferences'),
+    '按内容哈希缓存插件清单, 源码未变化的插件刷新时不再重复下载',
+  );
+
+  final storeInspectionFile =
+      File('packages/core/lib/src/store/plugin_package_inspection.dart');
+  expect(storeInspectionFile.existsSync(), '安装包契约核对 inspectPluginPackage 存在');
+  expect(
+    storeInspectionFile.readAsStringSync().contains('missingEntryScript'),
+    '安装前核对包内清单与入口脚本/UI 描述是否齐备',
+  );
+
+  // 版本比较语义: 直接断言生产实现
+  expectEq(
+    PluginStoreSemantics.compareVersions('1.2.3', '1.2.3'),
+    0,
+    '版本号相同时比较结果为 0',
+  );
+  expect(
+    PluginStoreSemantics.compareVersions('1.2.4', '1.2.3') > 0,
+    '补丁号更高判定为更新',
+  );
+  expect(
+    PluginStoreSemantics.compareVersions('1.2.3', '1.3.0') < 0,
+    '次版本更高判定为落后',
+  );
+  expectEq(
+    PluginStoreSemantics.compareVersions('1.2', '1.2.0'),
+    0,
+    '缺失版本段补零 (1.2 等价 1.2.0)',
+  );
+  expectEq(
+    PluginStoreSemantics.compareVersions('v1.2.0', '1.2.0'),
+    0,
+    '允许 v 前缀的版本写法',
+  );
+  expectEq(
+    PluginStoreSemantics.compareVersions('1.2.0+3', '1.2.0'),
+    0,
+    '剥离构建号后再比较',
+  );
+  expectEq(
+    PluginStoreSemantics.compareVersions('1a.2.3', '0.2.3'),
+    0,
+    '非数字版本段归零而非解析出脏数据',
+  );
+  expectEq(
+    PluginStoreSemantics.compareVersions('not-a-version', '0.0.1'),
+    -1,
+    '完全无法解析的版本号按 0.0.0 处理',
+  );
+  expect(
+    PluginStoreSemantics.isUpdateAvailable('1.1.0', '1.0.0'),
+    '商店版本更高时提示可更新',
+  );
+  expect(
+    !PluginStoreSemantics.isUpdateAvailable('1.0.0', '1.1.0'),
+    '本地版本更高时不提示降级更新',
+  );
+  expect(
+    PluginStoreSemantics.meetsMinAppVersion('0.1.0', null),
+    '插件未声明 minAppVersion 时放行',
+  );
+  expect(
+    !PluginStoreSemantics.meetsMinAppVersion('0.1.0', '0.2.0'),
+    '宿主版本低于插件要求时拦截安装',
+  );
+
+  // 商店安装编排: 临时产物清理与注册时机
+  final storeServiceFile = File('app/lib/src/plugin_store/store_service.dart');
+  expect(storeServiceFile.existsSync(), '商店安装编排服务 store_service.dart 存在');
+  final storeServiceCode = storeServiceFile.readAsStringSync();
+  expect(
+    storeServiceCode.contains('file.deleteSync()'),
+    '安装结束后无条件清理临时安装包',
+  );
+  expect(
+    storeServiceCode.contains('PluginInstaller.installFromPtx'),
+    '商店安装复用统一的生产安装器 (校验与沙箱解压同一链路)',
+  );
+
+  final storeProvidersFile = File('app/lib/src/plugin_store/store_providers.dart');
+  expect(storeProvidersFile.existsSync(), '商店依赖装配 store_providers.dart 存在');
+  final storeProvidersCode = storeProvidersFile.readAsStringSync();
+  expect(
+    storeProvidersCode.contains("'Aclguh'") && storeProvidersCode.contains("'PTX-plugins'"),
+    '商店默认指向 Aclguh/PTX-plugins 插件仓库',
+  );
+
+  final storePageFile = File('app/lib/src/plugin_store/plugin_store_page.dart');
+  expect(storePageFile.existsSync(), '插件商店页面 plugin_store_page.dart 存在');
+  final storePageCode = storePageFile.readAsStringSync();
+  expect(
+    storePageCode.contains('plugin-source 清单'),
+    '商店页向用户说明版本信息取自 plugin-source 清单',
+  );
+  expect(
+    storePageCode.contains('已是最新') && storePageCode.contains('更新'),
+    '商店页区分"安装 / 更新 / 已是最新"三种安装态',
+  );
+  expect(
+    storePageCode.contains('正在下载并安装'),
+    '安装期间提供进度遮罩并阻断重复触发',
+  );
+  expect(
+    File('app/test/plugin_store_page_test.dart').existsSync(),
+    '商店页具备宿主 Widget 测试',
+  );
+  expect(
+    File('packages/core/test/plugin_store_test.dart').existsSync(),
+    '商店客户端具备核心层单元测试',
+  );
 
   // 总结输出
   print('\n================================================================');

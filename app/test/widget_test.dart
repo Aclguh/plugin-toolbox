@@ -66,6 +66,33 @@ void main() {
     expect(find.text('PluginToolbox'), findsOneWidget);
   });
 
+  testWidgets('HomePage 提供插件商店入口, 点击跳转 /store', (WidgetTester tester) async {
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: HomePage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 空态主页给出商店入口 + 本地导入入口
+    expect(find.text('去插件商店安装'), findsOneWidget);
+    expect(find.text('导入本地 .ptx'), findsOneWidget);
+
+    final storeButton = find.byIcon(Icons.storefront_outlined);
+    expect(storeButton, findsOneWidget);
+    expect(
+      find.ancestor(of: storeButton, matching: find.byType(IconButton)),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('HomePage renders plugins in ReorderableGridView without category headers',
       (WidgetTester tester) async {
     final container = await createContainer(
@@ -281,8 +308,7 @@ void main() {
     expect(find.textContaining('插件运行错误'), findsOneWidget);
   });
 
-  testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {
-    final container = await createContainer(overrides: [
+  testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {    final container = await createContainer(overrides: [
       appInitFutureProvider.overrideWith((ref) async {}),
     ]);
     final router = container.read(appRouterProvider);

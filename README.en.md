@@ -6,7 +6,7 @@
 
 **PluginToolbox — A modern Android toolbox powered by lightweight sandboxes and declarative dynamic UI.**
 
-A deeply decoupled, fully offline, and hot-pluggable Android toolbox application. Without recompiling the host, users can import a single `.ptx` plugin package and run entirely new functionality instantly.
+A deeply decoupled and hot-pluggable Android toolbox application. Users can either import a local `.ptx` plugin package or install and update plugins online from the in-app plugin store — no host recompilation required, and new functionality runs instantly.
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.29+-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.7+-0175C2?logo=dart)](https://dart.dev)
@@ -32,12 +32,16 @@ Head to the [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 | armeabi-v7a | Legacy 32-bit devices | `app-armeabi-v7a-release.apk` |
 | x86_64 | Emulators | `app-x86_64-release.apk` |
 
-After installing, import a `.ptx` plugin package in the Plugin Manager to enable new features.
+After installing, browse and one-click install/update plugins in the in-app **Plugin Store** (metadata comes from the `plugin-source` manifests of [Aclguh/PTX-plugins](https://github.com/Aclguh/PTX-plugins)), or import a local `.ptx` package in the Plugin Manager.
 
 ---
 
 ## Core Features
 
+- **Built-in Plugin Store (online install & update)**:
+  - Metadata — version, description, author, category and permissions — is read from `plugin-source/<id>/plugin.json` via the GitHub Contents API, while the installable artifact comes from `dist/<id>.ptx`.
+  - Each entry shows "not installed / update available / up to date"; the confirmation dialog surfaces package size and permissions, re-installing the same id acts as a plugin update, and the plugin appears on the home grid immediately.
+  - The downloaded package is written to a temporary file before being handed to the very same installer used for local imports, and that temporary file is always cleaned up.
 - **Hot-Pluggable Plugin Ecosystem**:
   - `.ptx` (Plugin Toolbox Extension) packages based on the standard Zip archive format, supporting one-click installation, immediate activation, and safe uninstallation.
   - Every dynamic plugin owns an isolated sandbox storage space, preventing data contamination and unauthorized access between plugins.
@@ -58,9 +62,11 @@ This project is organized as a clean Monorepo with single-responsibility, unidir
 plugin-toolbox/
 ├── app/                  # Android host application (Flutter App)
 │   ├── lib/              # Pages, routing (go_router), global state (Riverpod)
+│   │   └── src/plugin_store/  # Plugin store page & install orchestration service
 │   └── test/             # Host widget tests & component interaction tests
 ├── packages/
 │   ├── core/             # Domain core: plugin models, registry, installer & sandbox security (Pure Dart)
+│   │   └── src/store/    # Store catalog client & version semantics (GitHub Contents API)
 │   ├── lua/              # Script execution: Lua engine & sandbox API bindings (with instruction budget)
 │   ├── dui/              # Declarative UI engine: JSON AST -> Flutter Widget dynamic rendering
 │   ├── ui/               # Shared presentation: AppTheme brand design system & reusable widget library
@@ -98,6 +104,68 @@ sequenceDiagram
     Lua-->>DUI: Update reactive state
     DUI-->>User: Refresh the view with partial updates
 ```
+
+### Plugin Store Install Flow
+
+The store separates remote metadata from local install state: version, description, author,
+category and permissions all come from the plugin repository's `plugin-source/<id>/plugin.json`,
+while the artifact comes from `dist/<id>.ptx`. Once downloaded, the package goes through
+exactly the same `PluginInstaller` validation and sandbox extraction path as a local import.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Store as Plugin Store page (app)
+    participant Svc as Store service (app)
+    participant Core as Core layer (packages/core)
+    participant GH as GitHub Contents API
+
+    User->>Store: Open the plugin store
+    Store->>Core: GithubPluginStoreClient.fetchCatalog()
+    Core->>GH: List the plugin-source and dist directories
+    GH-->>Core: plugin.json (base64) + .ptx metadata
+    Core-->>Store: Entries (version/description/permissions) + snapshot revision
+    Store->>Svc: buildItems(installed plugins)
+    Svc-->>User: Show not installed / update available / up to date
+    User->>Store: Tap install and confirm size & permissions
+    Store->>Svc: install(entry)
+    Svc->>GH: Download the .ptx (anchored to the revision)
+    Svc->>Svc: Write a temp file and call PluginInstaller
+    Svc->>Svc: Always delete the temporary package
+    Svc-->>Store: Install result plus version consistency warnings
+    Store->>Core: Register into PluginRegistry and persist the order
+```
+
+---
+
+## Plugin Store Configuration
+
+The store points at the plugin development repository [Aclguh/PTX-plugins](https://github.com/Aclguh/PTX-plugins)
+by default; the coordinates live in `app/lib/src/plugin_store/store_providers.dart`:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `kPluginStoreOwner` | `Aclguh` | Repository owner |
+| `kPluginStoreRepository` | `PTX-plugins` | Repository name |
+| Preferred branch | `master` | Falls back to the repo default branch when missing |
+| Metadata path | `plugin-source/<id>/plugin.json` | Version, description, author, category, permissions |
+| Artifact path | `dist/<id>.ptx` | Installable package (10MB cap, same as `PluginInstaller`) |
+
+Design notes:
+
+- **GitHub Contents API only**: `raw.githubusercontent.com` is unreachable on some networks,
+  whereas the Contents API returns base64 bodies that can both be parsed as a manifest and
+  written straight to disk as a package.
+- **Snapshot consistency**: the directory listing's `sha` anchors the subsequent manifest and
+  package requests, so the listed version and the downloaded artifact always come from the
+  same commit.
+- **Dirty data isolation**: a broken or incomplete `plugin.json` only skips that entry (with a
+  header hint) instead of failing the whole catalog; rate limits, timeouts and offline states
+  surface readable messages.
+- **Install-state semantics**: `PluginStoreSemantics` offers pure version comparison (missing
+  segments filled with zeros, `v` prefix and `+build` suffix allowed, non-numeric segments
+  zeroed) that drives the not-installed / update-available / up-to-date distinction.
 
 ---
 
@@ -165,10 +233,11 @@ flutter build apk --release --split-per-abi
 # 1. Static code analysis (0 warnings, 0 errors)
 dart analyze
 
-# 2. Automated specification and logic verification (83 assertions, pure Dart)
+# 2. Automated specification and logic verification (117 assertions, pure Dart)
 dart run tool/verify.dart
 
-# 3. Layered unit & widget tests (pure software testing, 119 cases, no devices needed)
+# 3. Layered unit & widget tests (pure software testing, 186 cases, no devices needed)
+#    packages/core 54 / packages/lua 68 / packages/dui 28 / packages/ui 6 / app 30
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
@@ -200,3 +269,6 @@ melos run build:apk      # Build release APKs (split-per-abi)
   - [GoRouter](https://pub.dev/packages/go_router) — declarative routing and navigation
   - [Archive](https://pub.dev/packages/archive) — high-performance cross-platform archive engine
   - [ReorderableGridView](https://pub.dev/packages/reorderable_grid_view) — smooth grid drag-and-drop reordering
+
+
+

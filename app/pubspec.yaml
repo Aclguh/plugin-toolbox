@@ -36,6 +36,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  # 仅测试使用: 构造与解析 .ptx (ZIP) 安装包夹具, 生产链路不依赖本包
+  archive: ^3.6.1
 
 flutter:
   uses-material-design: true

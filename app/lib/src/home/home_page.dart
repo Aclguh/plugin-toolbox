@@ -19,6 +19,11 @@ class HomePage extends ConsumerWidget {
         title: const Text('PluginToolbox'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.storefront_outlined),
+            tooltip: '插件商店',
+            onPressed: () => context.push('/store'),
+          ),
+          IconButton(
             icon: const Icon(Icons.extension_outlined),
             tooltip: '插件管理',
             onPressed: () => context.push('/manager'),
@@ -47,8 +52,13 @@ class HomePage extends ConsumerWidget {
                   const Text('暂无已启用的插件'),
                   const SizedBox(height: 12),
                   FilledButton.tonal(
+                    onPressed: () => context.push('/store'),
+                    child: const Text('去插件商店安装'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
                     onPressed: () => context.push('/manager'),
-                    child: const Text('去插件中心导入'),
+                    child: const Text('导入本地 .ptx'),
                   ),
                 ],
               ),

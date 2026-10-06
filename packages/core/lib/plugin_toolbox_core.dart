@@ -14,6 +14,13 @@ export 'src/plugin/plugin_list_controller.dart';
 export 'src/installer/plugin_installer.dart';
 export 'src/loader/plugin_loader.dart';
 
+// 插件商店（远端目录拉取与安装包下载）
+export 'src/store/plugin_store_entry.dart';
+export 'src/store/plugin_store_exception.dart';
+export 'src/store/plugin_package_inspection.dart';
+export 'src/store/jsdelivr_plugin_store_source.dart';
+export 'src/store/plugin_store_semantics.dart';
+
 // 基础服务
 export 'src/event/event_bus.dart';
 export 'src/event/app_event.dart';
