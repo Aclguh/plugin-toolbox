@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:lua_dardo/lua.dart';
@@ -299,6 +300,158 @@ class NetworkApi {
       return 0;
     });
     ls.setField(-2, 'request');
+
+    // network.resolveDns(host [, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      final host = ls.checkString(1) ?? '';
+      final cbRef = callbacks.ref(2);
+
+      unawaited(
+        InternetAddress.lookup(host).then((addresses) {
+          final ipList = addresses.map((a) => a.address).toList();
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'ok': true,
+                'host': host,
+                'addresses': ipList,
+              }
+            ]);
+          } else {
+            writeState('__dns_result', ipList);
+          }
+        }).catchError((Object error) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'ok': false,
+                'host': host,
+                'addresses': <String>[],
+                'error': error.toString(),
+              }
+            ]);
+          } else {
+            writeState('__dns_error', error.toString());
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'resolveDns');
+
+    // network.ping(host [, optionsTable | callback, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      final host = ls.checkString(1) ?? '';
+      int port = 80;
+      int timeoutMs = 3000;
+      int? cbRef;
+
+      if (ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      } else if (ls.type(2) == LuaType.luaTable) {
+        ls.getField(2, 'port');
+        if (ls.isInteger(-1)) port = ls.toInteger(-1);
+        ls.pop(1);
+
+        ls.getField(2, 'timeoutMs');
+        if (ls.isInteger(-1)) timeoutMs = ls.toInteger(-1);
+        ls.pop(1);
+
+        if (ls.type(3) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(3);
+        }
+      }
+
+      final stopwatch = Stopwatch()..start();
+      unawaited(
+        Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
+            .then((socket) {
+          stopwatch.stop();
+          final ip = socket.remoteAddress.address;
+          socket.destroy();
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'ok': true,
+                'host': host,
+                'ip': ip,
+                'port': port,
+                'latencyMs': stopwatch.elapsedMilliseconds,
+                'reachable': true,
+              }
+            ]);
+          }
+        }).catchError((Object error) {
+          stopwatch.stop();
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'ok': false,
+                'host': host,
+                'port': port,
+                'reachable': false,
+                'error': error.toString(),
+              }
+            ]);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'ping');
+
+    // network.scanPort(host, port [, timeoutMs | callback, callback])
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      final host = ls.checkString(1) ?? '';
+      final port = ls.checkInteger(2) ?? 0;
+      int timeoutMs = 2000;
+      int? cbRef;
+
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      } else if (ls.isInteger(3)) {
+        timeoutMs = ls.toInteger(3);
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      }
+
+      final stopwatch = Stopwatch()..start();
+      unawaited(
+        Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
+            .then((socket) {
+          stopwatch.stop();
+          socket.destroy();
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'host': host,
+                'port': port,
+                'open': true,
+                'latencyMs': stopwatch.elapsedMilliseconds,
+              }
+            ]);
+          }
+        }).catchError((_) {
+          stopwatch.stop();
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'host': host,
+                'port': port,
+                'open': false,
+                'latencyMs': stopwatch.elapsedMilliseconds,
+              }
+            ]);
+          }
+        }),
+      );
+      return 0;
+    });
+    ls.setField(-2, 'scanPort');
 
     ls.setGlobal('network');
   }

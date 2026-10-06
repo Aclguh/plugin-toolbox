@@ -1800,6 +1800,148 @@ void main() {
       expect(delegate.getState('charge_async'), isTrue);
       expect(delegate.getState('net_async'), 'wifi');
     });
+
+    test('SocketApi: 权限控制与 TCP/UDP 套接字接口', () async {
+      // 1. 无 network 权限时被拒绝
+      final noNetCtx = PluginContext(
+        pluginId: 'no_net',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      final noNetEngine = LuaEngine(context: noNetCtx, delegate: delegate);
+      expect(
+        () => noNetEngine.loadAndExecute('socket.tcpConnect("127.0.0.1", 8080, {})'),
+        throwsException,
+      );
+      expect(
+        () => noNetEngine.loadAndExecute('socket.udpBind(8080, {})'),
+        throwsException,
+      );
+
+      // 2. 有 network 权限时正常调用
+      final netCtx = PluginContext(
+        pluginId: 'net_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEngine = LuaEngine(context: netCtx, delegate: delegate);
+
+      netEngine.loadAndExecute('''
+        local id = socket.tcpConnect("127.0.0.1", 9999, {
+          onConnect = function(sId) state.set("tcp_conn", sId) end,
+          onError = function(sId, err) state.set("tcp_err", err) end,
+        })
+        state.set("tcp_id", id)
+
+        local okSend = socket.tcpSend(id, "ping")
+        state.set("tcp_send_ok", okSend)
+
+        local okClose = socket.tcpClose(id)
+        state.set("tcp_close_ok", okClose)
+
+        local udpId = socket.udpBind(0, {
+          onData = function(uId, data, addr, port) state.set("udp_data", data) end,
+        })
+        state.set("udp_id", udpId)
+        local okUdpSend = socket.udpSend(udpId, "127.0.0.1", 9999, "hello")
+        state.set("udp_send_ok", okUdpSend)
+        local okUdpClose = socket.udpClose(udpId)
+        state.set("udp_close_ok", okUdpClose)
+      ''');
+
+      expect(delegate.getState('tcp_id'), startsWith('tcp_'));
+      expect(delegate.getState('udp_id'), startsWith('udp_'));
+      expect(delegate.getState('tcp_close_ok'), isTrue);
+      expect(delegate.getState('udp_close_ok'), isTrue);
+
+      netEngine.close();
+    });
+
+    test('WebSocketApi: 权限控制与接口绑定', () async {
+      // 1. 无 network 权限拒绝
+      final noNetCtx = PluginContext(
+        pluginId: 'no_net',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      final noNetEngine = LuaEngine(context: noNetCtx, delegate: delegate);
+      expect(
+        () => noNetEngine.loadAndExecute('websocket.connect("ws://127.0.0.1:8080", {})'),
+        throwsException,
+      );
+
+      // 2. 有 network 权限
+      final netCtx = PluginContext(
+        pluginId: 'net_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEngine = LuaEngine(context: netCtx, delegate: delegate);
+
+      netEngine.loadAndExecute('''
+        local wsId = websocket.connect("ws://127.0.0.1:9999", {
+          onOpen = function(id) state.set("ws_open", id) end,
+          onError = function(id, err) state.set("ws_err", err) end,
+        })
+        state.set("ws_id", wsId)
+        local sent = websocket.send(wsId, "test")
+        state.set("ws_sent", sent)
+        local closed = websocket.close(wsId)
+        state.set("ws_closed", closed)
+      ''');
+
+      expect(delegate.getState('ws_id'), startsWith('ws_'));
+      expect(delegate.getState('ws_sent'), isFalse); // 未连上未入表
+      expect(delegate.getState('ws_closed'), isTrue);
+
+      netEngine.close();
+    });
+
+    test('NetworkApi: resolveDns, ping 与 scanPort 诊断绑定', () async {
+      final netCtx = PluginContext(
+        pluginId: 'net_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEngine = LuaEngine(context: netCtx, delegate: delegate);
+
+      netEngine.loadAndExecute('''
+        network.resolveDns("127.0.0.1", function(res)
+          state.set("dns_ok", res.ok)
+          state.set("dns_ips", res.addresses[1])
+        end)
+
+        network.ping("127.0.0.1", { port = 80, timeoutMs = 100 }, function(res)
+          state.set("ping_done", true)
+          state.set("ping_host", res.host)
+        end)
+
+        network.scanPort("127.0.0.1", 65534, 100, function(res)
+          state.set("scan_done", true)
+          state.set("scan_open", res.open)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.getState('dns_ok'), isTrue);
+      expect(delegate.getState('dns_ips'), '127.0.0.1');
+      expect(delegate.getState('ping_done'), isTrue);
+      expect(delegate.getState('ping_host'), '127.0.0.1');
+      expect(delegate.getState('scan_done'), isTrue);
+      expect(delegate.getState('scan_open'), isFalse);
+
+      netEngine.close();
+    });
   });
 }
 

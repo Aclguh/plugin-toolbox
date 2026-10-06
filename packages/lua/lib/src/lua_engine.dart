@@ -29,6 +29,8 @@ import 'api/sensor_api.dart';
 import 'api/image_api.dart';
 import 'api/notification_api.dart';
 import 'api/audio_api.dart';
+import 'api/socket_api.dart';
+import 'api/websocket_api.dart';
 import 'lua_callback_invoker.dart';
 
 /// 插件与宿主 UI 的双向交互委托契约
@@ -242,6 +244,8 @@ class LuaEngine {
   LuaCallbackInvoker? _callbacks;
   TimerApi? _timerApi;
   SensorApi? _sensorApi;
+  SocketApi? _socketApi;
+  WebSocketApi? _webSocketApi;
   bool _closed = false;
 
   /// 引擎是否已被关闭
@@ -309,6 +313,10 @@ class LuaEngine {
     ImageApi.bind(_ls, context, delegate, _callbacks!);
     NotificationApi.bind(_ls, context, delegate, _callbacks!);
     AudioApi.bind(_ls, context, delegate, _callbacks!);
+    _socketApi = SocketApi();
+    _socketApi!.bind(_ls, context, _callbacks!);
+    _webSocketApi = WebSocketApi();
+    _webSocketApi!.bind(_ls, context, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串
@@ -490,6 +498,8 @@ class LuaEngine {
     delegate.stopAudio();
     _sensorApi?.dispose(delegate, _callbacks!);
     _timerApi?.dispose(_callbacks);
+    _socketApi?.dispose(_callbacks);
+    _webSocketApi?.dispose(_callbacks);
     _callbacks?.clear();
   }
 }
