@@ -9,6 +9,7 @@ export 'src/plugin/dynamic_plugin.dart';
 export 'src/plugin/plugin_context.dart';
 export 'src/plugin/plugin_registry.dart';
 export 'src/plugin/plugin_list_controller.dart';
+export 'src/plugin/plugin_ipc_broker.dart';
 
 // 安装与加载
 export 'src/installer/plugin_installer.dart';

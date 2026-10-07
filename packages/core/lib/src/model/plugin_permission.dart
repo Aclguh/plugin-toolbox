@@ -9,7 +9,14 @@ enum PluginPermission {
   sensor('传感器', '允许读取设备运动与方向传感器数据'),
   notification('本地通知', '允许发送本地系统通知'),
   biometrics('生物认证', '允许调用系统指纹或面容识别进行身份核验'),
-  microphone('麦克风录音', '允许使用设备麦克风录音与实时声音分贝感知');
+  microphone('麦克风录音', '允许使用设备麦克风录音与实时声音分贝感知'),
+  screen('屏幕控制', '允许控制屏幕常亮与屏幕亮度调节'),
+  location('地理位置', '允许获取设备定位坐标与海拔信息'),
+  bluetooth('蓝牙低功耗', '允许扫描、连接与读写 BLE 外设设备'),
+  nfc('近场通信', '允许读取与写入 NFC 标签数据'),
+  ai('AI 模型网关', '允许调用宿主配置的统一大语言模型服务'),
+  database('结构化存储', '允许在独立沙箱中创建与读写 SQLite 数据库'),
+  ipc('跨插件互通', '允许与其他已安装插件通信与管道调用');
 
   const PluginPermission(this.label, this.description);
 
@@ -39,6 +46,21 @@ enum PluginPermission {
         return PluginPermission.biometrics;
       case 'microphone':
         return PluginPermission.microphone;
+      case 'screen':
+        return PluginPermission.screen;
+      case 'location':
+        return PluginPermission.location;
+      case 'bluetooth':
+        return PluginPermission.bluetooth;
+      case 'nfc':
+        return PluginPermission.nfc;
+      case 'ai':
+        return PluginPermission.ai;
+      case 'database':
+      case 'db':
+        return PluginPermission.database;
+      case 'ipc':
+        return PluginPermission.ipc;
       default:
         return null;
     }

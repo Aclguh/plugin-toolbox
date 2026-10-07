@@ -268,5 +268,56 @@ void main() {
       registry.loadOrder(['p1', 'p2', 'p3']);
       expect(registry.allPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
     });
+
+    test('PluginPermission 支持全新扩展权限解析', () {
+      expect(PluginPermission.fromString('screen'), PluginPermission.screen);
+      expect(PluginPermission.fromString('location'), PluginPermission.location);
+      expect(PluginPermission.fromString('bluetooth'), PluginPermission.bluetooth);
+      expect(PluginPermission.fromString('nfc'), PluginPermission.nfc);
+      expect(PluginPermission.fromString('ai'), PluginPermission.ai);
+      expect(PluginPermission.fromString('database'), PluginPermission.database);
+      expect(PluginPermission.fromString('db'), PluginPermission.database);
+      expect(PluginPermission.fromString('ipc'), PluginPermission.ipc);
+    });
+
+    test('PluginIpcBroker 注册、调用与生命周期隔离', () async {
+      final broker = PluginIpcBroker.instance;
+      broker.reset();
+
+      // 注册服务
+      broker.registerService('math_tool', 'add', (args) async {
+        if (args is List && args.length >= 2) {
+          return (args[0] as num) + (args[1] as num);
+        }
+        return 0;
+      });
+
+      expect(broker.hasService('math_tool', 'add'), isTrue);
+      expect(broker.hasService('math_tool', 'sub'), isFalse);
+
+      // 调用成功
+      final res = await broker.call(
+        callerPluginId: 'caller',
+        targetPluginId: 'math_tool',
+        functionName: 'add',
+        args: [10, 25],
+      );
+      expect(res['ok'], isTrue);
+      expect(res['result'], 35);
+
+      // 调用未注册服务
+      final failRes = await broker.call(
+        callerPluginId: 'caller',
+        targetPluginId: 'math_tool',
+        functionName: 'unknown',
+      );
+      expect(failRes['ok'], isFalse);
+      expect(failRes['error'], contains('未暴露接口'));
+
+      // 注销服务
+      broker.unregisterService('math_tool', 'add');
+      expect(broker.hasService('math_tool', 'add'), isFalse);
+    });
   });
 }
+
