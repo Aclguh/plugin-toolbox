@@ -35,6 +35,12 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import android.view.WindowManager
+import android.location.LocationManager
+import android.location.Location
+import android.nfc.NfcAdapter
+import android.bluetooth.BluetoothManager
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -43,6 +49,52 @@ import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.plugintoolbox/host_native"
+
+    // 初始分享数据接收
+    private var initialShareData: Map<String, Any>? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleShareIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val type = intent.type
+        if (Intent.ACTION_SEND == action && type != null) {
+            if ("text/plain" == type) {
+                val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+                val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+                if (text != null) {
+                    initialShareData = mapOf(
+                        "type" to "text",
+                        "text" to text,
+                        "subject" to (subject ?: "")
+                    )
+                }
+            } else {
+                val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                }
+                if (uri != null) {
+                    initialShareData = mapOf(
+                        "type" to "file",
+                        "uri" to uri.toString(),
+                        "mimeType" to type
+                    )
+                }
+            }
+        }
+    }
 
     // 传感器管理
     private var sensorManager: SensorManager? = null
@@ -757,6 +809,145 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(false)
                     }
+                }
+                "setKeepScreenOn" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    try {
+                        if (enabled) {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        } else {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "setBrightness" -> {
+                    val brightness = call.argument<Double>("brightness")?.toFloat() ?: -1f
+                    try {
+                        val lp = window.attributes
+                        lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
+                        window.attributes = lp
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "getBrightness" -> {
+                    try {
+                        val lp = window.attributes
+                        val b = if (lp.screenBrightness < 0f) {
+                            try {
+                                Settings.System.getInt(
+                                    contentResolver,
+                                    Settings.System.SCREEN_BRIGHTNESS
+                                ) / 255.0
+                            } catch (e: Exception) { 1.0 }
+                        } else {
+                            lp.screenBrightness.toDouble()
+                        }
+                        result.success(b)
+                    } catch (e: Exception) {
+                        result.success(1.0)
+                    }
+                }
+                "resetBrightness" -> {
+                    try {
+                        val lp = window.attributes
+                        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        window.attributes = lp
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "getInitialShare" -> {
+                    val share = initialShareData
+                    initialShareData = null
+                    result.success(share)
+                }
+                "isLocationAvailable" -> {
+                    try {
+                        val lm = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                        val gps = lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) ?: false
+                        val net = lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ?: false
+                        result.success(gps || net)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "getCurrentPosition" -> {
+                    try {
+                        val lm = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                        var loc: Location? = null
+                        try {
+                            if (lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+                                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                            }
+                            if (loc == null && lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
+                                loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                            }
+                        } catch (e: SecurityException) {}
+                        if (loc != null) {
+                            result.success(mapOf(
+                                "latitude" to loc.latitude,
+                                "longitude" to loc.longitude,
+                                "altitude" to loc.altitude,
+                                "accuracy" to loc.accuracy.toDouble(),
+                                "speed" to loc.speed.toDouble(),
+                                "timestamp" to loc.time
+                            ))
+                        } else {
+                            result.success(null)
+                        }
+                    } catch (e: Exception) {
+                        result.success(null)
+                    }
+                }
+                "isNfcAvailable" -> {
+                    try {
+                        val nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+                        result.success(nfcAdapter != null && nfcAdapter.isEnabled)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "readNdef" -> {
+                    result.success(null)
+                }
+                "writeNdef" -> {
+                    result.success(false)
+                }
+                "isBluetoothAvailable" -> {
+                    try {
+                        val bm = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                        val adapter = bm?.adapter
+                        result.success(adapter != null && adapter.isEnabled)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "startBluetoothScan" -> {
+                    result.success(false)
+                }
+                "stopBluetoothScan" -> {
+                    result.success(true)
+                }
+                "connectBluetooth" -> {
+                    result.success(false)
+                }
+                "disconnectBluetooth" -> {
+                    result.success(true)
+                }
+                "readBluetoothCharacteristic" -> {
+                    result.success(null)
+                }
+                "writeBluetoothCharacteristic" -> {
+                    result.success(false)
+                }
+                "recognizeText" -> {
+                    result.success(null)
                 }
                 else -> result.notImplemented()
             }

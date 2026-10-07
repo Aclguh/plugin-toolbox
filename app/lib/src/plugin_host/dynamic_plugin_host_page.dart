@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
@@ -88,12 +89,20 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   }
 
   bool _torchOn = false;
+  bool _screenKeepOn = false;
+  bool _brightnessModified = false;
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     if (_torchOn) {
       setTorch(false);
+    }
+    if (_screenKeepOn) {
+      setKeepScreenOn(false);
+    }
+    if (_brightnessModified) {
+      resetBrightness();
     }
     stopSensor('all');
     stopAudio();
@@ -903,6 +912,273 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       return res ?? _cachedNetType;
     } catch (_) {
       return _cachedNetType;
+    }
+  }
+
+  // ---- 屏幕控制与常亮 (Screen) ----
+  @override
+  Future<bool> setKeepScreenOn(bool enabled) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('setKeepScreenOn', {'enabled': enabled});
+      final ok = res ?? true;
+      if (ok) _screenKeepOn = enabled;
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setBrightness(double brightness) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('setBrightness', {'brightness': brightness});
+      final ok = res ?? true;
+      if (ok) _brightnessModified = true;
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<double> getBrightness() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<double>('getBrightness');
+      return res ?? 1.0;
+    } catch (_) {
+      return 1.0;
+    }
+  }
+
+  @override
+  Future<bool> resetBrightness() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('resetBrightness');
+      _brightnessModified = false;
+      return res ?? true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 系统分享接收 (Share Target) ----
+  @override
+  Future<Map<String, dynamic>?> getInitialShare() async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('getInitialShare');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ---- 地理位置与海拔 (Location) ----
+  @override
+  Future<bool> isLocationAvailable() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isLocationAvailable');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getCurrentPosition() async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('getCurrentPosition');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ---- NFC 近场通信 ----
+  @override
+  Future<bool> isNfcAvailable() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isNfcAvailable');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> readNdef() async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('readNdef');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> writeNdef(List<Map<String, dynamic>> records) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('writeNdef', {'records': records});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 蓝牙低功耗 (Bluetooth LE) ----
+  @override
+  Future<bool> isBluetoothAvailable() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isBluetoothAvailable');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> startBluetoothScan(
+      void Function(Map<String, dynamic> device) onDeviceFound) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('startBluetoothScan');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopBluetoothScan() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('stopBluetoothScan');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> connectBluetooth(String deviceId) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('connectBluetooth', {'deviceId': deviceId});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> disconnectBluetooth(String deviceId) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('disconnectBluetooth', {'deviceId': deviceId});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> readBluetoothCharacteristic(
+    String deviceId,
+    String serviceUuid,
+    String charUuid,
+  ) async {
+    try {
+      return await _nativeChannel.invokeMethod<String>('readBluetoothCharacteristic', {
+        'deviceId': deviceId,
+        'serviceUuid': serviceUuid,
+        'charUuid': charUuid,
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> writeBluetoothCharacteristic(
+    String deviceId,
+    String serviceUuid,
+    String charUuid,
+    String value,
+  ) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('writeBluetoothCharacteristic', {
+        'deviceId': deviceId,
+        'serviceUuid': serviceUuid,
+        'charUuid': charUuid,
+        'value': value,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- 离线 OCR 图像文字识别 ----
+  @override
+  Future<Map<String, dynamic>?> recognizeText(String filePath) async {
+    try {
+      final rootDir = widget.plugin.rootDir;
+      final file = File('${rootDir.path}/$filePath');
+      if (!file.existsSync()) return null;
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('recognizeText', {
+        'path': file.path,
+      });
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ---- 宿主统一 AI 网关 ----
+  @override
+  Future<bool> isAiAvailable() async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('isAiAvailable');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> aiChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) async {
+    try {
+      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('aiChat', {
+        'messages': messages,
+        'model': model,
+        'temperature': temperature,
+      });
+      return res ?? {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
+    } catch (_) {
+      return {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
+    }
+  }
+
+  @override
+  Stream<String> aiStreamChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) {
+    return const Stream.empty();
+  }
+
+  // ---- 跨插件互通与管道调起 ----
+  @override
+  Future<bool> openPlugin(
+    String targetPluginId, {
+    Map<String, dynamic>? initialData,
+  }) async {
+    if (!mounted) return false;
+    try {
+      await context.push('/plugin/$targetPluginId', extra: initialData);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
