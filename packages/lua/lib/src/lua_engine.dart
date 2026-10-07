@@ -33,6 +33,13 @@ import 'api/socket_api.dart';
 import 'api/websocket_api.dart';
 import 'api/biometrics_api.dart';
 import 'api/task_api.dart';
+import 'api/screen_api.dart';
+import 'api/location_api.dart';
+import 'api/nfc_api.dart';
+import 'api/bluetooth_api.dart';
+import 'api/database_api.dart';
+import 'api/ai_api.dart';
+import 'api/ipc_api.dart';
 import 'lua_callback_invoker.dart';
 import 'lua_value_codec.dart';
 
@@ -268,6 +275,107 @@ abstract class LuaHostDelegate {
 
   /// 停止当前语音朗读
   Future<bool> stopSpeaking() async => false;
+
+  // ---- 屏幕控制与常亮 (Screen) ----
+  /// 控制屏幕常亮开关 (返回是否设置成功)
+  Future<bool> setKeepScreenOn(bool enabled) async => false;
+
+  /// 调节屏幕亮度 (0.0 ~ 1.0)
+  Future<bool> setBrightness(double brightness) async => false;
+
+  /// 获取当前屏幕亮度 (0.0 ~ 1.0)
+  Future<double> getBrightness() async => 1.0;
+
+  /// 重置屏幕亮度为系统默认
+  Future<bool> resetBrightness() async => false;
+
+  // ---- 系统分享接收 (Share Target) ----
+  /// 获取由系统分享传入应用的初始数据
+  Future<Map<String, dynamic>?> getInitialShare() async => null;
+
+  // ---- 地理位置与海拔 (Location) ----
+  /// 查询定位服务是否可用
+  Future<bool> isLocationAvailable() async => false;
+
+  /// 获取当前地理位置坐标与海拔数据
+  Future<Map<String, dynamic>?> getCurrentPosition() async => null;
+
+  // ---- NFC 近场通信 ----
+  /// 查询当前设备是否支持 NFC
+  Future<bool> isNfcAvailable() async => false;
+
+  /// 读取当前感应到的 NFC NDEF 标签数据
+  Future<Map<String, dynamic>?> readNdef() async => null;
+
+  /// 向感应到的 NFC 标签写入 NDEF 记录
+  Future<bool> writeNdef(List<Map<String, dynamic>> records) async => false;
+
+  // ---- 蓝牙低功耗 (Bluetooth LE) ----
+  /// 查询当前设备蓝牙是否就绪可用
+  Future<bool> isBluetoothAvailable() async => false;
+
+  /// 启动蓝牙 LE 设备扫描
+  Future<bool> startBluetoothScan(
+          void Function(Map<String, dynamic> device) onDeviceFound) async =>
+      false;
+
+  /// 停止蓝牙 LE 设备扫描
+  Future<bool> stopBluetoothScan() async => false;
+
+  /// 连接指定 BLE 设备
+  Future<bool> connectBluetooth(String deviceId) async => false;
+
+  /// 断开指定 BLE 设备连接
+  Future<bool> disconnectBluetooth(String deviceId) async => false;
+
+  /// 读取 BLE 特征值
+  Future<String?> readBluetoothCharacteristic(
+    String deviceId,
+    String serviceUuid,
+    String charUuid,
+  ) async =>
+      null;
+
+  /// 写入 BLE 特征值
+  Future<bool> writeBluetoothCharacteristic(
+    String deviceId,
+    String serviceUuid,
+    String charUuid,
+    String value,
+  ) async =>
+      false;
+
+  // ---- 离线 OCR 图像文字识别 ----
+  /// 对沙箱内的图片进行文字识别
+  Future<Map<String, dynamic>?> recognizeText(String filePath) async => null;
+
+  // ---- 宿主统一 AI 网关 ----
+  /// 查询宿主是否已配置可用 AI 服务
+  Future<bool> isAiAvailable() async => false;
+
+  /// 发起 AI 文本生成或多轮对话
+  Future<Map<String, dynamic>> aiChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) async =>
+      {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
+
+  /// 发起流式 AI 对话增量输出
+  Stream<String> aiStreamChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) =>
+      const Stream.empty();
+
+  // ---- 跨插件互通与管道调起 ----
+  /// 唤起并打开目标插件 (可携带初始参数)
+  Future<bool> openPlugin(
+    String targetPluginId, {
+    Map<String, dynamic>? initialData,
+  }) async =>
+      false;
 }
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -360,6 +468,13 @@ class LuaEngine {
     _webSocketApi!.bind(_ls, context, _callbacks!);
     BiometricsApi.bind(_ls, context, delegate, _callbacks!);
     TaskApi.bind(_ls, context, _callbacks!);
+    ScreenApi.bind(_ls, context, delegate, _callbacks!);
+    LocationApi.bind(_ls, context, delegate, _callbacks!);
+    NfcApi.bind(_ls, context, delegate, _callbacks!);
+    BluetoothApi.bind(_ls, context, delegate, _callbacks!);
+    DatabaseApi.bind(_ls, context, _callbacks!);
+    AiApi.bind(_ls, context, delegate, _callbacks!);
+    IpcApi.bind(_ls, context, delegate, _callbacks!);
   }
 
   /// 执行 Lua 源代码字符串
@@ -417,7 +532,11 @@ class LuaEngine {
   void close() {
     if (_closed) return;
     _closed = true;
+    PluginIpcBroker.instance.unregisterService(context.pluginId);
     delegate.stopAudio();
+    delegate.stopBluetoothScan();
+    delegate.setKeepScreenOn(false);
+    delegate.resetBrightness();
     _sensorApi?.dispose(delegate, _callbacks!);
     _timerApi?.dispose(_callbacks);
     _socketApi?.dispose(_callbacks);

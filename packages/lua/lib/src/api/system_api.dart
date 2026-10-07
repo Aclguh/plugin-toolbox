@@ -230,6 +230,71 @@ class SystemApi {
     });
     ls.setField(-2, 'stopSpeak');
 
+    // system.getInitialShare([callback]) -> { type = "text"|"file", text = str?, path = str? }
+    ls.pushDartFunction((ls) {
+      int? cbRef;
+      if (callbacks != null && ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      }
+      if (delegate != null) {
+        delegate.getInitialShare().then((share) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [share]);
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [null]);
+          }
+        });
+      }
+      return 0;
+    });
+    ls.setField(-2, 'getInitialShare');
+
+    // system.setKeepScreenOn(enabled [, callback])
+    ls.pushDartFunction((ls) {
+      final enabled = ls.toBoolean(1);
+      int? cbRef;
+      if (callbacks != null && ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      }
+      if (delegate != null) {
+        delegate.setKeepScreenOn(enabled).then((ok) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [ok]);
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [false]);
+          }
+        });
+      }
+      return 0;
+    });
+    ls.setField(-2, 'setKeepScreenOn');
+
+    // system.setBrightness(brightness [, callback])
+    ls.pushDartFunction((ls) {
+      final brightness = ls.toNumber(1).clamp(0.0, 1.0);
+      int? cbRef;
+      if (callbacks != null && ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      }
+      if (delegate != null) {
+        delegate.setBrightness(brightness).then((ok) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [ok]);
+          }
+        }).catchError((Object _) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [false]);
+          }
+        });
+      }
+      return 0;
+    });
+    ls.setField(-2, 'setBrightness');
+
     ls.setGlobal('system');
   }
 

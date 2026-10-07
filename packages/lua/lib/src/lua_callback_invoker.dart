@@ -1,4 +1,5 @@
 import 'package:lua_dardo/lua.dart';
+import 'lua_value_codec.dart';
 
 /// Lua 异步回调调用器。
 ///
@@ -36,6 +37,22 @@ class LuaCallbackInvoker {
     if (!_activeRefs.contains(ref)) return;
     _ls.rawGetI(luaRegistryIndex, ref);
     _invokeTop(args);
+  }
+
+  /// 调用 [ref] 登记的回调函数并获取 1 个返回值 (适用于 IPC / RPC 等服务调用场景)
+  dynamic invokeWithResult(int ref, List<Object?> args) {
+    if (!_activeRefs.contains(ref)) return null;
+    _ls.rawGetI(luaRegistryIndex, ref);
+    for (final arg in args) {
+      _pushArg(arg);
+    }
+    _ls.setInstructionBudget(_instructionBudget);
+    final status = _ls.pCall(args.length, 1, 0);
+    if (status != ThreadStatus.luaOk) {
+      _ls.pop(1);
+      return null;
+    }
+    return LuaValueCodec.pop(_ls);
   }
 
   /// 显式注销并释放 [ref] 登记项

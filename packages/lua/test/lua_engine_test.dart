@@ -404,6 +404,169 @@ class MockLuaHostDelegate implements LuaHostDelegate {
     speechStopped = true;
     return true;
   }
+
+  bool keepScreenOn = false;
+  double screenBrightness = 1.0;
+  bool brightnessReset = false;
+  Map<String, dynamic>? initialShareData = {
+    'type': 'text',
+    'text': 'shared content'
+  };
+  bool locationAvailable = true;
+  Map<String, dynamic>? mockLocation = {
+    'latitude': 31.2304,
+    'longitude': 121.4737,
+    'altitude': 15.5,
+    'accuracy': 5.0,
+    'timestamp': 1700000000,
+  };
+  bool nfcAvailable = true;
+  Map<String, dynamic>? mockNdefRead = {
+    'records': [
+      {'type': 'text', 'payload': 'Hello NFC'}
+    ]
+  };
+  List<Map<String, dynamic>> writtenNdefRecords = [];
+  bool bluetoothAvailable = true;
+  bool bluetoothScanning = false;
+  String? connectedBleDevice;
+  String? disconnectedBleDevice;
+  String? mockBleCharValue = '01020304';
+  String? writtenBleCharValue;
+  Map<String, dynamic>? mockOcrResult = {
+    'text': 'Recognized Sample Text',
+    'lines': ['Recognized', 'Sample Text'],
+  };
+  bool aiAvailable = true;
+  Map<String, dynamic> mockAiChatResponse = {
+    'ok': true,
+    'text': 'AI generated response',
+    'usage': {'totalTokens': 42},
+  };
+  String? openedPluginId;
+  Map<String, dynamic>? openedPluginData;
+
+  @override
+  Future<bool> setKeepScreenOn(bool enabled) async {
+    keepScreenOn = enabled;
+    return true;
+  }
+
+  @override
+  Future<bool> setBrightness(double brightness) async {
+    screenBrightness = brightness;
+    return true;
+  }
+
+  @override
+  Future<double> getBrightness() async => screenBrightness;
+
+  @override
+  Future<bool> resetBrightness() async {
+    brightnessReset = true;
+    screenBrightness = 1.0;
+    return true;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getInitialShare() async => initialShareData;
+
+  @override
+  Future<bool> isLocationAvailable() async => locationAvailable;
+
+  @override
+  Future<Map<String, dynamic>?> getCurrentPosition() async => mockLocation;
+
+  @override
+  Future<bool> isNfcAvailable() async => nfcAvailable;
+
+  @override
+  Future<Map<String, dynamic>?> readNdef() async => mockNdefRead;
+
+  @override
+  Future<bool> writeNdef(List<Map<String, dynamic>> records) async {
+    writtenNdefRecords = records;
+    return true;
+  }
+
+  @override
+  Future<bool> isBluetoothAvailable() async => bluetoothAvailable;
+
+  @override
+  Future<bool> startBluetoothScan(
+      void Function(Map<String, dynamic> device) onDeviceFound) async {
+    bluetoothScanning = true;
+    onDeviceFound(
+        {'id': 'AA:BB:CC:DD:EE:FF', 'name': 'Test Beacon', 'rssi': -55});
+    return true;
+  }
+
+  @override
+  Future<bool> stopBluetoothScan() async {
+    bluetoothScanning = false;
+    return true;
+  }
+
+  @override
+  Future<bool> connectBluetooth(String deviceId) async {
+    connectedBleDevice = deviceId;
+    return true;
+  }
+
+  @override
+  Future<bool> disconnectBluetooth(String deviceId) async {
+    disconnectedBleDevice = deviceId;
+    return true;
+  }
+
+  @override
+  Future<String?> readBluetoothCharacteristic(
+          String deviceId, String serviceUuid, String charUuid) async =>
+      mockBleCharValue;
+
+  @override
+  Future<bool> writeBluetoothCharacteristic(
+    String deviceId,
+    String serviceUuid,
+    String charUuid,
+    String value,
+  ) async {
+    writtenBleCharValue = value;
+    return true;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> recognizeText(String filePath) async =>
+      mockOcrResult;
+
+  @override
+  Future<bool> isAiAvailable() async => aiAvailable;
+
+  @override
+  Future<Map<String, dynamic>> aiChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) async =>
+      mockAiChatResponse;
+
+  @override
+  Stream<String> aiStreamChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) async* {
+    yield 'Chunk1 ';
+    yield 'Chunk2';
+  }
+
+  @override
+  Future<bool> openPlugin(String targetPluginId,
+      {Map<String, dynamic>? initialData}) async {
+    openedPluginId = targetPluginId;
+    openedPluginData = initialData;
+    return true;
+  }
 }
 
 class InMemoryPluginStorage implements PluginStorage {
@@ -2267,6 +2430,372 @@ void main() {
       );
 
       quotaEngine.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('ScreenApi: 权限控制、常亮与亮度设置及资源还原', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('screen.setKeepScreenOn(true)'),
+        throwsException,
+      );
+
+      // 2. 有权限执行
+      final screenCtx = PluginContext(
+        pluginId: 'screen_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.screen},
+      );
+      final screenEngine = LuaEngine(context: screenCtx, delegate: delegate);
+
+      screenEngine.loadAndExecute('''
+        screen.setKeepScreenOn(true, function(ok)
+          state.set("screen_on_ok", ok)
+        end)
+        screen.setBrightness(0.75, function(ok)
+          state.set("brightness_set_ok", ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(delegate.keepScreenOn, isTrue);
+      expect(delegate.screenBrightness, 0.75);
+      expect(delegate.getState('screen_on_ok'), isTrue);
+      expect(delegate.getState('brightness_set_ok'), isTrue);
+
+      // close 还原状态
+      screenEngine.close();
+      expect(delegate.keepScreenOn, isFalse);
+      expect(delegate.brightnessReset, isTrue);
+    });
+
+    test('LocationApi: 权限控制与定位数据获取', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('location.getCurrentPosition(function() end)'),
+        throwsException,
+      );
+
+      // 2. 有权限获取
+      final locCtx = PluginContext(
+        pluginId: 'loc_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.location},
+      );
+      final locEngine = LuaEngine(context: locCtx, delegate: delegate);
+
+      locEngine.loadAndExecute('''
+        location.isAvailable(function(avail)
+          state.set("loc_avail", avail)
+        end)
+        location.getCurrentPosition(function(res)
+          state.set("loc_ok", res.ok)
+          state.set("loc_lat", res.latitude)
+          state.set("loc_lng", res.longitude)
+        end)
+        location.getAltitude(function(alt)
+          state.set("loc_alt", alt)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(delegate.getState('loc_avail'), isTrue);
+      expect(delegate.getState('loc_ok'), isTrue);
+      expect(delegate.getState('loc_lat'), 31.2304);
+      expect(delegate.getState('loc_lng'), 121.4737);
+      expect(delegate.getState('loc_alt'), 15.5);
+    });
+
+    test('NfcApi: 权限控制与 NDEF 标签读写', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('nfc.readNdef(function() end)'),
+        throwsException,
+      );
+
+      // 2. 有权限读写
+      final nfcCtx = PluginContext(
+        pluginId: 'nfc_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.nfc},
+      );
+      final nfcEngine = LuaEngine(context: nfcCtx, delegate: delegate);
+
+      nfcEngine.loadAndExecute('''
+        nfc.isAvailable(function(avail)
+          state.set("nfc_avail", avail)
+        end)
+        nfc.readNdef(function(res)
+          state.set("nfc_read_ok", res.ok)
+          state.set("nfc_read_payload", res.records[1].payload)
+        end)
+        nfc.writeNdef({ { type = "text", payload = "New NFC Tag" } }, function(res)
+          state.set("nfc_write_ok", res.ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(delegate.getState('nfc_avail'), isTrue);
+      expect(delegate.getState('nfc_read_ok'), isTrue);
+      expect(delegate.getState('nfc_read_payload'), 'Hello NFC');
+      expect(delegate.getState('nfc_write_ok'), isTrue);
+      expect(delegate.writtenNdefRecords.first['payload'], 'New NFC Tag');
+    });
+
+    test('BluetoothApi: 权限控制、扫描、连接与特征值读写', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('bluetooth.startScan(function() end)'),
+        throwsException,
+      );
+
+      // 2. 有权限扫描与操作
+      final bleCtx = PluginContext(
+        pluginId: 'ble_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.bluetooth},
+      );
+      final bleEngine = LuaEngine(context: bleCtx, delegate: delegate);
+
+      bleEngine.loadAndExecute('''
+        bluetooth.startScan(function(res)
+          state.set("ble_scan_dev", res.device.name)
+        end)
+        bluetooth.connect("AA:BB:CC", function(res)
+          state.set("ble_conn_ok", res.ok)
+        end)
+        bluetooth.read("AA:BB:CC", "180D", "2A37", function(res)
+          state.set("ble_read_val", res.value)
+        end)
+        bluetooth.write("AA:BB:CC", "180D", "2A37", "FFEE", function(res)
+          state.set("ble_write_ok", res.ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(delegate.getState('ble_scan_dev'), 'Test Beacon');
+      expect(delegate.getState('ble_conn_ok'), isTrue);
+      expect(delegate.getState('ble_read_val'), '01020304');
+      expect(delegate.getState('ble_write_ok'), isTrue);
+      expect(delegate.writtenBleCharValue, 'FFEE');
+
+      // 引擎关闭自动停止扫描
+      bleEngine.close();
+      expect(delegate.bluetoothScanning, isFalse);
+    });
+
+    test('DatabaseApi: 沙箱内纯 Dart 结构化 SQL 引擎执行与查询', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_db_test_');
+      final dbCtx = PluginContext(
+        pluginId: 'db_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.database},
+      );
+      final dbEngine = LuaEngine(context: dbCtx, delegate: delegate);
+
+      dbEngine.loadAndExecute('''
+        -- 1. 创建表
+        db.execute("CREATE TABLE users (id, name, score)", function(res)
+          state.set("db_create_ok", res.ok)
+        end)
+
+        -- 2. 插入多条记录
+        db.execute("INSERT INTO users (id, name, score) VALUES (?, ?, ?)", { 1, "Alice", 95 }, function(res)
+          state.set("db_ins1_ok", res.ok)
+        end)
+        db.execute("INSERT INTO users (id, name, score) VALUES (?, ?, ?)", { 2, "Bob", 80 }, function(res)
+          state.set("db_ins2_ok", res.ok)
+        end)
+
+        -- 3. 条件与排序查询
+        db.query("SELECT * FROM users WHERE score = ? ORDER BY score DESC", { 95 }, function(res)
+          state.set("db_query_ok", res.ok)
+          state.set("db_query_err", res.error)
+          if res.rows and res.rows[1] then
+            state.set("db_query_name", res.rows[1].name)
+          end
+        end)
+
+        -- 4. 更新记录
+        db.execute("UPDATE users SET score = ? WHERE name = ?", { 100, "Alice" }, function(res)
+          state.set("db_update_ok", res.ok)
+        end)
+
+        -- 5. 批量处理
+        db.batch({
+          "INSERT INTO users (id, name, score) VALUES (3, 'Charlie', 88)",
+          "DELETE FROM users WHERE name = 'Bob'"
+        }, function(res)
+          state.set("db_batch_ok", res.ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.getState('db_create_ok'), isTrue);
+      expect(delegate.getState('db_ins1_ok'), isTrue);
+      expect(delegate.getState('db_ins2_ok'), isTrue);
+      expect(delegate.getState('db_query_ok'), isTrue);
+      expect(delegate.getState('db_query_name'), 'Alice');
+      expect(delegate.getState('db_update_ok'), isTrue);
+      expect(delegate.getState('db_batch_ok'), isTrue);
+
+      dbEngine.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('AiApi: 统一大模型网关 chat 与 streamChat 调用', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('ai.chat({ messages = {} }, function() end)'),
+        throwsException,
+      );
+
+      // 2. 有权限正常发起
+      final aiCtx = PluginContext(
+        pluginId: 'ai_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.ai},
+      );
+      final aiEngine = LuaEngine(context: aiCtx, delegate: delegate);
+
+      aiEngine.loadAndExecute('''
+        ai.isAvailable(function(avail)
+          state.set("ai_avail", avail)
+        end)
+
+        ai.chat({
+          messages = { { role = "user", content = "Hello AI" } },
+          model = "gpt-4o",
+          temperature = 0.5
+        }, function(res)
+          state.set("ai_chat_ok", res.ok)
+          state.set("ai_chat_text", res.text)
+        end)
+
+        local chunks = ""
+        ai.streamChat({
+          messages = { { role = "user", content = "Stream test" } }
+        }, function(chunk)
+          chunks = chunks .. chunk
+        end, function()
+          state.set("ai_stream_text", chunks)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(delegate.getState('ai_avail'), isTrue);
+      expect(delegate.getState('ai_chat_ok'), isTrue);
+      expect(delegate.getState('ai_chat_text'), 'AI generated response');
+      expect(delegate.getState('ai_stream_text'), 'Chunk1 Chunk2');
+    });
+
+    test('IpcApi: 跨插件服务注册、RPC 调用与管道打开', () async {
+      // 1. 无权限拦截
+      expect(
+        () => engine.loadAndExecute('plugin.call("other", "fn")'),
+        throwsException,
+      );
+
+      // 2. 提供者插件 (provider) 注册接口
+      final providerCtx = PluginContext(
+        pluginId: 'provider_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.ipc},
+      );
+      final providerEngine = LuaEngine(context: providerCtx, delegate: delegate);
+
+      providerEngine.loadAndExecute('''
+        plugin.export("doubleNumber", function(num)
+          return num * 2
+        end)
+      ''');
+
+      // 3. 调用者插件 (caller) 进行 RPC 调用
+      final callerCtx = PluginContext(
+        pluginId: 'caller_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.ipc},
+      );
+      final callerEngine = LuaEngine(context: callerCtx, delegate: delegate);
+
+      callerEngine.loadAndExecute('''
+        plugin.call("provider_plugin", "doubleNumber", 21, function(res)
+          state.set("ipc_call_ok", res.ok)
+          state.set("ipc_call_val", res.result)
+        end)
+
+        plugin.open("diff_tool", { initialText = "compare me" }, function(res)
+          state.set("ipc_open_ok", res.ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(delegate.getState('ipc_call_ok'), isTrue);
+      expect(delegate.getState('ipc_call_val'), 42);
+      expect(delegate.getState('ipc_open_ok'), isTrue);
+      expect(delegate.openedPluginId, 'diff_tool');
+      expect(delegate.openedPluginData?['initialText'], 'compare me');
+
+      // 关闭 provider 引擎后，其接口被自动注销
+      providerEngine.close();
+      expect(
+        PluginIpcBroker.instance.hasService('provider_plugin', 'doubleNumber'),
+        isFalse,
+      );
+    });
+
+    test('VisionApi.recognizeText 离线 OCR 与 SystemApi.getInitialShare 初始分享', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_ocr_test_');
+      final ocrCtx = PluginContext(
+        pluginId: 'ocr_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.photoLibrary, PluginPermission.storage},
+      );
+      final ocrEngine = LuaEngine(context: ocrCtx, delegate: delegate);
+
+      // 1. 路径穿越拦截
+      expect(
+        () => ocrEngine.loadAndExecute('vision.recognizeText("../../secret.png")'),
+        throwsException,
+      );
+
+      // 2. 正常沙箱 OCR 调用
+      ocrEngine.loadAndExecute('''
+        vision.recognizeText("doc.png", function(res)
+          state.set("ocr_ok", res.ok)
+          state.set("ocr_text", res.text)
+        end)
+        system.getInitialShare(function(share)
+          state.set("initial_share_text", share.text)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(delegate.getState('ocr_ok'), isTrue);
+      expect(delegate.getState('ocr_text'), 'Recognized Sample Text');
+      expect(delegate.getState('initial_share_text'), 'shared content');
+
+      ocrEngine.close();
       await tempDir.delete(recursive: true);
     });
   });
