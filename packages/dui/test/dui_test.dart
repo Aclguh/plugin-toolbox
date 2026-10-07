@@ -697,5 +697,107 @@ void main() {
       expect(state.get('my_sign_has_drawing'), false);
       expect(state.get('my_sign_count'), 0);
     });
+
+    testWidgets('DuiRenderer 渲染 Chart (折线图与柱状图) 并支持状态插值', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('chart_points', '[10, 25, 40, 15, 30]');
+
+      final lineNode = {
+        'type': 'Chart',
+        'props': {
+          'type': 'line',
+          'data': '{{state.chart_points}}',
+          'labels': 'A,B,C,D,E',
+          'color': '#788CFF',
+          'height': 180,
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, lineNode),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiChart), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+
+      // 更新状态数据
+      state.set('chart_points', '[5, 15, 60, 20, 50]');
+      await tester.pump();
+      expect(find.byType(DuiChart), findsOneWidget);
+
+      // 测试柱状图
+      final barNode = {
+        'type': 'BarChart',
+        'props': {
+          'data': [100, 200, 300],
+          'labels': ['Mon', 'Tue', 'Wed'],
+          'color': '#31D9D0',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, barNode),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiChart), findsOneWidget);
+    });
+
+    testWidgets('DuiRenderer 渲染 Html 富文本并支持标签解析与链接事件', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      state.set('user_name', 'Alice');
+
+      final node = {
+        'type': 'Html',
+        'props': {
+          'html': '<b>你好</b> {{state.user_name}}，<a href="https://example.com">点击这里</a> 查看详情。',
+        },
+        'events': {
+          'onLinkTap': {'action': 'toast', 'message': 'link clicked'},
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiHtml), findsOneWidget);
+      expect(find.byType(SelectableText), findsOneWidget);
+
+      // 验证富文本内容被正确插值与解析
+      final selectableWidget = tester.widget<SelectableText>(find.byType(SelectableText));
+      expect(selectableWidget.data, isNull); // rich 模式 data 为 null，textSpan 不为 null
+      expect(selectableWidget.textSpan, isNotNull);
+      final textSpan = selectableWidget.textSpan!;
+      final fullText = textSpan.toPlainText();
+      expect(fullText.contains('你好'), isTrue);
+      expect(fullText.contains('Alice'), isTrue);
+      expect(fullText.contains('点击这里'), isTrue);
+    });
   });
 }

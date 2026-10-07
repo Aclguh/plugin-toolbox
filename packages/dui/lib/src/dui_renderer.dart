@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import 'dui_canvas.dart';
+import 'dui_chart.dart';
 import 'dui_drawing_pad.dart';
 import 'dui_event_handler.dart';
+import 'dui_html.dart';
 import 'dui_markdown.dart';
 import 'dui_pixel_grid.dart';
 import 'dui_state.dart';
@@ -650,6 +653,117 @@ class DuiRenderer {
     }
     registerFactory('MarkdownView', buildMarkdown);
     registerFactory('Markdown', buildMarkdown);
+
+    // ---- 图表组件 (Chart / LineChart / BarChart) ----
+    Widget buildChart(DuiNodeContext node) {
+      final chartType = node.props['type']?.toString() ??
+          (node.props['chartType']?.toString() ?? 'line');
+      final rawData = node.props['data'];
+      final rawLabels = node.props['labels'];
+      final height = node.height ?? 200.0;
+      final width = node.width;
+      final color = DuiUtils.parseColor(
+        state.interpolate(node.props['color']?.toString() ?? ''),
+      );
+      final secondaryColor = DuiUtils.parseColor(
+        state.interpolate(node.props['secondaryColor']?.toString() ?? ''),
+      );
+      final backgroundColor = DuiUtils.parseColor(
+        state.interpolate(node.props['backgroundColor']?.toString() ?? ''),
+      );
+      final minY = DuiUtils.tryDouble(node.props['minY']);
+      final maxY = DuiUtils.tryDouble(node.props['maxY']);
+      final showGrid = DuiUtils.tryBool(node.props['showGrid'], fallback: true);
+      final showLabels = DuiUtils.tryBool(node.props['showLabels'], fallback: true);
+      final showDots = DuiUtils.tryBool(node.props['showDots'], fallback: true);
+      final filled = DuiUtils.tryBool(node.props['filled'], fallback: true);
+      final strokeWidth = DuiUtils.tryDouble(node.props['strokeWidth']) ?? 2.5;
+      final barWidth = DuiUtils.tryDouble(node.props['barWidth']);
+
+      final dataStr = rawData is String
+          ? rawData
+          : (rawData != null ? jsonEncode(rawData) : '');
+      final keys = <String>{
+        ...DuiState.extractKeys(dataStr),
+        if (rawLabels is String) ...DuiState.extractKeys(rawLabels),
+      };
+
+      Widget renderChart() {
+        dynamic effectiveData = rawData;
+        if (rawData is String) {
+          effectiveData = state.interpolate(rawData);
+        }
+        dynamic effectiveLabels = rawLabels;
+        if (rawLabels is String) {
+          effectiveLabels = state.interpolate(rawLabels);
+        }
+
+        return DuiChart(
+          chartType: chartType,
+          data: effectiveData,
+          labels: effectiveLabels,
+          width: width,
+          height: height,
+          color: color,
+          secondaryColor: secondaryColor,
+          backgroundColor: backgroundColor,
+          minY: minY,
+          maxY: maxY,
+          showGrid: showGrid,
+          showLabels: showLabels,
+          showDots: showDots,
+          filled: filled,
+          strokeWidth: strokeWidth,
+          barWidth: barWidth,
+        );
+      }
+
+      if (keys.isEmpty) return renderChart();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => renderChart(),
+      );
+    }
+    registerFactory('Chart', buildChart);
+    registerFactory('LineChart', (n) {
+      n.props['type'] = 'line';
+      return buildChart(n);
+    });
+    registerFactory('BarChart', (n) {
+      n.props['type'] = 'bar';
+      return buildChart(n);
+    });
+
+    // ---- 富文本组件 (Html / HtmlView) ----
+    Widget buildHtml(DuiNodeContext node) {
+      final rawText = node.props['html']?.toString() ??
+          node.props['text']?.toString() ??
+          node.props['data']?.toString() ??
+          '';
+      final selectable =
+          DuiUtils.tryBool(node.props['selectable'], fallback: true);
+      final keys = DuiState.extractKeys(rawText);
+
+      void onLinkTap(String url) {
+        if (node.events.containsKey('onLinkTap')) {
+          eventHandler.handleEvent(node.events['onLinkTap'], url);
+        }
+      }
+
+      Widget renderHtml() => DuiHtml(
+            html: state.interpolate(rawText),
+            selectable: selectable,
+            onLinkTap: onLinkTap,
+          );
+
+      if (keys.isEmpty) return renderHtml();
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => renderHtml(),
+      );
+    }
+    registerFactory('Html', buildHtml);
+    registerFactory('HtmlView', buildHtml);
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，
