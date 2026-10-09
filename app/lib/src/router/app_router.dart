@@ -83,6 +83,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             );
           }
           if (plugin is DynamicPlugin) {
+            if (!registry.isInitialized(pluginId)) {
+              registry.initializePlugin(pluginId);
+            }
             return DynamicPluginHostPage(plugin: plugin);
           }
           // 内置插件页面

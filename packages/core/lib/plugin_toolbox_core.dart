@@ -30,3 +30,6 @@ export 'src/permission/permission_manager.dart';
 
 // 沙箱安全
 export 'src/sandbox/sandbox_path.dart';
+
+// 工具类
+export 'src/util/type_converter.dart';

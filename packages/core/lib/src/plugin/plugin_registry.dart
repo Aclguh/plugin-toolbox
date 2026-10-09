@@ -73,6 +73,7 @@ class PluginRegistry {
     _plugins[plugin.id] = plugin;
     _orderController.add(plugin.id);
     _invalidateCaches();
+    eventBus.fire(PluginInstalledEvent(plugin.id));
     _logger.i('Registered plugin: ${plugin.id} (dynamic: ${plugin.isDynamic})');
   }
 
@@ -100,6 +101,19 @@ class PluginRegistry {
       _logger.i('Unregistered & uninstalled plugin: $pluginId');
     }
   }
+
+  /// 按需初始化单个插件（懒加载，降低冷启动开销）
+  Future<void> initializePlugin(String pluginId) async {
+    final plugin = _plugins[pluginId];
+    if (plugin != null &&
+        !_disabledPlugins.contains(pluginId) &&
+        !_initializedPlugins.contains(pluginId)) {
+      await _initPlugin(plugin);
+    }
+  }
+
+  /// 查询插件是否已初始化
+  bool isInitialized(String pluginId) => _initializedPlugins.contains(pluginId);
 
   Future<void> initializeAll() async {
     // 并发初始化：单个慢插件不再拖慢整体启动耗时

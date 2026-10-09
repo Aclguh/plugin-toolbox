@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 /// 动态 UI (DUI) 辅助解析工具集，提供类型安全容错的图标、文本样式、颜色与数值解析
 class DuiUtils {
@@ -62,17 +63,11 @@ class DuiUtils {
     return accessor(Theme.of(context).textTheme);
   }
 
-  /// 解析十六进制颜色字符串：支持 `#RRGGBB` 与 `#AARRGGBB`（可省略 `#`）。
+  /// 解析十六进制颜色字符串：支持 `#RGB`、`#RRGGBB` 与 `#AARRGGBB`（可省略 `#`）。
   /// 非法输入统一返回 null 交由调用方降级，绝不允许使插件页面崩溃。
   static Color? parseColor(dynamic val) {
-    if (val == null) return null;
-    var hex = val.toString().trim();
-    if (hex.startsWith('#')) hex = hex.substring(1);
-    if (hex.length == 6) hex = 'FF$hex';
-    if (hex.length != 8) return null;
-    if (hex.contains(RegExp('[^0-9a-fA-F]'))) return null;
-    final value = int.tryParse(hex, radix: 16);
-    return value == null ? null : Color(value);
+    final hexInt = TypeConverter.parseColorHex(val);
+    return hexInt == null ? null : Color(hexInt);
   }
 
   /// 解析 EdgeInsets；数值与字符串数字统一容错
@@ -95,31 +90,12 @@ class DuiUtils {
   }
 
   /// 安全数值解析：统一容忍 num / String / null 三种输入。
-  ///
-  /// 第三方插件的 JSON 中数值常被误写为字符串（如 "100"），
-  /// 直接 `as num?` 强转会抛 TypeError 导致插件页面崩溃。
-  static double? tryDouble(dynamic val) {
-    if (val is num) return val.toDouble();
-    if (val is String) return double.tryParse(val.trim());
-    return null;
-  }
+  static double? tryDouble(dynamic val) => TypeConverter.tryDouble(val);
 
   /// 安全整型解析：容忍 num / String / null
-  static int? tryInt(dynamic val) {
-    if (val is num) return val.toInt();
-    if (val is String) return int.tryParse(val.trim());
-    return null;
-  }
+  static int? tryInt(dynamic val) => TypeConverter.tryInt(val);
 
   /// 安全布尔解析：容忍 bool / String（"true"）/ num（非零为真）/ null
-  static bool tryBool(dynamic val, {bool fallback = false}) {
-    if (val is bool) return val;
-    if (val is num) return val != 0;
-    if (val is String) {
-      final s = val.trim().toLowerCase();
-      if (s == 'true') return true;
-      if (s == 'false') return false;
-    }
-    return fallback;
-  }
+  static bool tryBool(dynamic val, {bool fallback = false}) =>
+      TypeConverter.tryBool(val, fallback: fallback);
 }

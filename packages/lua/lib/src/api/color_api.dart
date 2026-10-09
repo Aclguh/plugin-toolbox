@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:lua_dardo/lua.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 /// `color` — 颜色空间计算与格式转换 API。
 ///
@@ -10,32 +11,21 @@ class ColorApi {
 
     // color.hexToRgb(hexStr) -> table { r, g, b, a } | nil
     ls.pushDartFunction((ls) {
-      String hex = ls.checkString(1)?.trim() ?? '';
-      if (hex.startsWith('#')) hex = hex.substring(1);
-
-      int a = 255;
-      int r = 0, g = 0, b = 0;
-
-      if (hex.length == 3) {
-        // #RGB
-        r = int.tryParse(hex[0] + hex[0], radix: 16) ?? 0;
-        g = int.tryParse(hex[1] + hex[1], radix: 16) ?? 0;
-        b = int.tryParse(hex[2] + hex[2], radix: 16) ?? 0;
-      } else if (hex.length == 6) {
-        // #RRGGBB
-        r = int.tryParse(hex.substring(0, 2), radix: 16) ?? 0;
-        g = int.tryParse(hex.substring(2, 4), radix: 16) ?? 0;
-        b = int.tryParse(hex.substring(4, 6), radix: 16) ?? 0;
-      } else if (hex.length == 8) {
-        // #AARRGGBB
-        a = int.tryParse(hex.substring(0, 2), radix: 16) ?? 255;
-        r = int.tryParse(hex.substring(2, 4), radix: 16) ?? 0;
-        g = int.tryParse(hex.substring(4, 6), radix: 16) ?? 0;
-        b = int.tryParse(hex.substring(6, 8), radix: 16) ?? 0;
-      } else {
+      final input = ls.checkString(1);
+      if (input == null) {
         ls.pushNil();
         return 1;
       }
+      final colorInt = TypeConverter.parseColorHex(input);
+      if (colorInt == null) {
+        ls.pushNil();
+        return 1;
+      }
+
+      final a = (colorInt >> 24) & 0xFF;
+      final r = (colorInt >> 16) & 0xFF;
+      final g = (colorInt >> 8) & 0xFF;
+      final b = colorInt & 0xFF;
 
       ls.newTable();
       ls.pushString('r');

@@ -23,7 +23,6 @@ dependencies:
 
   # 状态管理 & 路由
   flutter_riverpod: ^2.6.0
-  riverpod_annotation: ^2.6.0
   go_router: ^14.0.0
 
   # 文件选择与动态取色

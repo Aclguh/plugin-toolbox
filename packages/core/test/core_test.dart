@@ -318,6 +318,32 @@ void main() {
       broker.unregisterService('math_tool', 'add');
       expect(broker.hasService('math_tool', 'add'), isFalse);
     });
+
+    test('TypeConverter 支持数值、布尔与多格式十六进制颜色安全转换', () {
+      expect(TypeConverter.tryDouble('12.34'), 12.34);
+      expect(TypeConverter.tryDouble(56), 56.0);
+      expect(TypeConverter.tryDouble('invalid'), isNull);
+      expect(TypeConverter.tryDouble(null), isNull);
+
+      expect(TypeConverter.tryInt('42'), 42);
+      expect(TypeConverter.tryInt(100.9), 100);
+      expect(TypeConverter.tryInt(null), isNull);
+
+      expect(TypeConverter.tryBool('true'), isTrue);
+      expect(TypeConverter.tryBool('false'), isFalse);
+      expect(TypeConverter.tryBool(1), isTrue);
+      expect(TypeConverter.tryBool(0), isFalse);
+      expect(TypeConverter.tryBool(null, fallback: true), isTrue);
+
+      expect(TypeConverter.parseColorHex('#F00'), 0xFFFF0000);
+      expect(TypeConverter.parseColorHex('#26366A'), 0xFF26366A);
+      expect(TypeConverter.parseColorHex('26366A'), 0xFF26366A);
+      expect(TypeConverter.parseColorHex('#8026366A'), 0x8026366A);
+      expect(TypeConverter.parseColorHex('#XYZ123'), isNull);
+      expect(TypeConverter.parseColorHex(''), isNull);
+      expect(TypeConverter.parseColorHex(null), isNull);
+    });
   });
 }
+
 

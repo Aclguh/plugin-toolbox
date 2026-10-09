@@ -799,5 +799,72 @@ void main() {
       expect(fullText.contains('Alice'), isTrue);
       expect(fullText.contains('点击这里'), isTrue);
     });
+
+    testWidgets('DuiHtml、DuiChart 与 DuiCanvas 异常与边界输入安全容错降级', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      // 1. DuiHtml 异常格式
+      final malformedHtmlNode = {
+        'type': 'Html',
+        'props': {
+          'html': '<b>未闭合标签<i>混合文本',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, malformedHtmlNode),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DuiHtml), findsOneWidget);
+
+      // 2. DuiChart 损坏数据
+      final corruptedChartNode = {
+        'type': 'Chart',
+        'props': {
+          'data': 'not-a-json-list',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, corruptedChartNode),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DuiChart), findsOneWidget);
+
+      // 3. DuiCanvas 损坏指令
+      final corruptedCanvasNode = {
+        'type': 'Canvas',
+        'props': {
+          'commands': 'invalid-json-commands',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, corruptedCanvasNode),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DuiCanvas), findsOneWidget);
+    });
   });
 }

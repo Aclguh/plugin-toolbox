@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,9 +33,16 @@ T safeRead<T>(SharedPreferences prefs, String key, T fallback, T? Function(Strin
 }
 
 class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
-  PluginRegistryNotifier(super.state, this._prefs);
+  PluginRegistryNotifier(super.state, this._prefs, {EventBus? eventBus}) {
+    if (eventBus != null) {
+      _subscription = eventBus.on<AppEvent>().listen((_) {
+        refresh();
+      });
+    }
+  }
 
   final SharedPreferences _prefs;
+  StreamSubscription<AppEvent>? _subscription;
 
   static const _orderKey = 'plugin_toolbox_plugin_order';
 
@@ -43,6 +51,12 @@ class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
 
   void refresh() {
     state = state;
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<void> saveOrder() async {
@@ -75,7 +89,7 @@ final pluginRegistryProvider = StateNotifierProvider<PluginRegistryNotifier, Plu
   // 注册中心只发出卸载请求事件，沙箱目录清理由安装器监听执行
   final uninstallSub = PluginInstaller.listenUninstallRequests(bus);
   ref.onDispose(() => uninstallSub.cancel());
-  return PluginRegistryNotifier(registry, prefs);
+  return PluginRegistryNotifier(registry, prefs, eventBus: bus);
 });
 
 class OrientationNotifier extends StateNotifier<bool> {

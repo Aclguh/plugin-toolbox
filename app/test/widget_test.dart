@@ -319,6 +319,49 @@ void main() {
     expect(find.textContaining('插件运行错误'), findsOneWidget);
   });
 
+  testWidgets('DynamicPluginHostPage 点击返回按钮安全退出页面', (WidgetTester tester) async {
+    final mockPlugin = createMockPlugin('back_test', '返回测试');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
+                    ),
+                  );
+                },
+                child: const Text('打开插件'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开插件'));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('返回测试'), findsOneWidget);
+
+    final backButton = find.byType(BackButton);
+    expect(backButton, findsOneWidget);
+    await tester.tap(backButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('打开插件'), findsOneWidget);
+    expect(find.text('返回测试'), findsNothing);
+  });
+
   testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {    final container = await createContainer(overrides: [
       appInitFutureProvider.overrideWith((ref) async {}),
     ]);

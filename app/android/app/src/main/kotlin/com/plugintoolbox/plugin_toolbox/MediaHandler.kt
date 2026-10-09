@@ -57,12 +57,8 @@ class MediaHandler(private val context: Context) : FeatureHandler {
                 Thread {
                     try {
                         val sampleRate = 44100
-                        val numSamples = (duration * sampleRate / 1000)
-                        val buffer = ShortArray(numSamples)
-                        for (i in 0 until numSamples) {
-                            val angle = 2.0 * Math.PI * i * freq / sampleRate
-                            buffer[i] = (Math.sin(angle) * 32767).toInt().toShort()
-                        }
+                        val buffer = generateToneBuffer(freq, duration, sampleRate)
+                        val numSamples = buffer.size
                         val minSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
                         @Suppress("DEPRECATION")
                         val track = AudioTrack(
@@ -206,5 +202,17 @@ class MediaHandler(private val context: Context) : FeatureHandler {
         activeMediaRecorder = null
         textToSpeech?.shutdown()
         textToSpeech = null
+    }
+
+    companion object {
+        fun generateToneBuffer(freq: Double, durationMs: Int, sampleRate: Int = 44100): ShortArray {
+            val numSamples = (durationMs * sampleRate / 1000)
+            val buffer = ShortArray(numSamples)
+            for (i in 0 until numSamples) {
+                val angle = 2.0 * Math.PI * i * freq / sampleRate
+                buffer[i] = (Math.sin(angle) * 32767).toInt().toShort()
+            }
+            return buffer
+        }
     }
 }

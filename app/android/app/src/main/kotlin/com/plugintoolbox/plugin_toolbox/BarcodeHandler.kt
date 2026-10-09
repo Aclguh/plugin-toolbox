@@ -67,7 +67,7 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
         return false
     }
 
-    private fun decodeBarcode(path: String): String? {
+    internal fun decodeBarcode(path: String): String? {
         val file = File(path)
         if (!file.exists()) return null
         return try {
