@@ -53,4 +53,8 @@ AGENTS.md
 PTX-plugins/
 
 # Archify 生成的图表产物
-.archify/
+.archify/
+
+# 临时本地建议与报告文档
+IMPROVEMENTS.md
+
