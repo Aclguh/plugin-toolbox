@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'dui_utils.dart';
@@ -407,7 +408,7 @@ class _DuiChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DuiChartPainter oldDelegate) {
-    return oldDelegate.values != values ||
+    return !listEquals(oldDelegate.values, values) ||
         oldDelegate.primaryColor != primaryColor ||
         oldDelegate.chartType != chartType ||
         oldDelegate.minY != minY ||

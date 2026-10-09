@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dui_utils.dart';
 
@@ -56,8 +57,9 @@ class DuiCanvas extends StatelessWidget {
 
 class DuiCanvasPainter extends CustomPainter {
   final List<Map<String, dynamic>> commands;
+  final Paint _paint = Paint();
 
-  const DuiCanvasPainter(this.commands);
+  DuiCanvasPainter(this.commands);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -95,7 +97,7 @@ class DuiCanvasPainter extends CustomPainter {
     final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
-    final paint = Paint()
+    final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke;
@@ -112,7 +114,7 @@ class DuiCanvasPainter extends CustomPainter {
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
     final radius = DuiUtils.tryDouble(cmd['borderRadius']);
 
-    final paint = Paint()
+    final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
@@ -133,7 +135,7 @@ class DuiCanvasPainter extends CustomPainter {
     final styleStr = cmd['style']?.toString().toLowerCase();
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
-    final paint = Paint()
+    final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
@@ -153,7 +155,7 @@ class DuiCanvasPainter extends CustomPainter {
     final styleStr = cmd['style']?.toString().toLowerCase();
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
-    final paint = Paint()
+    final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
@@ -181,5 +183,14 @@ class DuiCanvasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DuiCanvasPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DuiCanvasPainter oldDelegate) {
+    if (identical(oldDelegate.commands, commands)) return false;
+    if (oldDelegate.commands.length != commands.length) return true;
+    for (int i = 0; i < commands.length; i++) {
+      if (!mapEquals(oldDelegate.commands[i], commands[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

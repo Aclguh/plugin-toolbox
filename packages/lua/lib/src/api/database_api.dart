@@ -193,12 +193,12 @@ class _SandboxDatabaseEngine {
 
   Future<Map<String, dynamic>> _executeInternal(
       String rawSql, List<dynamic> params) async {
-    final sql = rawSql.trim();
+    final sql = _cleanSql(rawSql);
     final upper = sql.toUpperCase();
 
     if (upper.startsWith('CREATE TABLE')) {
       final match = RegExp(
-              r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_]+)',
+              r'^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_]+)',
               caseSensitive: false)
           .firstMatch(sql);
       if (match == null) {
@@ -212,7 +212,7 @@ class _SandboxDatabaseEngine {
 
     if (upper.startsWith('DROP TABLE')) {
       final match = RegExp(
-              r'DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_]+)',
+              r'^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_]+)',
               caseSensitive: false)
           .firstMatch(sql);
       if (match == null) {
@@ -225,7 +225,7 @@ class _SandboxDatabaseEngine {
     }
 
     if (upper.startsWith('INSERT INTO')) {
-      final match = RegExp(r'INSERT\s+INTO\s+([a-zA-Z0-9_]+)',
+      final match = RegExp(r'^INSERT\s+INTO\s+([a-zA-Z0-9_]+)',
               caseSensitive: false)
           .firstMatch(sql);
       if (match == null) {
@@ -246,14 +246,22 @@ class _SandboxDatabaseEngine {
             .toList();
       }
 
+      // 提取 VALUES (...) 中的内容
+      final valuesMatch = RegExp(r'VALUES\s*\((.*)\)', caseSensitive: false)
+          .firstMatch(sql);
+      List<dynamic> effectiveValues = params;
+      if (params.isEmpty && valuesMatch != null) {
+        effectiveValues = _parseValuesCsv(valuesMatch.group(1)!);
+      }
+
       final row = <String, dynamic>{};
-      if (cols != null && cols.length == params.length) {
+      if (cols != null && cols.length == effectiveValues.length) {
         for (int i = 0; i < cols.length; i++) {
-          row[cols[i]] = params[i];
+          row[cols[i]] = effectiveValues[i];
         }
       } else {
-        for (int i = 0; i < params.length; i++) {
-          row['col_${i + 1}'] = params[i];
+        for (int i = 0; i < effectiveValues.length; i++) {
+          row['col_${i + 1}'] = effectiveValues[i];
         }
       }
 
@@ -267,7 +275,7 @@ class _SandboxDatabaseEngine {
     }
 
     if (upper.startsWith('DELETE FROM')) {
-      final match = RegExp(r'DELETE\s+FROM\s+([a-zA-Z0-9_]+)',
+      final match = RegExp(r'^DELETE\s+FROM\s+([a-zA-Z0-9_]+)',
               caseSensitive: false)
           .firstMatch(sql);
       if (match == null) {
@@ -293,7 +301,7 @@ class _SandboxDatabaseEngine {
 
     if (upper.startsWith('UPDATE')) {
       final match =
-          RegExp(r'UPDATE\s+([a-zA-Z0-9_]+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$',
+          RegExp(r'^UPDATE\s+([a-zA-Z0-9_]+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$',
                   caseSensitive: false)
               .firstMatch(sql);
       if (match == null) {
@@ -306,22 +314,19 @@ class _SandboxDatabaseEngine {
       final table = _tables[tableName];
       if (table == null) return {'ok': true, 'rowsAffected': 0};
 
-      final setAssignments = setPart.split(',').map((s) => s.trim()).toList();
+      final setAssignments = _parseSetAssignments(setPart);
       int updatedCount = 0;
 
       // 提取参数分配
       int paramIdx = 0;
       final updatePairs = <String, dynamic>{};
-      for (final assign in setAssignments) {
-        final parts = assign.split('=');
-        if (parts.length == 2) {
-          final col =
-              parts[0].trim().replaceAll('`', '').replaceAll('"', '');
-          if (parts[1].trim() == '?' && paramIdx < params.length) {
-            updatePairs[col] = params[paramIdx++];
-          } else {
-            updatePairs[col] = parts[1].trim();
-          }
+      for (final entry in setAssignments.entries) {
+        final col = entry.key;
+        final rawVal = entry.value;
+        if (rawVal == '?' && paramIdx < params.length) {
+          updatePairs[col] = params[paramIdx++];
+        } else {
+          updatePairs[col] = _parseLiteral(rawVal);
         }
       }
 
@@ -359,7 +364,7 @@ class _SandboxDatabaseEngine {
 
   Future<Map<String, dynamic>> _queryInternal(
       String rawSql, List<dynamic> params) async {
-    final sql = rawSql.trim();
+    final sql = _cleanSql(rawSql);
     final upper = sql.toUpperCase();
     if (!upper.startsWith('SELECT ')) {
       return {'ok': false, 'error': '无效的 SELECT 语句', 'rows': <dynamic>[]};
@@ -434,6 +439,21 @@ class _SandboxDatabaseEngine {
       resultRows = resultRows
           .where((row) => _matchesWhere(row, whereFilter, params))
           .toList();
+    }
+
+    // 聚合函数 COUNT
+    final countMatch = RegExp(r'^COUNT\s*\((.*?)\)(?:\s+AS\s+([a-zA-Z0-9_]+))?',
+            caseSensitive: false)
+        .firstMatch(fields);
+    if (countMatch != null) {
+      final alias = countMatch.group(2) ?? 'count';
+      final count = resultRows.length;
+      return {
+        'ok': true,
+        'rows': [
+          {'count': count, alias: count}
+        ]
+      };
     }
 
     // 排序 ORDER BY
@@ -517,15 +537,145 @@ class _SandboxDatabaseEngine {
 
   bool _matchesWhere(
       Map<String, dynamic> row, String whereClause, List<dynamic> params) {
-    final parts = whereClause.split('=');
-    if (parts.length == 2) {
-      final col = parts[0].trim().replaceAll('`', '').replaceAll('"', '');
-      final rawTarget = parts[1].trim();
-      final target = (rawTarget == '?' && params.isNotEmpty)
-          ? params[0]
-          : rawTarget.replaceAll("'", '').replaceAll('"', '');
-      return row[col]?.toString() == target?.toString();
+    final conditions = whereClause.split(RegExp(r'\s+AND\s+', caseSensitive: false));
+    int paramIdx = 0;
+    for (final cond in conditions) {
+      if (!_evaluateCondition(row, cond.trim(), params, () => paramIdx++)) {
+        return false;
+      }
     }
     return true;
+  }
+
+  bool _evaluateCondition(Map<String, dynamic> row, String condition,
+      List<dynamic> params, int Function() nextParamIdx) {
+    final opMatch = RegExp(
+            r'^(.*?)\s*(>=|<=|!=|<>|>|<|=|LIKE)\s*(.*)$',
+            caseSensitive: false)
+        .firstMatch(condition);
+    if (opMatch == null) return true;
+
+    final col = opMatch.group(1)!.trim().replaceAll('`', '').replaceAll('"', '');
+    final op = opMatch.group(2)!.toUpperCase();
+    final rightRaw = opMatch.group(3)!.trim();
+
+    dynamic target;
+    if (rightRaw == '?') {
+      final idx = nextParamIdx();
+      target = idx < params.length ? params[idx] : null;
+    } else {
+      target = _parseLiteral(rightRaw);
+    }
+
+    final val = row[col];
+    if (op == '=') {
+      return _compare(val, target) == 0;
+    } else if (op == '!=' || op == '<>') {
+      return _compare(val, target) != 0;
+    } else if (op == '>') {
+      return _compare(val, target) > 0;
+    } else if (op == '>=') {
+      return _compare(val, target) >= 0;
+    } else if (op == '<') {
+      return _compare(val, target) < 0;
+    } else if (op == '<=') {
+      return _compare(val, target) <= 0;
+    } else if (op == 'LIKE') {
+      if (val == null || target == null) return false;
+      final patternStr = target
+          .toString()
+          .splitMapJoin(
+            RegExp(r'[%_]'),
+            onMatch: (m) => m[0] == '%' ? '.*' : '.',
+            onNonMatch: (n) => RegExp.escape(n),
+          );
+      final pattern = RegExp('^$patternStr\$', caseSensitive: false);
+      return pattern.hasMatch(val.toString());
+    }
+    return true;
+  }
+
+  static int _compare(dynamic a, dynamic b) {
+    if (a == null && b == null) return 0;
+    if (a == null) return -1;
+    if (b == null) return 1;
+    if (a is num && b is num) return a.compareTo(b);
+    return a.toString().compareTo(b.toString());
+  }
+
+  static String _cleanSql(String raw) {
+    var s = raw.replaceAll(RegExp(r'--[^\r\n]*'), ' ');
+    s = s.replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), ' ');
+    return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  static Map<String, String> _parseSetAssignments(String setPart) {
+    final map = <String, String>{};
+    final items = _parseCsv(setPart);
+    for (final item in items) {
+      final eqIdx = item.indexOf('=');
+      if (eqIdx != -1) {
+        final col = item
+            .substring(0, eqIdx)
+            .trim()
+            .replaceAll('`', '')
+            .replaceAll('"', '');
+        final val = item.substring(eqIdx + 1).trim();
+        map[col] = val;
+      }
+    }
+    return map;
+  }
+
+  static List<String> _parseCsv(String csv) {
+    final list = <String>[];
+    final buffer = StringBuffer();
+    bool inQuote = false;
+    String quoteChar = '';
+    for (int i = 0; i < csv.length; i++) {
+      final ch = csv[i];
+      if (inQuote) {
+        if (ch == quoteChar) {
+          inQuote = false;
+        }
+        buffer.write(ch);
+      } else {
+        if (ch == "'" || ch == '"') {
+          inQuote = true;
+          quoteChar = ch;
+          buffer.write(ch);
+        } else if (ch == ',') {
+          list.add(buffer.toString().trim());
+          buffer.clear();
+        } else {
+          buffer.write(ch);
+        }
+      }
+    }
+    if (buffer.isNotEmpty) {
+      list.add(buffer.toString().trim());
+    }
+    return list;
+  }
+
+  static List<dynamic> _parseValuesCsv(String csv) {
+    final rawList = _parseCsv(csv);
+    return rawList.map((s) => _parseLiteral(s)).toList();
+  }
+
+  static dynamic _parseLiteral(String s) {
+    if (s.isEmpty) return null;
+    final lower = s.toLowerCase();
+    if (lower == 'null') return null;
+    if (lower == 'true') return true;
+    if (lower == 'false') return false;
+    if (int.tryParse(s) != null) return int.parse(s);
+    if (double.tryParse(s) != null) return double.parse(s);
+    if ((s.startsWith("'") && s.endsWith("'")) ||
+        (s.startsWith('"') && s.endsWith('"'))) {
+      if (s.length >= 2) return s.substring(1, s.length - 1);
+      return '';
+    }
+    return s;
   }
 }

@@ -2664,6 +2664,23 @@ void main() {
       expect(delegate.getState('db_update_ok'), isTrue);
       expect(delegate.getState('db_batch_ok'), isTrue);
 
+      // 6. 测试增强 SQL: 多行注释清洗、字面量插入与 COUNT 统计、多条件过滤
+      dbEngine.loadAndExecute('''
+        local sql = [[
+          /* 多行 SQL 注释 */
+          -- 单行 SQL 注释
+          SELECT COUNT(*) AS total FROM users WHERE score >= 88 AND name LIKE 'C%'
+        ]]
+        db.query(sql, {}, function(res)
+          if res.ok and res.rows and res.rows[1] then
+            state.set("db_count_val", res.rows[1].total)
+          end
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('db_count_val'), 1);
+
       dbEngine.close();
       await tempDir.delete(recursive: true);
     });
