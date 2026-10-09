@@ -180,6 +180,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('卸载插件'), findsNothing);
+
+    // 点击插件卡片打开详情与权限管理弹窗
+    await tester.tap(find.text('Plugin 1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('权限管理'), findsOneWidget);
+    expect(find.text('完成'), findsOneWidget);
+
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(find.text('权限管理'), findsNothing);
   });
 
   testWidgets('批量导入: 逐文件安装, 单文件失败不影响其余, 结果可汇总',

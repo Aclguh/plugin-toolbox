@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import '../extensions/tool_plugin_ui_extension.dart';
 
 class PluginCard extends StatelessWidget {
   final ToolPlugin plugin;

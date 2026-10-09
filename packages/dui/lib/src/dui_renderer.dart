@@ -73,23 +73,39 @@ class DuiRenderer {
     _factories[type] = factory;
   }
 
-  /// 顶层构建入口：以 ListenableBuilder 订阅 [state]，
-  /// 状态变更后自动重建声明式组件树，宿主页面无需再手动 setState。
+  /// 构建声明式组件树根节点（下沉局部精准刷新，消除顶层全局全量重建风暴）
   Widget build(BuildContext context, Map<String, dynamic> rootNode) {
-    return ListenableBuilder(
-      listenable: state,
-      builder: (context, _) => buildWidget(context, rootNode),
-    );
+    return buildWidget(context, rootNode);
   }
 
   /// 将 JSON 节点递归转换为 Flutter Widget
   Widget buildWidget(BuildContext context, Map<String, dynamic> node) {
-    // 1. 检查条件可见性
+    // 1. 检查条件可见性（包含局部响应式绑定）
     final visibleExpr = node['visible'];
+    final visibleKeys = visibleExpr != null
+        ? DuiState.extractKeys(visibleExpr.toString())
+        : const <String>{};
+
+    if (visibleKeys.isNotEmpty) {
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(visibleKeys),
+        builder: (ctx, _) {
+          if (!state.evaluateVisible(visibleExpr)) {
+            return const SizedBox.shrink();
+          }
+          return _buildNodeContent(ctx, node);
+        },
+      );
+    }
+
     if (!state.evaluateVisible(visibleExpr)) {
       return const SizedBox.shrink();
     }
 
+    return _buildNodeContent(context, node);
+  }
+
+  Widget _buildNodeContent(BuildContext context, Map<String, dynamic> node) {
     final type = node['type']?.toString() ?? 'Container';
     final props = _asMap(node['props']);
     final childrenRaw = node['children'] as List<dynamic>? ?? const [];
@@ -204,52 +220,88 @@ class DuiRenderer {
 
     // ---- 输入框 (带双向绑定) ----
     registerFactory('TextField', (node) {
-      final currentVal =
-          node.ref != null ? (state.get(node.ref!)?.toString() ?? '') : '';
-      return _BoundTextField(
-        initialText: currentVal,
-        hint: node.props['hint']?.toString(),
-        label: node.props['label']?.toString(),
-        maxLines: DuiUtils.tryInt(node.props['maxLines']) ?? 1,
-        readOnly: DuiUtils.tryBool(node.props['readOnly']),
-        onChanged: (val) {
-          if (node.ref != null) {
-            state.set(node.ref!, val);
-          }
-          if (node.events.containsKey('onChanged')) {
-            eventHandler.handleEvent(node.events['onChanged'], val);
-          }
-        },
-      );
+      Widget buildTextField() {
+        final currentVal =
+            node.ref != null ? (state.get(node.ref!)?.toString() ?? '') : '';
+        return _BoundTextField(
+          initialText: currentVal,
+          hint: node.props['hint']?.toString(),
+          label: node.props['label']?.toString(),
+          maxLines: DuiUtils.tryInt(node.props['maxLines']) ?? 1,
+          readOnly: DuiUtils.tryBool(node.props['readOnly']),
+          onChanged: (val) {
+            if (node.ref != null) {
+              state.set(node.ref!, val);
+            }
+            if (node.events.containsKey('onChanged')) {
+              eventHandler.handleEvent(node.events['onChanged'], val);
+            }
+          },
+        );
+      }
+
+      if (node.ref != null) {
+        return ListenableBuilder(
+          listenable: state.listenableForKey(node.ref!),
+          builder: (_, __) => buildTextField(),
+        );
+      }
+      return buildTextField();
     });
 
     // ---- 按钮类 ----
     registerFactory('FilledButton', (node) {
-      final label = state.interpolate(node.props['text']?.toString() ?? '');
+      final rawText = node.props['text']?.toString() ?? '';
+      final keys = DuiState.extractKeys(rawText);
       final iconStr = node.props['icon']?.toString();
       void onPressed() =>
           eventHandler.handleEvent(node.events['onPressed']);
-      return iconStr != null
-          ? FilledButton.icon(
-              icon: Icon(DuiUtils.parseIcon(iconStr)),
-              label: Text(label),
-              onPressed: onPressed,
-            )
-          : FilledButton(onPressed: onPressed, child: Text(label));
+
+      Widget buildButton() {
+        final label = state.interpolate(rawText);
+        return iconStr != null
+            ? FilledButton.icon(
+                icon: Icon(DuiUtils.parseIcon(iconStr)),
+                label: Text(label),
+                onPressed: onPressed,
+              )
+            : FilledButton(onPressed: onPressed, child: Text(label));
+      }
+
+      if (keys.isNotEmpty) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys(keys),
+          builder: (_, __) => buildButton(),
+        );
+      }
+      return buildButton();
     });
 
     registerFactory('OutlinedButton', (node) {
-      final label = state.interpolate(node.props['text']?.toString() ?? '');
+      final rawText = node.props['text']?.toString() ?? '';
+      final keys = DuiState.extractKeys(rawText);
       final iconStr = node.props['icon']?.toString();
       void onPressed() =>
           eventHandler.handleEvent(node.events['onPressed']);
-      return iconStr != null
-          ? OutlinedButton.icon(
-              icon: Icon(DuiUtils.parseIcon(iconStr)),
-              label: Text(label),
-              onPressed: onPressed,
-            )
-          : OutlinedButton(onPressed: onPressed, child: Text(label));
+
+      Widget buildButton() {
+        final label = state.interpolate(rawText);
+        return iconStr != null
+            ? OutlinedButton.icon(
+                icon: Icon(DuiUtils.parseIcon(iconStr)),
+                label: Text(label),
+                onPressed: onPressed,
+              )
+            : OutlinedButton(onPressed: onPressed, child: Text(label));
+      }
+
+      if (keys.isNotEmpty) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys(keys),
+          builder: (_, __) => buildButton(),
+        );
+      }
+      return buildButton();
     });
 
     registerFactory('IconButton', (node) => IconButton(

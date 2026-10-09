@@ -1,25 +1,25 @@
-import 'package:flutter/widgets.dart';
 import '../model/plugin_category.dart';
 import 'plugin_context.dart';
 
-/// 所有插件（内嵌与动态）的基类接口
+/// 所有插件（内嵌与动态）的基类领域模型接口。
+///
+/// 领域模型保持纯净，不反向依赖 Flutter UI 库（IconData / ImageProvider 等）。
+/// 相关的视觉表现由 UI 表现层通过扩展方法提供。
 abstract class ToolPlugin {
   String get id;
   String get name;
   String get description;
   String get version;
   PluginCategory get category;
-  
+
   /// 是否为动态安装的插件（.ptx）
   bool get isDynamic => false;
 
-  /// 图标（原生 IconData 或自定义）
-  IconData get icon;
+  /// 插件图标标识名称（纯文本描述，如 'build'、'calculate'）
+  String get iconName => 'build';
 
-  /// 可选的图片图标源：动态插件可提供沙箱内图标文件，
-  /// UI 层据此前缀渲染而无需对具体插件类型做硬检查（保持多态）。
-  /// 返回 null 时 UI 层回退到 [icon] 矢量图标。
-  ImageProvider? get iconProvider => null;
+  /// 可选的沙箱内本地图片图标文件路径
+  String? get iconPath => null;
 
   /// 插件路由标识
   String get routePath => id;
@@ -29,7 +29,4 @@ abstract class ToolPlugin {
 
   /// 销毁生命周期
   Future<void> dispose();
-
-  /// 可选自定义设置项构建
-  Widget? buildSettings(BuildContext context) => null;
 }

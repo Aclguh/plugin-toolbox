@@ -83,12 +83,15 @@ class FsApi {
       }
 
       final file = File(fullPath);
+      final oldSize = file.existsSync() ? file.lengthSync() : 0;
       file.parent.createSync(recursive: true);
       file.writeAsStringSync(
         content,
         mode: append ? FileMode.append : FileMode.write,
         flush: true,
       );
+      final newSize = file.lengthSync();
+      context.updateUsedBytes(newSize - oldSize);
       ls.pushBoolean(true);
       return 1;
     });
@@ -119,13 +122,16 @@ class FsApi {
       final fullPath = resolveSafePath(ls, relPath);
       final file = File(fullPath);
       if (file.existsSync()) {
+        final len = file.lengthSync();
         file.deleteSync();
+        context.updateUsedBytes(-len);
         ls.pushBoolean(true);
         return 1;
       }
       final dir = Directory(fullPath);
       if (dir.existsSync()) {
         dir.deleteSync(recursive: true);
+        context.invalidateStorageQuotaCache();
         ls.pushBoolean(true);
         return 1;
       }
@@ -304,12 +310,15 @@ class FsApi {
 
       try {
         final file = File(fullPath);
+        final oldSize = file.existsSync() ? file.lengthSync() : 0;
         file.parent.createSync(recursive: true);
         file.writeAsBytesSync(
           bytes,
           mode: append ? FileMode.append : FileMode.write,
           flush: true,
         );
+        final newSize = file.lengthSync();
+        context.updateUsedBytes(newSize - oldSize);
         ls.pushBoolean(true);
         return 1;
       } catch (e) {
@@ -349,8 +358,11 @@ class FsApi {
 
       try {
         final destFile = File(destFull);
+        final oldSize = destFile.existsSync() ? destFile.lengthSync() : 0;
         destFile.parent.createSync(recursive: true);
         srcFile.copySync(destFull);
+        final newSize = destFile.lengthSync();
+        context.updateUsedBytes(newSize - oldSize);
         ls.pushBoolean(true);
         return 1;
       } catch (e) {
@@ -560,8 +572,11 @@ class FsApi {
           return 2;
         }
         final file = File(fullPath);
+        final oldSize = file.existsSync() ? file.lengthSync() : 0;
         file.parent.createSync(recursive: true);
         file.writeAsBytesSync(bytes, flush: true);
+        final newSize = file.lengthSync();
+        context.updateUsedBytes(newSize - oldSize);
         ls.pushBoolean(true);
         return 1;
       } catch (e) {

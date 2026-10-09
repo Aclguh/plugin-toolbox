@@ -68,6 +68,27 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
               Text(
                 '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
               ),
+              if (item.entry.permissions.any((p) => PluginPermission.fromString(p)?.isSensitive ?? false)) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 16,
+                      color: Theme.of(ctx).colorScheme.error,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '包含敏感硬件或网络权限，安装后首次使用需谨慎',
+                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(ctx).colorScheme.error,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (item.installedVersion != null) ...[
                 const SizedBox(height: 12),
                 Text(

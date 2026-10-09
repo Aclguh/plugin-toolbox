@@ -23,6 +23,16 @@ enum PluginPermission {
   final String label;
   final String description;
 
+  /// 是否属于涉及用户隐私、硬件设备或外网传输的高危敏感权限
+  bool get isSensitive =>
+      this == PluginPermission.camera ||
+      this == PluginPermission.microphone ||
+      this == PluginPermission.location ||
+      this == PluginPermission.photoLibrary ||
+      this == PluginPermission.network ||
+      this == PluginPermission.bluetooth ||
+      this == PluginPermission.nfc;
+
   static PluginPermission? fromString(String value) {
     switch (value.toLowerCase()) {
       case 'clipboard':

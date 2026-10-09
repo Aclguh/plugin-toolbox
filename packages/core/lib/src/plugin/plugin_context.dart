@@ -27,8 +27,11 @@ class PluginContext {
   /// 插件专属沙箱存储配额上限 (MB)，默认 50MB
   final int storageQuotaMb;
 
+  /// 内存中缓存的沙箱已占用字节数（避免每次写入触发全量递归磁盘扫描）
+  int? _cachedUsedBytes;
+
   /// 创建插件运行上下文
-  const PluginContext({
+  PluginContext({
     required this.pluginId,
     required this.storage,
     required this.eventBus,
@@ -41,20 +44,45 @@ class PluginContext {
   /// 检查插件是否已被授予指定权限 [perm]
   bool hasPermission(PluginPermission perm) => grantedPermissions.contains(perm);
 
-  /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
-  bool checkStorageQuota(int additionalBytes) {
-    if (rootDir == null) return true;
-    final maxBytes = storageQuotaMb * 1024 * 1024;
-    int currentBytes = 0;
+  /// 获取当前已使用的沙箱存储字节数
+  int get currentUsedBytes {
+    if (_cachedUsedBytes != null) return _cachedUsedBytes!;
+    _cachedUsedBytes = _calculateDiskUsedBytes();
+    return _cachedUsedBytes!;
+  }
+
+  int _calculateDiskUsedBytes() {
+    if (rootDir == null) return 0;
+    int bytes = 0;
     try {
       if (rootDir!.existsSync()) {
         for (final entity in rootDir!.listSync(recursive: true, followLinks: false)) {
           if (entity is File) {
-            currentBytes += entity.lengthSync();
+            bytes += entity.lengthSync();
           }
         }
       }
     } catch (_) {}
-    return (currentBytes + additionalBytes) <= maxBytes;
+    return bytes;
+  }
+
+  /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
+  bool checkStorageQuota(int additionalBytes) {
+    if (rootDir == null) return true;
+    final maxBytes = storageQuotaMb * 1024 * 1024;
+    return (currentUsedBytes + additionalBytes) <= maxBytes;
+  }
+
+  /// 更新沙箱缓存字节增量（写入或删除文件时调用）
+  void updateUsedBytes(int delta) {
+    if (_cachedUsedBytes != null) {
+      _cachedUsedBytes = (_cachedUsedBytes! + delta);
+      if (_cachedUsedBytes! < 0) _cachedUsedBytes = 0;
+    }
+  }
+
+  /// 清除缓存，下次检查时重新扫描全盘
+  void invalidateStorageQuotaCache() {
+    _cachedUsedBytes = null;
   }
 }

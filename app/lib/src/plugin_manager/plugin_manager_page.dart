@@ -215,6 +215,117 @@ class PluginManagerPage extends ConsumerWidget {
     }
   }
 
+  void _showPluginDetails(
+    BuildContext context,
+    WidgetRef ref,
+    ToolPlugin plugin,
+  ) {
+    final dynamicPlugin = plugin is DynamicPlugin ? plugin : null;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final declaredPermissions = dynamicPlugin?.manifest.permissions ?? <PluginPermission>[];
+          final grantedPermissions = dynamicPlugin?.context?.grantedPermissions ?? <PluginPermission>{};
+
+          return AlertDialog(
+            title: Text(plugin.name),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ID: ${plugin.id}'),
+                  const SizedBox(height: 4),
+                  Text('版本: ${plugin.version}'),
+                  const SizedBox(height: 4),
+                  Text('分类: ${plugin.category.label}'),
+                  if (dynamicPlugin != null) ...[
+                    const SizedBox(height: 4),
+                    Text('作者: ${dynamicPlugin.manifest.author}'),
+                    const SizedBox(height: 4),
+                    Text('沙箱配额: ${dynamicPlugin.manifest.storageQuotaMb} MB'),
+                  ],
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 6),
+                  Text(
+                    '权限管理',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  if (declaredPermissions.isEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '该插件未声明任何系统权限',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    ...declaredPermissions.map((perm) {
+                      final isGranted = grantedPermissions.contains(perm);
+                      return SwitchListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Text(perm.label),
+                            if (perm.isSensitive) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .errorContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '敏感',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text(perm.description),
+                        value: isGranted,
+                        onChanged: (enabled) {
+                          setDialogState(() {
+                            if (enabled) {
+                              dynamicPlugin?.context?.grantedPermissions.add(perm);
+                            } else {
+                              dynamicPlugin?.context?.grantedPermissions.remove(perm);
+                            }
+                          });
+                        },
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('完成'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildPluginIcon(BuildContext context, ToolPlugin plugin) {
     // 多态图标：经基类 iconProvider 获取图片源，避免对动态插件类型硬检查；
     // 图片解码失败或文件缺失时回退矢量图标，不在 build 中做同步磁盘检查
@@ -405,6 +516,7 @@ class PluginManagerPage extends ConsumerWidget {
                         ref.read(pluginRegistryProvider.notifier).refresh();
                       },
                     ),
+                    onTap: () => _showPluginDetails(context, ref, plugin),
                     onLongPress: () => _confirmDelete(context, ref, plugin),
                   ),
                 );

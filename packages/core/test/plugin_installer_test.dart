@@ -283,12 +283,18 @@ void main() {
       // 写入 800KB 文件
       final file = File('${tempDir.path}/test.bin');
       await file.writeAsBytes(List<int>.filled(800 * 1024, 0));
+      ctx.invalidateStorageQuotaCache();
 
       // 当前已有 800KB，尝试再写入 300KB 超出 1MB 配额 (800 + 300 = 1100 > 1024)
       expect(ctx.checkStorageQuota(300 * 1024), isFalse);
 
       // 尝试再写入 100KB 在配额内 (800 + 100 = 900 <= 1024)
       expect(ctx.checkStorageQuota(100 * 1024), isTrue);
+
+      // 验证内存增量维护
+      ctx.updateUsedBytes(200 * 1024);
+      // 当前内存缓存为 800 + 200 = 1000KB，尝试再写入 100KB 超出 1MB 配额 (1000 + 100 = 1100 > 1024)
+      expect(ctx.checkStorageQuota(100 * 1024), isFalse);
 
       await tempDir.delete(recursive: true);
     });
