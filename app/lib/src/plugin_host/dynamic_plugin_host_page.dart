@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +8,9 @@ import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
+import 'plugin_native_bridge.dart';
+
+/// 动态插件宿主页面容器
 class DynamicPluginHostPage extends StatefulWidget {
   final DynamicPlugin plugin;
 
@@ -21,9 +23,7 @@ class DynamicPluginHostPage extends StatefulWidget {
 class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     with WidgetsBindingObserver
     implements LuaHostDelegate, DuiActionExecutor {
-  static const MethodChannel _nativeChannel =
-      MethodChannel('com.plugintoolbox/host_native');
-
+  late final PluginNativeBridge _nativeBridge;
   late final DuiState _duiState;
   late final DuiEventHandler _eventHandler;
   late final DuiRenderer _renderer;
@@ -37,6 +37,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _nativeBridge = PluginNativeBridge(pluginRootDir: widget.plugin.rootDir);
     _duiState = DuiState();
     _eventHandler = DuiEventHandler(
       state: _duiState,
@@ -58,7 +59,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       _runner?.onResume();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      stopSensor('all');
+      _nativeBridge.stopSensor('all');
       _runner?.onPause();
     }
   }
@@ -92,24 +93,10 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
-  bool _torchOn = false;
-  bool _screenKeepOn = false;
-  bool _brightnessModified = false;
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (_torchOn) {
-      setTorch(false);
-    }
-    if (_screenKeepOn) {
-      setKeepScreenOn(false);
-    }
-    if (_brightnessModified) {
-      resetBrightness();
-    }
-    stopSensor('all');
-    stopAudio();
+    _nativeBridge.dispose();
     _runner?.dispose();
     _duiState.dispose();
     super.dispose();
@@ -125,11 +112,9 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
-  // --- LuaHostDelegate 协议 ---
+  // --- LuaHostDelegate: 状态管理 ---
   @override
-  void onStateChanged(String key, dynamic value) {
-    _duiState.set(key, value);
-  }
+  void onStateChanged(String key, dynamic value) => _duiState.set(key, value);
 
   @override
   dynamic getState(String key) => _duiState.get(key);
@@ -137,6 +122,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   @override
   Map<String, dynamic> getAllStates() => _duiState.getAll();
 
+  // --- LuaHostDelegate: UI 弹窗与用户交互 ---
   @override
   void showToast(String message) {
     if (!mounted) return;
@@ -191,6 +177,100 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   }
 
   @override
+  Future<String?> showPrompt({
+    required String title,
+    String? hint,
+    String? defaultValue,
+  }) async {
+    if (!mounted) return null;
+    final controller = TextEditingController(text: defaultValue);
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: hint),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    return res;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> showPickItem({
+    required String title,
+    required List<String> items,
+    int initialIndex = 0,
+  }) async {
+    if (!mounted) return null;
+    return await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(title),
+        children: items.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final item = entry.value;
+          return SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop({'index': idx, 'text': item}),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(item),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>?> showBottomSheet({
+    required String title,
+    required List<String> items,
+  }) async {
+    if (!mounted) return null;
+    return await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                title,
+                style: Theme.of(ctx).textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const Divider(height: 1),
+            ...items.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final item = entry.value;
+              return ListTile(
+                title: Text(item, textAlign: TextAlign.center),
+                onTap: () => Navigator.of(ctx).pop({'index': idx, 'text': item}),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   void hideKeyboard() {
     if (mounted) {
       FocusScope.of(context).unfocus();
@@ -216,136 +296,6 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       default:
         HapticFeedback.vibrate();
         break;
-    }
-  }
-
-  @override
-  Future<void> shareText(String text, {String? subject}) async {
-    try {
-      await _nativeChannel.invokeMethod('shareText', {
-        'text': text,
-        'subject': subject,
-      });
-    } catch (_) {}
-  }
-
-  @override
-  Future<bool> openUrl(String url) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('openUrl', {
-        'url': url,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<String?> pickFile({List<String>? allowedExtensions}) async {
-    try {
-      final res = await FilePicker.platform.pickFiles(
-        type: (allowedExtensions != null && allowedExtensions.isNotEmpty)
-            ? FileType.custom
-            : FileType.any,
-        allowedExtensions: allowedExtensions,
-      );
-      if (res == null || res.files.isEmpty) return null;
-      final file = res.files.first;
-      final srcPath = file.path;
-      if (srcPath == null) return null;
-
-      final rootDir = widget.plugin.rootDir;
-      final fileName = file.name;
-      final destDir = Directory('${rootDir.path}/data');
-      if (!destDir.existsSync()) {
-        destDir.createSync(recursive: true);
-      }
-      final destFile = File('${destDir.path}/$fileName');
-      await File(srcPath).copy(destFile.path);
-      return 'data/$fileName';
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<String?> pickImage() async {
-    try {
-      final res = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-      );
-      if (res == null || res.files.isEmpty) return null;
-      final file = res.files.first;
-      final srcPath = file.path;
-      if (srcPath == null) return null;
-
-      final rootDir = widget.plugin.rootDir;
-      final fileName = file.name;
-      final destDir = Directory('${rootDir.path}/data');
-      if (!destDir.existsSync()) {
-        destDir.createSync(recursive: true);
-      }
-      final destFile = File('${destDir.path}/$fileName');
-      await File(srcPath).copy(destFile.path);
-      return 'data/$fileName';
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<bool> setTorch(bool enabled) async {
-    _torchOn = enabled;
-    try {
-      await _nativeChannel.invokeMethod<bool>('setTorch', {'enabled': enabled});
-    } catch (_) {}
-    return true;
-  }
-
-  @override
-  bool get isTorchOn => _torchOn;
-
-  @override
-  Future<bool> shareFile(
-    String filePath, {
-    String? mimeType,
-    String? subject,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('shareFile', {
-        'path': filePath,
-        'mimeType': mimeType,
-        'subject': subject,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> saveToGallery(String filePath) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('saveToGallery', {
-        'path': filePath,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> exportFile(String filePath, {String? defaultName}) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('exportFile', {
-        'path': filePath,
-        'defaultName': defaultName,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
     }
   }
 
@@ -411,768 +361,6 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   }
 
   @override
-  Future<String?> scanBarcode({String? prompt}) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<String>('scanBarcode', {
-        'prompt': prompt,
-      });
-      if (res != null) return res;
-    } catch (_) {}
-    if (!mounted) return null;
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return await showPrompt(
-        title: prompt ?? '扫码识别 (桌面模拟)',
-        hint: '请输入或粘贴条形码/二维码扫描内容',
-      );
-    }
-    return null;
-  }
-
-  @override
-  Future<String?> decodeBarcodeFromImage(String filePath) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<String>(
-        'decodeBarcodeFromImage',
-        {'path': filePath},
-      );
-      if (res != null) return res;
-    } catch (_) {}
-    if (!mounted) return null;
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return await showPrompt(
-        title: '图片二维码识别 (桌面模拟)',
-        hint: '未检测到原生条码识别器，可手动输入模拟识别结果',
-      );
-    }
-    return null;
-  }
-
-  final Map<String, Map<String, dynamic>> _sensorCache = {};
-
-  @override
-  Future<bool> startSensor(String type) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('startSensor', {
-        'type': type,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> stopSensor(String type) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('stopSensor', {
-        'type': type,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>?> getSensorData(String type) async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
-        'getSensorData',
-        {'type': type},
-      );
-      if (res != null) {
-        _sensorCache[type] = res;
-      }
-      return res ?? _sensorCache[type];
-    } catch (_) {
-      return _sensorCache[type];
-    }
-  }
-
-  // ---- 媒体图像处理 (P2) ----
-  @override
-  Future<Map<String, dynamic>?> imageInfo(String filePath) async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
-        'imageInfo',
-        {'path': filePath},
-      );
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<bool> compressImage(
-    String srcPath,
-    String destPath, {
-    int quality = 80,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('compressImage', {
-        'src': srcPath,
-        'dest': destPath,
-        'quality': quality,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> cropImage(
-    String srcPath,
-    String destPath, {
-    required int x,
-    required int y,
-    required int width,
-    required int height,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('cropImage', {
-        'src': srcPath,
-        'dest': destPath,
-        'x': x,
-        'y': y,
-        'width': width,
-        'height': height,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> convertImage(
-    String srcPath,
-    String destPath, {
-    required String format,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('convertImage', {
-        'src': srcPath,
-        'dest': destPath,
-        'format': format,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> stripExifImage(String srcPath, String destPath) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('stripExifImage', {
-        'src': srcPath,
-        'dest': destPath,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 系统通知与定时调度 (P2) ----
-  @override
-  Future<int> showNotification({
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<int>('showNotification', {
-        'title': title,
-        'body': body,
-        'payload': payload,
-      });
-      return res ?? -1;
-    } catch (_) {
-      return -1;
-    }
-  }
-
-  @override
-  Future<int> scheduleNotification({
-    required String title,
-    required String body,
-    required int delaySeconds,
-    String? payload,
-  }) async {
-    try {
-      final res =
-          await _nativeChannel.invokeMethod<int>('scheduleNotification', {
-        'title': title,
-        'body': body,
-        'delaySeconds': delaySeconds,
-        'payload': payload,
-      });
-      return res ?? -1;
-    } catch (_) {
-      return -1;
-    }
-  }
-
-  @override
-  Future<bool> cancelNotification(int id) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('cancelNotification', {
-        'id': id,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> cancelAllNotifications() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('cancelAllNotifications');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 音频播放与频率发生器 (P2) ----
-  @override
-  Future<bool> playAudio(String filePath) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('playAudio', {
-        'path': filePath,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> stopAudio() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('stopAudio');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> playTone(double frequencyHz, int durationMs) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('playTone', {
-        'frequency': frequencyHz,
-        'durationMs': durationMs,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 生物认证与端侧交互 ----
-  @override
-  Future<bool> isBiometricsAvailable() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isBiometricsAvailable');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
-        'authenticateBiometrics',
-        {'reason': reason},
-      );
-      return res ?? {'success': false, 'error': 'failed'};
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  // ---- 麦克风录音与声音分贝感知 ----
-  @override
-  Future<bool> startAudioRecording(String destPath) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('startAudioRecording', {
-        'path': destPath,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>?> stopAudioRecording() async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('stopAudioRecording');
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<double> getAudioDecibel() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<double>('getAudioDecibel');
-      return res ?? 0.0;
-    } catch (_) {
-      return 0.0;
-    }
-  }
-
-  // ---- 语音合成 (TTS) ----
-  @override
-  Future<bool> speakText(
-    String text, {
-    String? language,
-    double? pitch,
-    double? rate,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('speakText', {
-        'text': text,
-        'language': language,
-        'pitch': pitch,
-        'rate': rate,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> stopSpeaking() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('stopSpeaking');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 高级交互弹窗 (P3) ----
-  @override
-  Future<String?> showPrompt({
-    required String title,
-    String? hint,
-    String? defaultValue,
-  }) async {
-    if (!mounted) return null;
-    final controller = TextEditingController(text: defaultValue ?? '');
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: hint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Future<Map<String, dynamic>?> showPickItem({
-    required String title,
-    required List<String> items,
-    int initialIndex = 0,
-  }) async {
-    if (!mounted) return null;
-    return showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(title),
-        children: [
-          for (int i = 0; i < items.length; i++)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, {'index': i, 'text': items[i]}),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  items[i],
-                  style: TextStyle(
-                    fontWeight: i == initialIndex ? FontWeight.bold : FontWeight.normal,
-                    color: i == initialIndex ? Theme.of(ctx).colorScheme.primary : null,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Future<Map<String, dynamic>?> showBottomSheet({
-    required String title,
-    required List<String> items,
-  }) async {
-    if (!mounted) return null;
-    return showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (title.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    title,
-                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: items.length,
-                  itemBuilder: (ctx, idx) {
-                    return ListTile(
-                      title: Text(items[idx]),
-                      onTap: () => Navigator.of(ctx).pop({
-                        'index': idx,
-                        'text': items[idx],
-                      }),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ---- 硬件与系统深度状态感知 (P3) ----
-  int _cachedBattery = 100;
-  bool _cachedIsCharging = false;
-  String _cachedNetType = 'unknown';
-
-  @override
-  int get batteryLevel => _cachedBattery;
-
-  @override
-  bool get isCharging => _cachedIsCharging;
-
-  @override
-  String get networkType => _cachedNetType;
-
-  @override
-  Future<int> getBatteryLevel() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<int>('getBatteryLevel');
-      if (res != null) _cachedBattery = res;
-      return res ?? _cachedBattery;
-    } catch (_) {
-      return _cachedBattery;
-    }
-  }
-
-  @override
-  Future<bool> checkIsCharging() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isCharging');
-      if (res != null) _cachedIsCharging = res;
-      return res ?? _cachedIsCharging;
-    } catch (_) {
-      return _cachedIsCharging;
-    }
-  }
-
-  @override
-  Future<String> fetchNetworkType() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<String>('getNetworkType');
-      if (res != null) _cachedNetType = res;
-      return res ?? _cachedNetType;
-    } catch (_) {
-      return _cachedNetType;
-    }
-  }
-
-  // ---- 屏幕控制与常亮 (Screen) ----
-  @override
-  Future<bool> setKeepScreenOn(bool enabled) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('setKeepScreenOn', {'enabled': enabled});
-      final ok = res ?? true;
-      if (ok) _screenKeepOn = enabled;
-      return ok;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> setBrightness(double brightness) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('setBrightness', {'brightness': brightness});
-      final ok = res ?? true;
-      if (ok) _brightnessModified = true;
-      return ok;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<double> getBrightness() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<double>('getBrightness');
-      return res ?? 1.0;
-    } catch (_) {
-      return 1.0;
-    }
-  }
-
-  @override
-  Future<bool> resetBrightness() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('resetBrightness');
-      _brightnessModified = false;
-      return res ?? true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 系统分享接收 (Share Target) ----
-  @override
-  Future<Map<String, dynamic>?> getInitialShare() async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('getInitialShare');
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ---- 地理位置与海拔 (Location) ----
-  @override
-  Future<bool> isLocationAvailable() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isLocationAvailable');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>?> getCurrentPosition() async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('getCurrentPosition');
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ---- NFC 近场通信 ----
-  @override
-  Future<bool> isNfcAvailable() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isNfcAvailable');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>?> readNdef() async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('readNdef');
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<bool> writeNdef(List<Map<String, dynamic>> records) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('writeNdef', {'records': records});
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 蓝牙低功耗 (Bluetooth LE) ----
-  @override
-  Future<bool> isBluetoothAvailable() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isBluetoothAvailable');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> startBluetoothScan(
-      void Function(Map<String, dynamic> device) onDeviceFound) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('startBluetoothScan');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> stopBluetoothScan() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('stopBluetoothScan');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> connectBluetooth(String deviceId) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('connectBluetooth', {'deviceId': deviceId});
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> disconnectBluetooth(String deviceId) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('disconnectBluetooth', {'deviceId': deviceId});
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<String?> readBluetoothCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String charUuid,
-  ) async {
-    try {
-      return await _nativeChannel.invokeMethod<String>('readBluetoothCharacteristic', {
-        'deviceId': deviceId,
-        'serviceUuid': serviceUuid,
-        'charUuid': charUuid,
-      });
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<bool> writeBluetoothCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String charUuid,
-    String value,
-  ) async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('writeBluetoothCharacteristic', {
-        'deviceId': deviceId,
-        'serviceUuid': serviceUuid,
-        'charUuid': charUuid,
-        'value': value,
-      });
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ---- 离线 OCR 图像文字识别 ----
-  @override
-  Future<Map<String, dynamic>?> recognizeText(String filePath) async {
-    try {
-      final rootDir = widget.plugin.rootDir;
-      final file = File('${rootDir.path}/$filePath');
-      if (!file.existsSync()) return null;
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('recognizeText', {
-        'path': file.path,
-      });
-      return res;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ---- 宿主统一 AI 网关 ----
-  @override
-  Future<bool> isAiAvailable() async {
-    try {
-      final res = await _nativeChannel.invokeMethod<bool>('isAiAvailable');
-      return res ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> aiChat({
-    required List<Map<String, dynamic>> messages,
-    String? model,
-    double? temperature,
-  }) async {
-    try {
-      final res = await _nativeChannel.invokeMapMethod<String, dynamic>('aiChat', {
-        'messages': messages,
-        'model': model,
-        'temperature': temperature,
-      });
-      return res ?? {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
-    } catch (_) {
-      return {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
-    }
-  }
-
-  @override
-  Stream<String> aiStreamChat({
-    required List<Map<String, dynamic>> messages,
-    String? model,
-    double? temperature,
-  }) {
-    return const Stream.empty();
-  }
-
-  // ---- 跨插件互通与管道调起 ----
-  @override
   Future<bool> openPlugin(
     String targetPluginId, {
     Map<String, dynamic>? initialData,
@@ -1186,6 +374,261 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
+  // --- LuaHostDelegate: 平台与系统能力委派至 PluginNativeBridge ---
+  @override
+  Future<void> shareText(String text, {String? subject}) =>
+      _nativeBridge.shareText(text, subject: subject);
+
+  @override
+  Future<bool> openUrl(String url) => _nativeBridge.openUrl(url);
+
+  @override
+  Future<String?> pickFile({List<String>? allowedExtensions}) =>
+      _nativeBridge.pickFile(allowedExtensions: allowedExtensions);
+
+  @override
+  Future<String?> pickImage() => _nativeBridge.pickImage();
+
+  @override
+  Future<bool> setTorch(bool enabled) => _nativeBridge.setTorch(enabled);
+
+  @override
+  bool get isTorchOn => _nativeBridge.isTorchOn;
+
+  @override
+  Future<bool> shareFile(String filePath, {String? mimeType, String? subject}) =>
+      _nativeBridge.shareFile(filePath, mimeType: mimeType, subject: subject);
+
+  @override
+  Future<bool> saveToGallery(String filePath) =>
+      _nativeBridge.saveToGallery(filePath);
+
+  @override
+  Future<bool> exportFile(String filePath, {String? defaultName}) =>
+      _nativeBridge.exportFile(filePath, defaultName: defaultName);
+
+  @override
+  Future<String?> scanBarcode({String? prompt}) async {
+    final res = await _nativeBridge.scanBarcode(prompt: prompt);
+    if (res != null) return res;
+    if (!mounted) return null;
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return await showPrompt(
+        title: prompt ?? '扫码识别 (桌面模拟)',
+        hint: '请输入或粘贴条形码/二维码扫描内容',
+      );
+    }
+    return null;
+  }
+
+  @override
+  Future<String?> decodeBarcodeFromImage(String filePath) async {
+    final res = await _nativeBridge.decodeBarcodeFromImage(filePath);
+    if (res != null) return res;
+    if (!mounted) return null;
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return await showPrompt(
+        title: '图片二维码识别 (桌面模拟)',
+        hint: '未检测到原生条码识别器，可手动输入模拟识别结果',
+      );
+    }
+    return null;
+  }
+
+  @override
+  Future<bool> startSensor(String type) => _nativeBridge.startSensor(type);
+
+  @override
+  Future<bool> stopSensor(String type) => _nativeBridge.stopSensor(type);
+
+  @override
+  Future<Map<String, dynamic>?> getSensorData(String type) =>
+      _nativeBridge.getSensorData(type);
+
+  @override
+  Future<Map<String, dynamic>?> imageInfo(String filePath) =>
+      _nativeBridge.imageInfo(filePath);
+
+  @override
+  Future<bool> compressImage(String srcPath, String destPath, {int quality = 80}) =>
+      _nativeBridge.compressImage(srcPath, destPath, quality: quality);
+
+  @override
+  Future<bool> cropImage(String srcPath, String destPath,
+          {required int x, required int y, required int width, required int height}) =>
+      _nativeBridge.cropImage(srcPath, destPath,
+          x: x, y: y, width: width, height: height);
+
+  @override
+  Future<bool> convertImage(String srcPath, String destPath, {required String format}) =>
+      _nativeBridge.convertImage(srcPath, destPath, format: format);
+
+  @override
+  Future<bool> stripExifImage(String srcPath, String destPath) =>
+      _nativeBridge.stripExifImage(srcPath, destPath);
+
+  @override
+  Future<int> showNotification({required String title, required String body, String? payload}) =>
+      _nativeBridge.showNotification(title: title, body: body, payload: payload);
+
+  @override
+  Future<int> scheduleNotification(
+          {required String title, required String body, required int delaySeconds, String? payload}) =>
+      _nativeBridge.scheduleNotification(
+          title: title, body: body, delaySeconds: delaySeconds, payload: payload);
+
+  @override
+  Future<bool> cancelNotification(int id) =>
+      _nativeBridge.cancelNotification(id);
+
+  @override
+  Future<bool> cancelAllNotifications() =>
+      _nativeBridge.cancelAllNotifications();
+
+  @override
+  Future<bool> playAudio(String filePath) => _nativeBridge.playAudio(filePath);
+
+  @override
+  Future<bool> stopAudio() => _nativeBridge.stopAudio();
+
+  @override
+  Future<bool> playTone(double frequencyHz, int durationMs) =>
+      _nativeBridge.playTone(frequencyHz, durationMs);
+
+  @override
+  Future<bool> startAudioRecording(String destPath) =>
+      _nativeBridge.startAudioRecording(destPath);
+
+  @override
+  Future<Map<String, dynamic>?> stopAudioRecording() =>
+      _nativeBridge.stopAudioRecording();
+
+  @override
+  Future<double> getAudioDecibel() => _nativeBridge.getAudioDecibel();
+
+  @override
+  Future<bool> speakText(String text, {String? language, double? pitch, double? rate}) =>
+      _nativeBridge.speakText(text, language: language, pitch: pitch, rate: rate);
+
+  @override
+  Future<bool> stopSpeaking() => _nativeBridge.stopSpeaking();
+
+  @override
+  Future<bool> setKeepScreenOn(bool enabled) =>
+      _nativeBridge.setKeepScreenOn(enabled);
+
+  @override
+  Future<bool> setBrightness(double brightness) =>
+      _nativeBridge.setBrightness(brightness);
+
+  @override
+  Future<double> getBrightness() => _nativeBridge.getBrightness();
+
+  @override
+  Future<bool> resetBrightness() => _nativeBridge.resetBrightness();
+
+  @override
+  int get batteryLevel => 100;
+
+  @override
+  bool get isCharging => false;
+
+  @override
+  Future<bool> checkIsCharging() async => false;
+
+  @override
+  String get networkType => 'unknown';
+
+  @override
+  Future<int> getBatteryLevel() => _nativeBridge.getBatteryLevel();
+
+  @override
+  Future<String> fetchNetworkType() => _nativeBridge.fetchNetworkType();
+
+  @override
+  Future<Map<String, dynamic>?> getInitialShare() =>
+      _nativeBridge.getInitialShare();
+
+  @override
+  Future<bool> isBiometricsAvailable() =>
+      _nativeBridge.isBiometricsAvailable();
+
+  @override
+  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) =>
+      _nativeBridge.authenticateBiometrics(reason: reason);
+
+  @override
+  Future<bool> isLocationAvailable() => _nativeBridge.isLocationAvailable();
+
+  @override
+  Future<Map<String, dynamic>?> getCurrentPosition() =>
+      _nativeBridge.getCurrentPosition();
+
+  @override
+  Future<bool> isNfcAvailable() => _nativeBridge.isNfcAvailable();
+
+  @override
+  Future<Map<String, dynamic>?> readNdef() => _nativeBridge.readNdef();
+
+  @override
+  Future<bool> writeNdef(List<Map<String, dynamic>> records) =>
+      _nativeBridge.writeNdef(records);
+
+  @override
+  Future<bool> isBluetoothAvailable() =>
+      _nativeBridge.isBluetoothAvailable();
+
+  @override
+  Future<bool> startBluetoothScan(
+          void Function(Map<String, dynamic> device) onDeviceFound) =>
+      _nativeBridge.startBluetoothScan(onDeviceFound);
+
+  @override
+  Future<bool> stopBluetoothScan() => _nativeBridge.stopBluetoothScan();
+
+  @override
+  Future<bool> connectBluetooth(String deviceId) =>
+      _nativeBridge.connectBluetooth(deviceId);
+
+  @override
+  Future<bool> disconnectBluetooth(String deviceId) =>
+      _nativeBridge.disconnectBluetooth(deviceId);
+
+  @override
+  Future<String?> readBluetoothCharacteristic(
+          String deviceId, String serviceUuid, String charUuid) =>
+      _nativeBridge.readBluetoothCharacteristic(deviceId, serviceUuid, charUuid);
+
+  @override
+  Future<bool> writeBluetoothCharacteristic(
+          String deviceId, String serviceUuid, String charUuid, String value) =>
+      _nativeBridge.writeBluetoothCharacteristic(deviceId, serviceUuid, charUuid, value);
+
+  @override
+  Future<Map<String, dynamic>?> recognizeText(String filePath) =>
+      _nativeBridge.recognizeText(filePath);
+
+  @override
+  Future<bool> isAiAvailable() => _nativeBridge.isAiAvailable();
+
+  @override
+  Future<Map<String, dynamic>> aiChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) =>
+      _nativeBridge.aiChat(
+          messages: messages, model: model, temperature: temperature);
+
+  @override
+  Stream<String> aiStreamChat({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double? temperature,
+  }) =>
+      _nativeBridge.aiStreamChat(
+          messages: messages, model: model, temperature: temperature);
+
   @override
   Widget build(BuildContext context) {
     return PluginPageScaffold(
@@ -1195,7 +638,6 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
           : _loadError != null
               ? ErrorView(message: '插件运行错误:\n$_loadError')
               : _uiRootNode != null
-                  // 渲染器顶层已通过 ListenableBuilder 订阅状态，无需手动 setState
                   ? _renderer.build(context, _uiRootNode!)
                   : const Center(child: Text('无 UI 描述')),
     );
