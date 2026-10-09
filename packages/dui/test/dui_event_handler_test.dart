@@ -111,6 +111,37 @@ void main() {
       expect(executor.toasts, ['已复制到剪贴板']);
     });
 
+    test('copyToClipboard 未声明权限时阻断复制并提示权限不足', () async {
+      String? copiedText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText = (call.arguments as Map)['text'] as String?;
+          return null;
+        }
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding.instance
+          .defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      final restrictedHandler = DuiEventHandler(
+        state: state,
+        executor: executor,
+        permissionChecker: (perm) => false, // 拒绝所有权限
+      );
+
+      final event = {
+        'action': 'copyToClipboard',
+        'text': 'Secret Data',
+      };
+
+      restrictedHandler.handleEvent(event);
+
+      expect(copiedText, isNull);
+      expect(executor.toasts, contains(predicate<String>((s) => s.contains('权限不足'))));
+    });
+
     test('容错降级：null 或非法事件定义安全无害忽略', () {
       expect(() => handler.handleEvent(null), returnsNormally);
       expect(() => handler.handleEvent({}), returnsNormally);

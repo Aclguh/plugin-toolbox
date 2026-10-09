@@ -71,17 +71,41 @@ class LuaValueCodec {
     return result;
   }
 
-  /// 深度读取指定栈索引的 Lua 表结构并识别连续数组或字典
-  static dynamic readTable(LuaState ls, int idx) {
+  static const int maxTableDepth = 64;
+
+  /// 深度读取指定栈索引的 Lua 表结构并识别连续数组或字典（含循环引用与深度防护）
+  static dynamic readTable(
+    LuaState ls,
+    int idx, [
+    Set<Object?>? seenPointers,
+    int depth = 0,
+  ]) {
+    if (depth > maxTableDepth) {
+      return null;
+    }
+    final absIdx = idx < 0 ? ls.getTop() + idx + 1 : idx;
+    final pointer = ls.toPointer(absIdx);
+    final seen = seenPointers ?? <Object?>{};
+    if (pointer != null && seen.contains(pointer)) {
+      return null;
+    }
+    if (pointer != null) {
+      seen.add(pointer);
+    }
+
     final rawEntries = <dynamic, dynamic>{};
     ls.pushNil();
-    while (ls.next(idx < 0 ? idx - 1 : idx)) {
+    while (ls.next(absIdx)) {
       final dynamic key = ls.isInteger(-2)
           ? ls.toInteger(-2)
           : (ls.toStr(-2) ?? ls.toInteger(-2).toString());
-      final val = readCurrentValue(ls);
+      final val = readCurrentValue(ls, seen, depth + 1);
       rawEntries[key] = val;
       ls.pop(1);
+    }
+
+    if (pointer != null) {
+      seen.remove(pointer);
     }
 
     if (rawEntries.isEmpty) {
@@ -114,7 +138,11 @@ class LuaValueCodec {
   }
 
   /// 读取当前栈顶的值但不弹出
-  static dynamic readCurrentValue(LuaState ls) {
+  static dynamic readCurrentValue(
+    LuaState ls, [
+    Set<Object?>? seenPointers,
+    int depth = 0,
+  ]) {
     final type = ls.type(-1);
     switch (type) {
       case LuaType.luaNil:
@@ -126,7 +154,7 @@ class LuaValueCodec {
       case LuaType.luaString:
         return ls.toStr(-1);
       case LuaType.luaTable:
-        return readTable(ls, -1);
+        return readTable(ls, -1, seenPointers, depth);
       default:
         return null;
     }

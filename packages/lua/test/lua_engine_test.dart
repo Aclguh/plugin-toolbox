@@ -827,6 +827,20 @@ void main() {
       cyclic['self'] = cyclic;
       expect(() => engine.callFunction('sink', [cyclic]), throwsException);
     });
+
+    test('Lua 侧包含循环引用的表出栈被安全截断，不发生栈溢出', () {
+      engine.loadAndExecute('''
+        function getCyclic()
+          local a = { name = "root" }
+          a.self = a
+          return a
+        end
+      ''');
+      final res = engine.callFunction('getCyclic');
+      expect(res, isA<Map>());
+      expect((res as Map)['name'], 'root');
+      expect(res['self'], isNull);
+    });
   });
 
   group('Lua 异步宿主 API', () {

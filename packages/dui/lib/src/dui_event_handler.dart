@@ -1,5 +1,9 @@
 import 'package:flutter/services.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'dui_state.dart';
+
+/// 动态界面的权限检查器回调
+typedef DuiPermissionChecker = bool Function(PluginPermission permission);
 
 /// DUI 动作执行接口，连接 DUI 事件与底层宿主逻辑或脚本引擎
 abstract class DuiActionExecutor {
@@ -18,10 +22,14 @@ class DuiEventHandler {
   /// 外部动作执行器
   final DuiActionExecutor executor;
 
+  /// 插件权限校验器（为空时表示不受限环境）
+  final DuiPermissionChecker? permissionChecker;
+
   /// 创建事件处理器
   DuiEventHandler({
     required this.state,
     required this.executor,
+    this.permissionChecker,
   });
 
   /// 事件定义接受宽容的 Map 类型并做防御式取值：
@@ -48,6 +56,11 @@ class DuiEventHandler {
         break;
 
       case 'copyToClipboard':
+        if (permissionChecker != null &&
+            !permissionChecker!(PluginPermission.clipboard)) {
+          executor.showToast('权限不足: 插件未声明 clipboard 权限');
+          break;
+        }
         final rawText = eventDef['text']?.toString() ?? '';
         final text = state.interpolate(rawText);
         Clipboard.setData(ClipboardData(text: text));

@@ -38,7 +38,11 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _duiState = DuiState();
-    _eventHandler = DuiEventHandler(state: _duiState, executor: this);
+    _eventHandler = DuiEventHandler(
+      state: _duiState,
+      executor: this,
+      permissionChecker: (perm) => widget.plugin.context?.hasPermission(perm) ?? false,
+    );
     _renderer = DuiRenderer(
       state: _duiState,
       eventHandler: _eventHandler,
