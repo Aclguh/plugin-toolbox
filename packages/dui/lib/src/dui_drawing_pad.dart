@@ -156,10 +156,16 @@ class _DuiDrawingPadState extends State<DuiDrawingPad> {
     }
 
     final picture = recorder.endRecording();
-    final img = await picture.toImage(w.toInt(), h.toInt());
-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) return null;
-    return base64Encode(byteData.buffer.asUint8List());
+    ui.Image? img;
+    try {
+      img = await picture.toImage(w.toInt(), h.toInt());
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      return base64Encode(byteData.buffer.asUint8List());
+    } finally {
+      picture.dispose();
+      img?.dispose();
+    }
   }
 
   @override

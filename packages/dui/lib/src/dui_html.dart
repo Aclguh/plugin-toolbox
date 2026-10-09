@@ -8,7 +8,7 @@ import 'dui_utils.dart';
 /// 纯 Dart 轻量标签解析，无需 WebView 或沉重外部库。
 /// 支持常见标签：`<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<a href="...">`,
 /// `<color value="...">`, `<h1>`-`<h6>`, `<p>`, `<br>`, `<li>` 等。
-class DuiHtml extends StatelessWidget {
+class DuiHtml extends StatefulWidget {
   final String html;
   final TextStyle? baseStyle;
   final bool selectable;
@@ -23,19 +23,42 @@ class DuiHtml extends StatelessWidget {
   });
 
   @override
+  State<DuiHtml> createState() => _DuiHtmlState();
+}
+
+class _DuiHtmlState extends State<DuiHtml> {
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  void _disposeRecognizers() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _disposeRecognizers();
+
     final theme = Theme.of(context);
-    final defaultStyle = baseStyle ??
+    final defaultStyle = widget.baseStyle ??
         theme.textTheme.bodyMedium ??
         const TextStyle(fontSize: 14.0);
 
     final span = _HtmlParser(
       theme: theme,
       baseStyle: defaultStyle,
-      onLinkTap: onLinkTap,
-    ).parse(html);
+      onLinkTap: widget.onLinkTap,
+      recognizers: _recognizers,
+    ).parse(widget.html);
 
-    if (selectable) {
+    if (widget.selectable) {
       return SelectableText.rich(span);
     }
     return Text.rich(span);
@@ -60,11 +83,13 @@ class _HtmlParser {
   final ThemeData theme;
   final TextStyle baseStyle;
   final void Function(String url)? onLinkTap;
+  final List<TapGestureRecognizer>? recognizers;
 
   _HtmlParser({
     required this.theme,
     required this.baseStyle,
     this.onLinkTap,
+    this.recognizers,
   });
 
   TextSpan parse(String rawHtml) {
@@ -203,6 +228,7 @@ class _HtmlParser {
   InlineSpan _buildSpan(String text, TextStyle style, String? href) {
     if (href != null && onLinkTap != null) {
       final recognizer = TapGestureRecognizer()..onTap = () => onLinkTap!(href);
+      recognizers?.add(recognizer);
       return TextSpan(text: text, style: style, recognizer: recognizer);
     }
     return TextSpan(text: text, style: style);

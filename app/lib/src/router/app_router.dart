@@ -44,6 +44,44 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               body: Center(child: Text('未找到 ID 为 [$pluginId] 的插件')),
             );
           }
+          if (!registry.isEnabled(pluginId)) {
+            return Scaffold(
+              appBar: AppBar(title: Text(plugin.name)),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.block_outlined,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '插件已停用',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '该插件当前处于禁用状态。如需使用，请前往插件管理中心重新启用。',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.tonal(
+                        onPressed: () => context.go('/manager'),
+                        child: const Text('前往插件管理'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
           if (plugin is DynamicPlugin) {
             return DynamicPluginHostPage(plugin: plugin);
           }

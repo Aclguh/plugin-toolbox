@@ -328,4 +328,30 @@ void main() {
     expect(find.text('要访问的页面不存在'), findsOneWidget);
     expect(find.text('返回工具箱首页'), findsOneWidget);
   });
+
+  testWidgets('访问已停用插件路由展示停用提示页', (WidgetTester tester) async {
+    final mockPlugin = createMockPlugin('disabled_p', '已停用插件');
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final registry = container.read(pluginRegistryProvider);
+    registry.register(mockPlugin);
+    await registry.setEnabled('disabled_p', false);
+
+    final router = container.read(appRouterProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/plugin/disabled_p');
+    await tester.pumpAndSettle();
+
+    expect(find.text('插件已停用'), findsOneWidget);
+    expect(find.text('前往插件管理'), findsOneWidget);
+  });
 }
