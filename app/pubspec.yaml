@@ -30,6 +30,7 @@ dependencies:
   dynamic_color: ^1.7.0
   shared_preferences: ^2.3.0
   reorderable_grid_view: ^2.2.8
+  logger: ^2.5.0
 
 dev_dependencies:
   flutter_test:

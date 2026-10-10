@@ -1,24 +1,36 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:logger/logger.dart';
 
 /// 动态插件与宿主 Android 原生及系统能力调度的专用桥接层
 class PluginNativeBridge {
-  static const MethodChannel _nativeChannel =
-      MethodChannel('com.plugintoolbox/host_native');
+  static const String defaultChannelName = 'com.plugintoolbox/host_native';
 
+  final MethodChannel _nativeChannel;
   final Directory pluginRootDir;
+  final Logger? _logger;
   final Map<String, Map<String, dynamic>> _sensorCache = {};
 
   bool _torchOn = false;
   bool _screenKeepOn = false;
   bool _brightnessModified = false;
 
-  PluginNativeBridge({required this.pluginRootDir});
+  PluginNativeBridge({
+    required this.pluginRootDir,
+    MethodChannel? nativeChannel,
+    Logger? logger,
+  })  : _nativeChannel =
+            nativeChannel ?? const MethodChannel(defaultChannelName),
+        _logger = logger;
 
   bool get isTorchOn => _torchOn;
   bool get isScreenKeepOn => _screenKeepOn;
   bool get isBrightnessModified => _brightnessModified;
+
+  void _logError(String op, Object e, [StackTrace? st]) {
+    _logger?.w('PluginNativeBridge: $op 调用失败: $e', error: e, stackTrace: st);
+  }
 
   void dispose() {
     if (_torchOn) {
@@ -41,7 +53,9 @@ class PluginNativeBridge {
         'text': text,
         'subject': subject,
       });
-    } catch (_) {}
+    } catch (e, st) {
+      _logError('shareText', e, st);
+    }
   }
 
   Future<bool> openUrl(String url) async {
@@ -50,7 +64,8 @@ class PluginNativeBridge {
         'url': url,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('openUrl', e, st);
       return false;
     }
   }
@@ -59,8 +74,11 @@ class PluginNativeBridge {
     _torchOn = enabled;
     try {
       await _nativeChannel.invokeMethod<bool>('setTorch', {'enabled': enabled});
-    } catch (_) {}
-    return true;
+      return true;
+    } catch (e, st) {
+      _logError('setTorch', e, st);
+      return true;
+    }
   }
 
   Future<bool> shareFile(
@@ -75,7 +93,8 @@ class PluginNativeBridge {
         'subject': subject,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('shareFile', e, st);
       return false;
     }
   }
@@ -86,7 +105,8 @@ class PluginNativeBridge {
         'path': filePath,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('saveToGallery', e, st);
       return false;
     }
   }
@@ -98,7 +118,8 @@ class PluginNativeBridge {
         'defaultName': defaultName,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('exportFile', e, st);
       return false;
     }
   }
@@ -125,7 +146,8 @@ class PluginNativeBridge {
       final destFile = File('${destDir.path}/$fileName');
       await File(srcPath).copy(destFile.path);
       return 'data/$fileName';
-    } catch (_) {
+    } catch (e, st) {
+      _logError('pickFile', e, st);
       return null;
     }
   }
@@ -148,7 +170,8 @@ class PluginNativeBridge {
       final destFile = File('${destDir.path}/$fileName');
       await File(srcPath).copy(destFile.path);
       return 'data/$fileName';
-    } catch (_) {
+    } catch (e, st) {
+      _logError('pickImage', e, st);
       return null;
     }
   }
@@ -160,7 +183,8 @@ class PluginNativeBridge {
         'prompt': prompt,
       });
       return res;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('scanBarcode', e, st);
       return null;
     }
   }
@@ -172,7 +196,8 @@ class PluginNativeBridge {
         {'path': filePath},
       );
       return res;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('decodeBarcodeFromImage', e, st);
       return null;
     }
   }
@@ -184,7 +209,8 @@ class PluginNativeBridge {
         'type': type,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('startSensor', e, st);
       return false;
     }
   }
@@ -195,7 +221,8 @@ class PluginNativeBridge {
         'type': type,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stopSensor', e, st);
       return false;
     }
   }
@@ -210,7 +237,8 @@ class PluginNativeBridge {
         _sensorCache[type] = res;
       }
       return res ?? _sensorCache[type];
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getSensorData', e, st);
       return _sensorCache[type];
     }
   }
@@ -223,7 +251,8 @@ class PluginNativeBridge {
         {'path': filePath},
       );
       return res;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('imageInfo', e, st);
       return null;
     }
   }
@@ -240,7 +269,8 @@ class PluginNativeBridge {
         'quality': quality,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('compressImage', e, st);
       return false;
     }
   }
@@ -263,7 +293,8 @@ class PluginNativeBridge {
         'height': height,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('cropImage', e, st);
       return false;
     }
   }
@@ -280,7 +311,8 @@ class PluginNativeBridge {
         'format': format,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('convertImage', e, st);
       return false;
     }
   }
@@ -292,7 +324,8 @@ class PluginNativeBridge {
         'dest': destPath,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stripExifImage', e, st);
       return false;
     }
   }
@@ -310,7 +343,8 @@ class PluginNativeBridge {
         'payload': payload,
       });
       return res ?? -1;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('showNotification', e, st);
       return -1;
     }
   }
@@ -329,7 +363,8 @@ class PluginNativeBridge {
         'payload': payload,
       });
       return res ?? -1;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('scheduleNotification', e, st);
       return -1;
     }
   }
@@ -340,7 +375,8 @@ class PluginNativeBridge {
         'id': id,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('cancelNotification', e, st);
       return false;
     }
   }
@@ -350,7 +386,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<bool>('cancelAllNotifications');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('cancelAllNotifications', e, st);
       return false;
     }
   }
@@ -362,7 +399,8 @@ class PluginNativeBridge {
         'path': filePath,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('playAudio', e, st);
       return false;
     }
   }
@@ -371,7 +409,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<bool>('stopAudio');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stopAudio', e, st);
       return false;
     }
   }
@@ -383,7 +422,8 @@ class PluginNativeBridge {
         'durationMs': durationMs,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('playTone', e, st);
       return false;
     }
   }
@@ -395,7 +435,8 @@ class PluginNativeBridge {
         'path': destPath,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('startAudioRecording', e, st);
       return false;
     }
   }
@@ -403,7 +444,8 @@ class PluginNativeBridge {
   Future<Map<String, dynamic>?> stopAudioRecording() async {
     try {
       return await _nativeChannel.invokeMapMethod<String, dynamic>('stopRecording');
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stopAudioRecording', e, st);
       return null;
     }
   }
@@ -417,7 +459,8 @@ class PluginNativeBridge {
         return (res['max'] as num).toDouble();
       }
       return 0.0;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getAudioDecibel', e, st);
       return 0.0;
     }
   }
@@ -437,7 +480,8 @@ class PluginNativeBridge {
         'pitch': pitch ?? 1.0,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('speakText', e, st);
       return false;
     }
   }
@@ -446,7 +490,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<bool>('stopSpeaking');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stopSpeaking', e, st);
       return false;
     }
   }
@@ -460,7 +505,8 @@ class PluginNativeBridge {
         {'enabled': enabled},
       );
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('setKeepScreenOn', e, st);
       return false;
     }
   }
@@ -473,7 +519,8 @@ class PluginNativeBridge {
         {'brightness': brightness},
       );
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('setBrightness', e, st);
       return false;
     }
   }
@@ -482,7 +529,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<double>('getBrightness');
       return res ?? 1.0;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getBrightness', e, st);
       return 1.0;
     }
   }
@@ -492,7 +540,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<bool>('resetBrightness');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('resetBrightness', e, st);
       return false;
     }
   }
@@ -502,7 +551,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<int>('getBatteryLevel');
       return res ?? 100;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getBatteryLevel', e, st);
       return 100;
     }
   }
@@ -512,7 +562,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<String>('getNetworkStatus');
       return res ?? 'unknown';
-    } catch (_) {
+    } catch (e, st) {
+      _logError('fetchNetworkType', e, st);
       return 'unknown';
     }
   }
@@ -523,7 +574,8 @@ class PluginNativeBridge {
       return await _nativeChannel.invokeMapMethod<String, dynamic>(
         'getInitialShare',
       );
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getInitialShare', e, st);
       return null;
     }
   }
@@ -540,7 +592,8 @@ class PluginNativeBridge {
         {'reason': reason},
       );
       return {'success': res ?? false};
-    } catch (e) {
+    } catch (e, st) {
+      _logError('authenticateBiometrics', e, st);
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -551,7 +604,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<bool>('isLocationAvailable');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('isLocationAvailable', e, st);
       return false;
     }
   }
@@ -561,7 +615,8 @@ class PluginNativeBridge {
       return await _nativeChannel.invokeMapMethod<String, dynamic>(
         'getCurrentPosition',
       );
-    } catch (_) {
+    } catch (e, st) {
+      _logError('getCurrentPosition', e, st);
       return null;
     }
   }
@@ -571,7 +626,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<bool>('isNfcAvailable');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('isNfcAvailable', e, st);
       return false;
     }
   }
@@ -579,7 +635,8 @@ class PluginNativeBridge {
   Future<Map<String, dynamic>?> readNdef() async {
     try {
       return await _nativeChannel.invokeMapMethod<String, dynamic>('readNdef');
-    } catch (_) {
+    } catch (e, st) {
+      _logError('readNdef', e, st);
       return null;
     }
   }
@@ -590,7 +647,8 @@ class PluginNativeBridge {
         'records': records,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('writeNdef', e, st);
       return false;
     }
   }
@@ -601,7 +659,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<bool>('isBluetoothAvailable');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('isBluetoothAvailable', e, st);
       return false;
     }
   }
@@ -612,7 +671,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<bool>('startBluetoothScan');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('startBluetoothScan', e, st);
       return false;
     }
   }
@@ -622,7 +682,8 @@ class PluginNativeBridge {
       final res =
           await _nativeChannel.invokeMethod<bool>('stopBluetoothScan');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('stopBluetoothScan', e, st);
       return false;
     }
   }
@@ -633,7 +694,8 @@ class PluginNativeBridge {
         'deviceId': deviceId,
       });
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('connectBluetooth', e, st);
       return false;
     }
   }
@@ -645,7 +707,8 @@ class PluginNativeBridge {
         {'deviceId': deviceId},
       );
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('disconnectBluetooth', e, st);
       return false;
     }
   }
@@ -664,7 +727,8 @@ class PluginNativeBridge {
           'charUuid': charUuid,
         },
       );
-    } catch (_) {
+    } catch (e, st) {
+      _logError('readBluetoothCharacteristic', e, st);
       return null;
     }
   }
@@ -686,7 +750,8 @@ class PluginNativeBridge {
         },
       );
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('writeBluetoothCharacteristic', e, st);
       return false;
     }
   }
@@ -699,7 +764,8 @@ class PluginNativeBridge {
       return await _nativeChannel.invokeMapMethod<String, dynamic>('recognizeText', {
         'path': file.path,
       });
-    } catch (_) {
+    } catch (e, st) {
+      _logError('recognizeText', e, st);
       return null;
     }
   }
@@ -709,7 +775,8 @@ class PluginNativeBridge {
     try {
       final res = await _nativeChannel.invokeMethod<bool>('isAiAvailable');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      _logError('isAiAvailable', e, st);
       return false;
     }
   }
@@ -726,7 +793,8 @@ class PluginNativeBridge {
         'temperature': temperature,
       });
       return res ?? {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
-    } catch (_) {
+    } catch (e, st) {
+      _logError('aiChat', e, st);
       return {'ok': false, 'error': 'AI 网关未配置或服务不可用'};
     }
   }
