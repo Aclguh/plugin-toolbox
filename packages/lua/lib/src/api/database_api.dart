@@ -13,7 +13,18 @@ import '../lua_value_codec.dart';
 /// 严格限定于插件沙箱独立文件 (`<sandbox>/plugin_data.db`)，
 /// 提供纯 Dart 实现的无依赖结构化 SQL 查询与增删改查引擎。
 class DatabaseApi {
+  _SandboxDatabaseEngine? _engine;
+
   static void bind(
+    LuaState ls,
+    PluginContext context,
+    LuaCallbackInvoker callbacks,
+  ) {
+    final api = DatabaseApi();
+    api.bindInstance(ls, context, callbacks);
+  }
+
+  void bindInstance(
     LuaState ls,
     PluginContext context,
     LuaCallbackInvoker callbacks,
@@ -33,6 +44,7 @@ class DatabaseApi {
     final dbEngine = _SandboxDatabaseEngine(
       dbFile: File(dbPath),
     );
+    _engine = dbEngine;
 
     // db.execute(sql [, paramsList | callback, callback])
     ls.pushDartFunction((ls) {
@@ -131,7 +143,34 @@ class DatabaseApi {
     });
     ls.setField(-2, 'batch');
 
+    // db.flush([callback]) - 显式将内存缓冲区改动即时刷入磁盘
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      int? cbRef;
+      if (ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      }
+      dbEngine.flush().then((res) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [res]);
+        }
+      }).catchError((Object e) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {'ok': false, 'error': e.toString()}
+          ]);
+        }
+      });
+      return 0;
+    });
+    ls.setField(-2, 'flush');
+
     ls.setGlobal('db');
+  }
+
+  void dispose() {
+    _engine?.dispose();
+    _engine = null;
   }
 }
 
@@ -141,6 +180,8 @@ class _SandboxDatabaseEngine {
   Map<String, List<Map<String, dynamic>>> _tables = {};
   Future<void>? _loadFuture;
   Future<dynamic> _opQueue = Future.value();
+  bool _isDirty = false;
+  Timer? _debounceTimer;
 
   _SandboxDatabaseEngine({required this.dbFile});
 
@@ -167,22 +208,64 @@ class _SandboxDatabaseEngine {
     }
   }
 
+  void _schedulePersist() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 50), () {
+      flush();
+    });
+  }
+
   Future<void> _persist() async {
     try {
       if (!await dbFile.parent.exists()) {
         await dbFile.parent.create(recursive: true);
       }
-      await dbFile.writeAsString(json.encode(_tables));
+      final payload = json.encode(_tables);
+      await dbFile.writeAsString(payload);
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> flush() {
+    final completer = Completer<Map<String, dynamic>>();
+    _opQueue = _opQueue.whenComplete(() async {
+      _debounceTimer?.cancel();
+      _debounceTimer = null;
+      if (!_isDirty) {
+        completer.complete({'ok': true});
+        return;
+      }
+      try {
+        await _persist();
+        _isDirty = false;
+        completer.complete({'ok': true});
+      } catch (e) {
+        completer.complete({'ok': false, 'error': e.toString()});
+      }
+    });
+    return completer.future;
+  }
+
+  void dispose() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    if (_isDirty) {
+      try {
+        if (!dbFile.parent.existsSync()) {
+          dbFile.parent.createSync(recursive: true);
+        }
+        dbFile.writeAsStringSync(json.encode(_tables));
+        _isDirty = false;
+      } catch (_) {}
+    }
+  }
+
   Future<Map<String, dynamic>> execute(
-      String rawSql, List<dynamic> params) {
+      String rawSql, List<dynamic> params, {bool autoPersist = true}) {
     final completer = Completer<Map<String, dynamic>>();
     _opQueue = _opQueue.whenComplete(() async {
       try {
         await _ensureLoaded();
-        final res = await _executeInternal(rawSql, params);
+        final res = await _executeInternal(rawSql, params, autoPersist: autoPersist);
         completer.complete(res);
       } catch (e) {
         completer.complete({'ok': false, 'error': e.toString()});
@@ -192,7 +275,7 @@ class _SandboxDatabaseEngine {
   }
 
   Future<Map<String, dynamic>> _executeInternal(
-      String rawSql, List<dynamic> params) async {
+      String rawSql, List<dynamic> params, {bool autoPersist = true}) async {
     final sql = _cleanSql(rawSql);
     final upper = sql.toUpperCase();
 
@@ -206,7 +289,8 @@ class _SandboxDatabaseEngine {
       }
       final tableName = match.group(1)!;
       _tables.putIfAbsent(tableName, () => []);
-      await _persist();
+      _isDirty = true;
+      if (autoPersist) _schedulePersist();
       return {'ok': true, 'rowsAffected': 0};
     }
 
@@ -220,7 +304,8 @@ class _SandboxDatabaseEngine {
       }
       final tableName = match.group(1)!;
       _tables.remove(tableName);
-      await _persist();
+      _isDirty = true;
+      if (autoPersist) _schedulePersist();
       return {'ok': true, 'rowsAffected': 0};
     }
 
@@ -266,7 +351,8 @@ class _SandboxDatabaseEngine {
       }
 
       table.add(row);
-      await _persist();
+      _isDirty = true;
+      if (autoPersist) _schedulePersist();
       return {
         'ok': true,
         'rowsAffected': 1,
@@ -295,7 +381,10 @@ class _SandboxDatabaseEngine {
         table.removeWhere((row) => _matchesWhere(row, whereClause, params));
         deletedCount = initialLen - table.length;
       }
-      await _persist();
+      if (deletedCount > 0) {
+        _isDirty = true;
+        if (autoPersist) _schedulePersist();
+      }
       return {'ok': true, 'rowsAffected': deletedCount};
     }
 
@@ -339,7 +428,10 @@ class _SandboxDatabaseEngine {
           updatedCount++;
         }
       }
-      await _persist();
+      if (updatedCount > 0) {
+        _isDirty = true;
+        if (autoPersist) _schedulePersist();
+      }
       return {'ok': true, 'rowsAffected': updatedCount};
     }
 
@@ -514,17 +606,32 @@ class _SandboxDatabaseEngine {
   }
 
   Future<Map<String, dynamic>> batch(
-      List<Map<String, dynamic>> statements) async {
-    int totalAffected = 0;
-    for (final stmt in statements) {
-      final sql = (stmt['sql'] ?? '').toString();
-      final params = (stmt['params'] as List?) ?? [];
-      final res = await execute(sql, params);
-      if (res['ok'] == true) {
-        totalAffected += (res['rowsAffected'] as num?)?.toInt() ?? 0;
+      List<Map<String, dynamic>> statements) {
+    final completer = Completer<Map<String, dynamic>>();
+    _opQueue = _opQueue.whenComplete(() async {
+      try {
+        await _ensureLoaded();
+        int totalAffected = 0;
+        for (final stmt in statements) {
+          final sql = (stmt['sql'] ?? '').toString();
+          final params = (stmt['params'] as List?) ?? [];
+          final res = await _executeInternal(sql, params, autoPersist: false);
+          if (res['ok'] == true) {
+            totalAffected += (res['rowsAffected'] as num?)?.toInt() ?? 0;
+          }
+        }
+        if (_isDirty) {
+          _debounceTimer?.cancel();
+          _debounceTimer = null;
+          await _persist();
+          _isDirty = false;
+        }
+        completer.complete({'ok': true, 'totalAffected': totalAffected});
+      } catch (e) {
+        completer.complete({'ok': false, 'error': e.toString()});
       }
-    }
-    return {'ok': true, 'totalAffected': totalAffected};
+    });
+    return completer.future;
   }
 
   String? _extractWhereClause(String sql) {

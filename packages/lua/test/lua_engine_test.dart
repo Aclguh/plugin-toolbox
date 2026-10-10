@@ -2734,7 +2734,66 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(delegate.getState('db_count_val'), 1);
 
+      // 7. 测试显式 flush 刷盘
+      dbEngine.loadAndExecute('''
+        db.flush(function(res)
+          state.set("db_flush_ok", res.ok)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('db_flush_ok'), isTrue);
+
+      final dbFile = File('${tempDir.path}/plugin_data.db');
+      expect(dbFile.existsSync(), isTrue);
+
       dbEngine.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('DatabaseApi: 批量处理单次合并落盘与脏写节流写入机制', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_db_batch_');
+      final dbCtx = PluginContext(
+        pluginId: 'db_batch_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.database},
+      );
+      final dbEngine = LuaEngine(context: dbCtx, delegate: delegate);
+
+      // 批量创建和插入 20 条记录，并在无阻塞情况下迅速完成
+      dbEngine.loadAndExecute('''
+        db.execute("CREATE TABLE items (id, name, val)", function(res)
+          state.set("batch_create_ok", res.ok)
+        end)
+
+        local stmts = {}
+        for i = 1, 20 do
+          table.insert(stmts, "INSERT INTO items (id, name, val) VALUES (" .. i .. ", 'item_" .. i .. "', " .. (i * 10) .. ")")
+        end
+
+        db.batch(stmts, function(res)
+          state.set("batch_res_ok", res.ok)
+          state.set("batch_res_affected", res.totalAffected)
+        end)
+
+        db.query("SELECT COUNT(*) AS c FROM items", {}, function(res)
+          if res.ok and res.rows and res.rows[1] then
+            state.set("batch_query_count", res.rows[1].c)
+          end
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(delegate.getState('batch_create_ok'), isTrue);
+      expect(delegate.getState('batch_res_ok'), isTrue);
+      expect(delegate.getState('batch_res_affected'), 20);
+      expect(delegate.getState('batch_query_count'), 20);
+
+      dbEngine.close();
+      final dbFile = File('${tempDir.path}/plugin_data.db');
+      expect(dbFile.existsSync(), isTrue);
       await tempDir.delete(recursive: true);
     });
 

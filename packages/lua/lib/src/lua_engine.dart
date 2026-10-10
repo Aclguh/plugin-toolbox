@@ -395,6 +395,7 @@ class LuaEngine {
   SensorApi? _sensorApi;
   SocketApi? _socketApi;
   WebSocketApi? _webSocketApi;
+  DatabaseApi? _databaseApi;
   bool _closed = false;
 
   /// 引擎是否已被关闭
@@ -472,7 +473,8 @@ class LuaEngine {
     LocationApi.bind(_ls, context, delegate, _callbacks!);
     NfcApi.bind(_ls, context, delegate, _callbacks!);
     BluetoothApi.bind(_ls, context, delegate, _callbacks!);
-    DatabaseApi.bind(_ls, context, _callbacks!);
+    _databaseApi = DatabaseApi();
+    _databaseApi!.bindInstance(_ls, context, _callbacks!);
     AiApi.bind(_ls, context, delegate, _callbacks!);
     IpcApi.bind(_ls, context, delegate, _callbacks!);
   }
@@ -541,6 +543,7 @@ class LuaEngine {
     _timerApi?.dispose(_callbacks);
     _socketApi?.dispose(_callbacks);
     _webSocketApi?.dispose(_callbacks);
+    _databaseApi?.dispose();
     _callbacks?.clear();
   }
 }
