@@ -64,6 +64,28 @@ void main() {
     });
   });
 
+  group('DuiUtils 图标解析与回退', () {
+    test('parseIcon 支持精确匹配常用 Material 图标', () {
+      expect(DuiUtils.parseIcon('lock'), Icons.lock);
+      expect(DuiUtils.parseIcon('timer'), Icons.timer);
+      expect(DuiUtils.parseIcon('palette'), Icons.palette);
+      expect(DuiUtils.parseIcon('translate'), Icons.translate);
+      expect(DuiUtils.parseIcon('calculate'), Icons.calculate);
+      expect(DuiUtils.parseIcon('wifi'), Icons.wifi);
+      expect(DuiUtils.parseIcon('bluetooth'), Icons.bluetooth);
+    });
+
+    test('parseIcon 对未完全匹配的图标名称提供语义智能降级', () {
+      expect(DuiUtils.parseIcon('user_lock_key'), Icons.lock);
+      expect(DuiUtils.parseIcon('custom_timer_stopwatch'), Icons.timer);
+      expect(DuiUtils.parseIcon('custom_schedule_clock'), Icons.access_time);
+      expect(DuiUtils.parseIcon('my_calculator_app'), Icons.calculate);
+      expect(DuiUtils.parseIcon('unknown_foobar_xyz'), Icons.extension);
+      expect(DuiUtils.parseIcon(null), Icons.extension);
+      expect(DuiUtils.parseIcon(''), Icons.extension);
+    });
+  });
+
   group('DuiRenderer Tests', () {
     testWidgets('renders Text, Button and handles click events', (tester) async {
       final state = DuiState();
