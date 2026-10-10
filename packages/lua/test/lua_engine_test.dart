@@ -1396,6 +1396,59 @@ void main() {
       expect(delegate.getState('exported_ok'), true);
     });
 
+    test('FsApi 异步非阻塞读写 (readFile, writeFile, readFileAsync, writeFileAsync)', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_fs_async_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final fsCtx = PluginContext(
+        pluginId: 'fs_async_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final fsEngine = LuaEngine(context: fsCtx, delegate: delegate);
+
+      // 1. fs.writeFile 带 callback
+      fsEngine.loadAndExecute('''
+        fs.writeFile("async_1.txt", "async hello 1", function(ok, err)
+          state.set("write_1_ok", ok)
+          fs.readFile("async_1.txt", function(content, err)
+            state.set("read_1_content", content)
+          end)
+        end)
+      ''');
+
+      // 2. fs.writeFileAsync 与 fs.readFileAsync
+      fsEngine.loadAndExecute('''
+        fs.writeFileAsync("async_2.txt", "async hello 2", function(ok, err)
+          state.set("write_2_ok", ok)
+          fs.readFileAsync("async_2.txt", function(content, err)
+            state.set("read_2_content", content)
+          end)
+        end)
+      ''');
+
+      // 3. 读取不存在文件的异步错误回调
+      fsEngine.loadAndExecute('''
+        fs.readFileAsync("not_exist.txt", function(content, err)
+          state.set("read_err_content", content == nil)
+          state.set("read_err_msg", err)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(delegate.getState('write_1_ok'), true);
+      expect(delegate.getState('read_1_content'), 'async hello 1');
+      expect(delegate.getState('write_2_ok'), true);
+      expect(delegate.getState('read_2_content'), 'async hello 2');
+      expect(delegate.getState('read_err_content'), true);
+      expect(delegate.getState('read_err_msg'), contains('文件不存在'));
+    });
+
     test('CryptoApi HMAC 与 SHA512 计算', () {
       engine.loadAndExecute('''
         state.set("h_md5", crypto.hmacMd5("key", "data"))

@@ -40,11 +40,30 @@ class FsApi {
       return '${rootDir.path}/$relPath';
     }
 
-    // fs.readFile(relPath) -> string | nil, error
+    // fs.readFile(relPath [, callback]) -> string | nil, error
     ls.pushDartFunction((ls) {
       checkStoragePermission(ls);
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSafePath(ls, relPath);
+      final cbRef = ls.type(2) == LuaType.luaFunction ? callbacks.ref(2) : null;
+
+      if (cbRef != null) {
+        unawaited(() async {
+          try {
+            final file = File(fullPath);
+            if (!await file.exists()) {
+              callbacks.invokeAndRelease(cbRef, [null, '文件不存在: $relPath']);
+              return;
+            }
+            final content = await file.readAsString();
+            callbacks.invokeAndRelease(cbRef, [content, null]);
+          } catch (e) {
+            callbacks.invokeAndRelease(cbRef, [null, e.toString()]);
+          }
+        }());
+        return 0;
+      }
+
       final file = File(fullPath);
       if (!file.existsSync()) {
         ls.pushNil();
@@ -63,22 +82,88 @@ class FsApi {
     });
     ls.setField(-2, 'readFile');
 
-    // fs.writeFile(relPath, content [, append]) -> bool
+    // fs.readFileAsync(relPath, callback)
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final fullPath = resolveSafePath(ls, relPath);
+      final cbRef = callbacks.ref(2);
+      if (cbRef == null) {
+        ls.error2('fs.readFileAsync 必须提供 callback 回调函数');
+        return 0;
+      }
+      unawaited(() async {
+        try {
+          final file = File(fullPath);
+          if (!await file.exists()) {
+            callbacks.invokeAndRelease(cbRef, [null, '文件不存在: $relPath']);
+            return;
+          }
+          final content = await file.readAsString();
+          callbacks.invokeAndRelease(cbRef, [content, null]);
+        } catch (e) {
+          callbacks.invokeAndRelease(cbRef, [null, e.toString()]);
+        }
+      }());
+      return 0;
+    });
+    ls.setField(-2, 'readFileAsync');
+
+    // fs.writeFile(relPath, content [, append, callback]) -> bool
     ls.pushDartFunction((ls) {
       checkStoragePermission(ls);
       final relPath = ls.checkString(1) ?? '';
       final content = ls.checkString(2) ?? '';
-      final append = !ls.isNoneOrNil(3) && ls.toBoolean(3);
+      bool append = false;
+      int? cbRef;
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      } else {
+        if (!ls.isNoneOrNil(3)) append = ls.toBoolean(3);
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      }
       final fullPath = resolveSafePath(ls, relPath);
 
       // 保护清单和元数据不被篡改
       if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [false, '受保护的核心清单禁止覆写']);
+          return 0;
+        }
         ls.error2('受保护的核心清单禁止覆写');
         return 0;
       }
 
       if (!context.checkStorageQuota(content.length)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
+          return 0;
+        }
         ls.error2('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
+        return 0;
+      }
+
+      if (cbRef != null) {
+        final callbackRef = cbRef;
+        unawaited(() async {
+          try {
+            final file = File(fullPath);
+            final oldSize = await file.exists() ? await file.length() : 0;
+            await file.parent.create(recursive: true);
+            await file.writeAsString(
+              content,
+              mode: append ? FileMode.append : FileMode.write,
+              flush: true,
+            );
+            final newSize = await file.length();
+            context.updateUsedBytes(newSize - oldSize);
+            callbacks.invokeAndRelease(callbackRef, [true, null]);
+          } catch (e) {
+            callbacks.invokeAndRelease(callbackRef, [false, e.toString()]);
+          }
+        }());
         return 0;
       }
 
@@ -96,6 +181,60 @@ class FsApi {
       return 1;
     });
     ls.setField(-2, 'writeFile');
+
+    // fs.writeFileAsync(relPath, content [, append], callback)
+    ls.pushDartFunction((ls) {
+      checkStoragePermission(ls);
+      final relPath = ls.checkString(1) ?? '';
+      final content = ls.checkString(2) ?? '';
+      bool append = false;
+      int? cbRef;
+      if (ls.type(3) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(3);
+      } else {
+        if (!ls.isNoneOrNil(3)) append = ls.toBoolean(3);
+        if (ls.type(4) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(4);
+        }
+      }
+
+      if (cbRef == null) {
+        ls.error2('fs.writeFileAsync 必须提供 callback 回调函数');
+        return 0;
+      }
+
+      final callbackRef = cbRef;
+      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+        callbacks.invokeAndRelease(callbackRef, [false, '受保护的核心清单禁止覆写']);
+        return 0;
+      }
+
+      if (!context.checkStorageQuota(content.length)) {
+        callbacks.invokeAndRelease(callbackRef, [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
+        return 0;
+      }
+
+      final fullPath = resolveSafePath(ls, relPath);
+      unawaited(() async {
+        try {
+          final file = File(fullPath);
+          final oldSize = await file.exists() ? await file.length() : 0;
+          await file.parent.create(recursive: true);
+          await file.writeAsString(
+            content,
+            mode: append ? FileMode.append : FileMode.write,
+            flush: true,
+          );
+          final newSize = await file.length();
+          context.updateUsedBytes(newSize - oldSize);
+          callbacks.invokeAndRelease(callbackRef, [true, null]);
+        } catch (e) {
+          callbacks.invokeAndRelease(callbackRef, [false, e.toString()]);
+        }
+      }());
+      return 0;
+    });
+    ls.setField(-2, 'writeFileAsync');
 
     // fs.exists(relPath) -> bool
     ls.pushDartFunction((ls) {
@@ -548,11 +687,12 @@ class FsApi {
     });
     ls.setField(-2, 'pickFile');
 
-    // fs.writeBase64(relPath, base64Content) -> bool, error
+    // fs.writeBase64(relPath, base64Content [, callback]) -> bool, error
     ls.pushDartFunction((ls) {
       checkStoragePermission(ls);
       final relPath = ls.checkString(1) ?? '';
       var b64 = ls.checkString(2) ?? '';
+      final cbRef = ls.type(3) == LuaType.luaFunction ? callbacks.ref(3) : null;
       if (b64.startsWith('data:')) {
         final comma = b64.indexOf(',');
         if (comma >= 0) {
@@ -561,15 +701,39 @@ class FsApi {
       }
       final fullPath = resolveSafePath(ls, relPath);
       if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [false, '受保护的核心清单禁止覆写']);
+          return 0;
+        }
         ls.error2('受保护的核心清单禁止覆写');
         return 0;
       }
       try {
         final bytes = base64Decode(b64.replaceAll(RegExp(r'\s+'), ''));
         if (!context.checkStorageQuota(bytes.length)) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [false, '存储配额超限: 写入将超出插件沙箱配额']);
+            return 0;
+          }
           ls.pushBoolean(false);
           ls.pushString('存储配额超限: 写入将超出插件沙箱配额');
           return 2;
+        }
+        if (cbRef != null) {
+          unawaited(() async {
+            try {
+              final file = File(fullPath);
+              final oldSize = await file.exists() ? await file.length() : 0;
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(bytes, flush: true);
+              final newSize = await file.length();
+              context.updateUsedBytes(newSize - oldSize);
+              callbacks.invokeAndRelease(cbRef, [true, null]);
+            } catch (e) {
+              callbacks.invokeAndRelease(cbRef, [false, e.toString()]);
+            }
+          }());
+          return 0;
         }
         final file = File(fullPath);
         final oldSize = file.existsSync() ? file.lengthSync() : 0;
@@ -580,6 +744,10 @@ class FsApi {
         ls.pushBoolean(true);
         return 1;
       } catch (e) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [false, e.toString()]);
+          return 0;
+        }
         ls.pushBoolean(false);
         ls.pushString(e.toString());
         return 2;
@@ -587,11 +755,28 @@ class FsApi {
     });
     ls.setField(-2, 'writeBase64');
 
-    // fs.readBase64(relPath) -> string | nil, error
+    // fs.readBase64(relPath [, callback]) -> string | nil, error
     ls.pushDartFunction((ls) {
       checkStoragePermission(ls);
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSafePath(ls, relPath);
+      final cbRef = ls.type(2) == LuaType.luaFunction ? callbacks.ref(2) : null;
+      if (cbRef != null) {
+        unawaited(() async {
+          try {
+            final file = File(fullPath);
+            if (!await file.exists()) {
+              callbacks.invokeAndRelease(cbRef, [null, '文件不存在: $relPath']);
+              return;
+            }
+            final bytes = await file.readAsBytes();
+            callbacks.invokeAndRelease(cbRef, [base64Encode(bytes), null]);
+          } catch (e) {
+            callbacks.invokeAndRelease(cbRef, [null, e.toString()]);
+          }
+        }());
+        return 0;
+      }
       final file = File(fullPath);
       if (!file.existsSync()) {
         ls.pushNil();
