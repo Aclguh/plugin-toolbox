@@ -14,6 +14,7 @@ class MainActivity : FlutterActivity() {
     // 初始分享数据接收
     private var initialShareData: Map<String, Any>? = null
     private val handlers = mutableListOf<FeatureHandler>()
+    private val permissionHelper by lazy { PermissionHelper(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,10 +65,11 @@ class MainActivity : FlutterActivity() {
         handlers.clear()
         handlers.add(SystemFeatureHandler(
             activity = this,
+            permissionHelper = permissionHelper,
             getInitialShareData = { initialShareData },
             clearInitialShareData = { initialShareData = null }
         ))
-        handlers.add(MediaHandler(this))
+        handlers.add(MediaHandler(this, permissionHelper))
         handlers.add(SensorHandler(this))
         handlers.add(ImageHandler(this))
         handlers.add(BarcodeHandler(this))
@@ -79,6 +81,22 @@ class MainActivity : FlutterActivity() {
                 }
             }
             result.notImplemented()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (permissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)) {
+            return
+        }
+        for (handler in handlers) {
+            if (handler.onRequestPermissionsResult(requestCode, permissions, grantResults)) {
+                return
+            }
         }
     }
 

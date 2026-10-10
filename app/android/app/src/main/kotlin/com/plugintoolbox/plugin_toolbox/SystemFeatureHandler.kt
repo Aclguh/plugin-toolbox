@@ -31,6 +31,7 @@ import java.io.File
 
 class SystemFeatureHandler(
     private val activity: Activity,
+    private val permissionHelper: PermissionHelper = PermissionHelper(activity),
     private val getInitialShareData: () -> Map<String, Any>?,
     private val clearInitialShareData: () -> Unit
 ) : FeatureHandler {
@@ -42,8 +43,28 @@ class SystemFeatureHandler(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scheduledRunnables = mutableMapOf<Int, Runnable>()
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ): Boolean {
+        return permissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
     override fun handleMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean {
         return when (call.method) {
+            "hasPermission" -> {
+                val perm = call.argument<String>("permission") ?: ""
+                result.success(permissionHelper.hasFeaturePermission(perm))
+                true
+            }
+            "requestPermission" -> {
+                val perm = call.argument<String>("permission") ?: ""
+                permissionHelper.requestFeaturePermission(perm) { granted ->
+                    result.success(granted)
+                }
+                true
+            }
             "shareText" -> {
                 val text = call.argument<String>("text") ?: ""
                 val subject = call.argument<String?>("subject")
@@ -152,18 +173,30 @@ class SystemFeatureHandler(
             "showNotification" -> {
                 val title = call.argument<String>("title") ?: "通知"
                 val body = call.argument<String>("body") ?: ""
-                val id = nextNotificationId++
-                val nm = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                ensureNotificationChannel(nm)
-                val notif = NotificationCompat.Builder(activity, NOTIFICATION_CHANNEL_ID)
-                    .setContentTitle(title)
-                    .setContentText(body)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .setAutoCancel(true)
-                    .build()
-                nm.notify(id, notif)
-                result.success(id)
+                val postNotification = {
+                    val id = nextNotificationId++
+                    val nm = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    ensureNotificationChannel(nm)
+                    val notif = NotificationCompat.Builder(activity, NOTIFICATION_CHANNEL_ID)
+                        .setContentTitle(title)
+                        .setContentText(body)
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .setAutoCancel(true)
+                        .build()
+                    nm.notify(id, notif)
+                    result.success(id)
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    !permissionHelper.hasPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                ) {
+                    permissionHelper.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)) {
+                        postNotification()
+                    }
+                } else {
+                    postNotification()
+                }
                 true
             }
             "scheduleNotification" -> {
@@ -353,31 +386,45 @@ class SystemFeatureHandler(
                 true
             }
             "getCurrentPosition" -> {
-                try {
-                    val lm = activity.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                    var loc: Location? = null
+                val fetchLocation = {
                     try {
-                        if (lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
-                            loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                        val lm = activity.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                        var loc: Location? = null
+                        try {
+                            if (lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+                                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                            }
+                            if (loc == null && lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
+                                loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                            }
+                        } catch (e: SecurityException) {}
+                        if (loc != null) {
+                            result.success(mapOf(
+                                "latitude" to loc.latitude,
+                                "longitude" to loc.longitude,
+                                "altitude" to loc.altitude,
+                                "accuracy" to loc.accuracy.toDouble(),
+                                "speed" to loc.speed.toDouble(),
+                                "timestamp" to loc.time
+                            ))
+                        } else {
+                            result.success(null)
                         }
-                        if (loc == null && lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
-                            loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                        }
-                    } catch (e: SecurityException) {}
-                    if (loc != null) {
-                        result.success(mapOf(
-                            "latitude" to loc.latitude,
-                            "longitude" to loc.longitude,
-                            "altitude" to loc.altitude,
-                            "accuracy" to loc.accuracy.toDouble(),
-                            "speed" to loc.speed.toDouble(),
-                            "timestamp" to loc.time
-                        ))
-                    } else {
+                    } catch (e: Exception) {
                         result.success(null)
                     }
-                } catch (e: Exception) {
-                    result.success(null)
+                }
+
+                if (permissionHelper.hasFeaturePermission("location")) {
+                    fetchLocation()
+                } else {
+                    permissionHelper.requestFeaturePermission("location") { granted ->
+                        if (granted) {
+                            fetchLocation()
+                        } else {
+                            result.success(null)
+                        }
+                    }
                 }
                 true
             }
@@ -409,7 +456,13 @@ class SystemFeatureHandler(
                 true
             }
             "startBluetoothScan" -> {
-                result.success(false)
+                if (!permissionHelper.hasFeaturePermission("bluetooth")) {
+                    permissionHelper.requestFeaturePermission("bluetooth") { granted ->
+                        result.success(granted)
+                    }
+                } else {
+                    result.success(true)
+                }
                 true
             }
             "stopBluetoothScan" -> {

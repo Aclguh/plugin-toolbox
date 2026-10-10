@@ -13,13 +13,26 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.Locale
 
-class MediaHandler(private val context: Context) : FeatureHandler {
+import android.app.Activity
+
+class MediaHandler(
+    private val context: Context,
+    private val permissionHelper: PermissionHelper? = if (context is Activity) PermissionHelper(context) else null
+) : FeatureHandler {
     private var activeMediaPlayer: MediaPlayer? = null
     private var activeMediaRecorder: MediaRecorder? = null
     private var recordingStartTime = 0L
     private var recordingFilePath: String? = null
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ): Boolean {
+        return permissionHelper?.onRequestPermissionsResult(requestCode, permissions, grantResults) ?: false
+    }
 
     override fun handleMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean {
         return when (call.method) {
@@ -80,29 +93,43 @@ class MediaHandler(private val context: Context) : FeatureHandler {
             }
             "startAudioRecording" -> {
                 val destPath = call.argument<String>("path") ?: ""
-                try {
-                    activeMediaRecorder?.release()
-                    val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        MediaRecorder(context)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        MediaRecorder()
+                val doStart = {
+                    try {
+                        activeMediaRecorder?.release()
+                        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            MediaRecorder(context)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            MediaRecorder()
+                        }
+                        recorder.apply {
+                            setAudioSource(MediaRecorder.AudioSource.MIC)
+                            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                            setOutputFile(destPath)
+                            prepare()
+                            start()
+                        }
+                        activeMediaRecorder = recorder
+                        recordingStartTime = System.currentTimeMillis()
+                        recordingFilePath = destPath
+                        result.success(true)
+                    } catch (e: Exception) {
+                        activeMediaRecorder = null
+                        result.success(false)
                     }
-                    recorder.apply {
-                        setAudioSource(MediaRecorder.AudioSource.MIC)
-                        setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                        setOutputFile(destPath)
-                        prepare()
-                        start()
+                }
+
+                if (permissionHelper != null && !permissionHelper.hasPermission(android.Manifest.permission.RECORD_AUDIO)) {
+                    permissionHelper.requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO)) { granted ->
+                        if (granted) {
+                            doStart()
+                        } else {
+                            result.success(false)
+                        }
                     }
-                    activeMediaRecorder = recorder
-                    recordingStartTime = System.currentTimeMillis()
-                    recordingFilePath = destPath
-                    result.success(true)
-                } catch (e: Exception) {
-                    activeMediaRecorder = null
-                    result.success(false)
+                } else {
+                    doStart()
                 }
                 true
             }

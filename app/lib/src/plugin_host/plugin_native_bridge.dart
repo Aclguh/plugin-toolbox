@@ -806,4 +806,29 @@ class PluginNativeBridge {
   }) {
     return const Stream.empty();
   }
+
+  // --- 系统运行时动态权限 ---
+  Future<bool> hasSystemPermission(String permission) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('hasPermission', {
+        'permission': permission,
+      });
+      return res ?? false;
+    } catch (e, st) {
+      _logError('hasPermission', e, st);
+      return false;
+    }
+  }
+
+  Future<bool> requestSystemPermission(String permission) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<bool>('requestPermission', {
+        'permission': permission,
+      });
+      return res ?? false;
+    } catch (e, st) {
+      _logError('requestPermission', e, st);
+      return false;
+    }
+  }
 }
