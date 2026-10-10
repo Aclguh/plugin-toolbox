@@ -69,24 +69,50 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                 '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
               ),
               if (item.entry.permissions.any((p) => PluginPermission.fromString(p)?.isSensitive ?? false)) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: 16,
-                      color: Theme.of(ctx).colorScheme.error,
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.errorContainer.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Theme.of(ctx).colorScheme.error.withValues(alpha: 0.4),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '包含敏感硬件或网络权限，安装后首次使用需谨慎',
-                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(ctx).colorScheme.error,
-                            ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.security_update_warning_outlined,
+                            size: 18,
+                            color: Theme.of(ctx).colorScheme.error,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '敏感权限授权提醒',
+                            style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                                  color: Theme.of(ctx).colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      for (final p in item.entry.permissions
+                          .map(PluginPermission.fromString)
+                          .where((p) => p != null && p.isSensitive)
+                          .cast<PluginPermission>())
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            '• ${p.label}: ${p.description}',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
               if (item.installedVersion != null) ...[

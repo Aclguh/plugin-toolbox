@@ -82,12 +82,36 @@ class PluginManagerPage extends ConsumerWidget {
         installer: PluginInstaller.installFromPtx,
       );
 
-      // 注册并初始化全部成功项 (同 ID 覆盖即插件更新)
       final registry = ref.read(pluginRegistryProvider);
+      final pluginsToRegister = <DynamicPlugin>[];
       for (final plugin in outcome.installed) {
+        final sensitivePerms =
+            plugin.manifest.permissions.where((p) => p.isSensitive).toList();
+        if (sensitivePerms.isNotEmpty && context.mounted) {
+          final approved = await _confirmSensitivePermissions(
+            context,
+            plugin.name,
+            plugin.version,
+            sensitivePerms,
+          );
+          if (approved != true) {
+            // 用户拒绝授权，清理沙箱目录并移至失败列表
+            await PluginInstaller.uninstall(plugin.id);
+            outcome.succeeded.remove('${plugin.name} v${plugin.version}');
+            outcome.failed.add('${plugin.name}: 用户拒绝授权敏感权限');
+            continue;
+          }
+        }
+        pluginsToRegister.add(plugin);
+      }
+
+      // 注册并初始化全部获授权项 (同 ID 覆盖即插件更新)
+      for (final plugin in pluginsToRegister) {
         registry.register(plugin);
       }
-      await registry.initializeAll();
+      if (pluginsToRegister.isNotEmpty) {
+        await registry.initializeAll();
+      }
 
       // 触发 UI 刷新
       ref.read(pluginRegistryProvider.notifier).refresh();
@@ -159,6 +183,88 @@ class PluginManagerPage extends ConsumerWidget {
         ),
       );
     }
+  }
+
+  Future<bool> _confirmSensitivePermissions(
+    BuildContext context,
+    String name,
+    String version,
+    List<PluginPermission> sensitivePermissions,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.security_update_warning_outlined,
+              color: Theme.of(ctx).colorScheme.error,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            const Text('敏感权限授权确认'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('插件「$name v$version」申请了以下敏感权限：'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx)
+                      .colorScheme
+                      .errorContainer
+                      .withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(ctx)
+                        .colorScheme
+                        .error
+                        .withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final p in sensitivePermissions)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          '• ${p.label}: ${p.description}',
+                          style: Theme.of(ctx).textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('拒绝并取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('同意并安装'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Future<void> _confirmDelete(
