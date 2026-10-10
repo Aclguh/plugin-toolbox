@@ -367,7 +367,7 @@ packages:
     source: path
     version: "0.1.0"
   plugin_toolbox_lua:
-    dependency: "direct main"
+    dependency: "direct overridden"
     description:
       path: "../lua"
       relative: true

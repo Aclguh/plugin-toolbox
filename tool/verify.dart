@@ -231,6 +231,13 @@ void main() {
       corePubspecContent.contains('riverpod_annotation');
   expect(!hasIllegalPubspecDeps, 'packages/core 规范排除 go_router 与 riverpod 等上层框架依赖');
 
+  final duiPubspecFile = File('packages/dui/pubspec.yaml');
+  expect(duiPubspecFile.existsSync(), 'packages/dui/pubspec.yaml 存在');
+  final duiPubspecContent = duiPubspecFile.readAsStringSync();
+  final duiHasLuaDep = duiPubspecContent.contains('plugin_toolbox_lua');
+  expect(!duiHasLuaDep, 'packages/dui 严禁依赖 packages/lua 模块 (保持兄弟模块单向解耦)');
+
+
   // 4. 动态插件规范与样例完整性校验
   print('\n--- 4. .ptx 动态插件与 Manifest 规范校验 ---');
   final samplePlugins = ['base64_tool', 'hash_tool'];
