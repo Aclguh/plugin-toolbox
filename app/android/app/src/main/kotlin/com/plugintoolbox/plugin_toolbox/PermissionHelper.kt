@@ -29,38 +29,44 @@ class PermissionHelper(private val activity: Activity) {
     }
 
     fun getPermissionsForFeature(feature: String): Array<String> {
-        return when (feature.lowercase()) {
-            "location" -> arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-            "audio", "record_audio", "microphone" -> arrayOf(
-                Manifest.permission.RECORD_AUDIO
-            )
-            "camera" -> arrayOf(
-                Manifest.permission.CAMERA
-            )
-            "notification", "notifications" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    emptyArray()
+        return getPermissionsForFeature(feature, Build.VERSION.SDK_INT)
+    }
+
+    companion object {
+        fun getPermissionsForFeature(feature: String, sdkInt: Int = Build.VERSION.SDK_INT): Array<String> {
+            return when (feature.lowercase()) {
+                "location" -> arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+                "audio", "record_audio", "microphone" -> arrayOf(
+                    Manifest.permission.RECORD_AUDIO
+                )
+                "camera" -> arrayOf(
+                    Manifest.permission.CAMERA
+                )
+                "notification", "notifications" -> {
+                    if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        emptyArray()
+                    }
                 }
-            }
-            "bluetooth" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    arrayOf(
-                        Manifest.permission.BLUETOOTH_SCAN,
-                        Manifest.permission.BLUETOOTH_CONNECT
-                    )
-                } else {
-                    arrayOf(
-                        Manifest.permission.BLUETOOTH,
-                        Manifest.permission.BLUETOOTH_ADMIN
-                    )
+                "bluetooth" -> {
+                    if (sdkInt >= Build.VERSION_CODES.S) {
+                        arrayOf(
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        )
+                    } else {
+                        arrayOf(
+                            Manifest.permission.BLUETOOTH,
+                            Manifest.permission.BLUETOOTH_ADMIN
+                        )
+                    }
                 }
+                else -> if (feature.startsWith("android.permission.")) arrayOf(feature) else emptyArray()
             }
-            else -> if (feature.startsWith("android.permission.")) arrayOf(feature) else emptyArray()
         }
     }
 
