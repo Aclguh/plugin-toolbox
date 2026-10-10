@@ -298,5 +298,25 @@ void main() {
 
       await tempDir.delete(recursive: true);
     });
+
+    test('PluginInstaller 支持注入 baseDirectory 独立安装与卸载', () async {
+      final customBaseDir = await tempDirFactory.createTemp('custom_plugins_');
+      final ptxFile = await writeTempPtx(buildPtx(validEntries(id: 'injected_test')));
+
+      final plugin = await PluginInstaller.installFromPtx(
+        ptxFile,
+        baseDirectory: customBaseDir,
+      );
+
+      expect(plugin.id, 'injected_test');
+      expect(plugin.rootDir.path.startsWith(customBaseDir.path), isTrue);
+      expect(await File('${plugin.rootDir.path}/plugin.json').exists(), isTrue);
+
+      // 验证 uninstall 支持注入 baseDirectory
+      await PluginInstaller.uninstall('injected_test', baseDirectory: customBaseDir);
+      expect(await plugin.rootDir.exists(), isFalse);
+
+      await customBaseDir.delete(recursive: true);
+    });
   });
 }

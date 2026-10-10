@@ -14,7 +14,10 @@ class PluginInstaller {
   static final RegExp _validIdPattern = RegExp(r'^[a-z0-9_]{3,50}$');
 
   /// 从给定的 .ptx 文件路径进行解析与安装
-  static Future<DynamicPlugin> installFromPtx(File ptxFile) async {
+  static Future<DynamicPlugin> installFromPtx(
+    File ptxFile, {
+    Directory? baseDirectory,
+  }) async {
     final length = await ptxFile.length();
     if (length > maxPackageSizeBytes) {
       throw const FormatException('插件安装包过大 (超过 10MB)');
@@ -53,8 +56,14 @@ class PluginInstaller {
     }
 
     // 4. 定位目标安装目录
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final targetDir = Directory('${appDocDir.path}/plugins/${manifest.id}');
+    final Directory pluginsBaseDir;
+    if (baseDirectory != null) {
+      pluginsBaseDir = baseDirectory;
+    } else {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      pluginsBaseDir = Directory('${appDocDir.path}/plugins');
+    }
+    final targetDir = Directory('${pluginsBaseDir.path}/${manifest.id}');
     if (await targetDir.exists()) {
       await targetDir.delete(recursive: true);
     }
@@ -85,9 +94,18 @@ class PluginInstaller {
   }
 
   /// 卸载插件
-  static Future<void> uninstall(String pluginId) async {
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final targetDir = Directory('${appDocDir.path}/plugins/$pluginId');
+  static Future<void> uninstall(
+    String pluginId, {
+    Directory? baseDirectory,
+  }) async {
+    final Directory pluginsBaseDir;
+    if (baseDirectory != null) {
+      pluginsBaseDir = baseDirectory;
+    } else {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      pluginsBaseDir = Directory('${appDocDir.path}/plugins');
+    }
+    final targetDir = Directory('${pluginsBaseDir.path}/$pluginId');
     if (await targetDir.exists()) {
       await targetDir.delete(recursive: true);
     }
@@ -98,10 +116,13 @@ class PluginInstaller {
   /// 注册中心只通过事件总线发出卸载请求（保持自身无文件系统职责），
   /// 由宿主在组装层调用本方法建立"请求 -> 清理"的桥接。
   static StreamSubscription<PluginUninstallRequestedEvent>
-      listenUninstallRequests(EventBus eventBus) {
+      listenUninstallRequests(
+    EventBus eventBus, {
+    Directory? baseDirectory,
+  }) {
     return eventBus.on<PluginUninstallRequestedEvent>().listen((event) async {
       try {
-        await uninstall(event.pluginId);
+        await uninstall(event.pluginId, baseDirectory: baseDirectory);
       } on FileSystemException {
         // 沙箱目录可能已被外部移除，卸载流程不因此中断
       }
