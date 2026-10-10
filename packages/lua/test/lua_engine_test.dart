@@ -2308,6 +2308,52 @@ void main() {
       netEngine.close();
     });
 
+    test('NetworkApi & SocketApi: 域名白名单机制 (CSP) 拦截未授权域名访问', () async {
+      final cspCtx = PluginContext(
+        pluginId: 'csp_net_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+        allowedDomains: ['api.github.com'],
+      );
+      final cspEngine = LuaEngine(context: cspCtx, delegate: delegate);
+
+      // 1. 未授权域名的 GET 请求被拦截
+      cspEngine.loadAndExecute('''
+        network.get("https://evil.com/api", function(res)
+          state.set("get_blocked_ok", res.ok)
+          state.set("get_blocked_err", res.error)
+        end)
+      ''');
+
+      // 2. 未授权主机的 resolveDns 被拦截
+      cspEngine.loadAndExecute('''
+        network.resolveDns("192.168.1.1", function(res)
+          state.set("dns_blocked_ok", res.ok)
+          state.set("dns_blocked_err", res.error)
+        end)
+      ''');
+
+      // 3. 未授权主机的 TCP 连接被拦截
+      cspEngine.loadAndExecute('''
+        socket.tcpConnect("192.168.1.100", 8080, {
+          onError = function(id, err)
+            state.set("tcp_blocked_err", err)
+          end
+        })
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('get_blocked_ok'), isFalse);
+      expect(delegate.getState('get_blocked_err'), contains('域名不在白名单内: evil.com'));
+      expect(delegate.getState('dns_blocked_ok'), isFalse);
+      expect(delegate.getState('dns_blocked_err'), contains('域名不在白名单内'));
+      expect(delegate.getState('tcp_blocked_err'), contains('域名不在白名单内'));
+
+      cspEngine.close();
+    });
+
     test('BiometricsApi: 权限拦截与生物识别核验绑定', () async {
       // 1. 无权限时报错
       final noPermEngine = LuaEngine(context: context, delegate: delegate);

@@ -86,6 +86,22 @@ class WebSocketApi {
         ls.pop(1);
       }
 
+      final Uri uri;
+      try {
+        uri = Uri.parse(url);
+      } on FormatException catch (e) {
+        ls.error2('URL 不合法: $e');
+        return 0;
+      }
+
+      if (!context.isHostAllowed(uri.host)) {
+        if (onErrorRef != null) {
+          callbacks.invoke(onErrorRef, ['', '域名不在白名单内: ${uri.host}']);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
       final wsId = 'ws_${_nextId++}';
       _pendingWs.add(wsId);
 

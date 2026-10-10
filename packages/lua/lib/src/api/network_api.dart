@@ -110,6 +110,11 @@ class NetworkApi {
         return 0;
       }
 
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return 0;
+      }
+
       unawaited(
         http.get(uri, headers: headers).then((response) {
           handleResponse(response, cbRef);
@@ -152,6 +157,11 @@ class NetworkApi {
         return 0;
       }
 
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return 0;
+      }
+
       unawaited(
         http.post(uri, headers: headers, body: body).then((response) {
           handleResponse(response, cbRef);
@@ -188,6 +198,11 @@ class NetworkApi {
         return 0;
       }
 
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return 0;
+      }
+
       unawaited(
         http.put(uri, headers: headers, body: body).then((response) {
           handleResponse(response, cbRef);
@@ -220,6 +235,11 @@ class NetworkApi {
         uri = Uri.parse(url);
       } on FormatException catch (e) {
         ls.error2('URL 不合法: $e');
+        return 0;
+      }
+
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
         return 0;
       }
 
@@ -280,6 +300,11 @@ class NetworkApi {
         return 0;
       }
 
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return 0;
+      }
+
       final req = http.Request(method, uri);
       req.headers.addAll(headers);
       if (body != null) {
@@ -306,6 +331,22 @@ class NetworkApi {
       checkPermission(ls);
       final host = ls.checkString(1) ?? '';
       final cbRef = callbacks.ref(2);
+
+      if (!context.isHostAllowed(host)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {
+              'ok': false,
+              'host': host,
+              'addresses': <String>[],
+              'error': '域名不在白名单内: $host',
+            }
+          ]);
+        } else {
+          writeState('__dns_error', '域名不在白名单内: $host');
+        }
+        return 0;
+      }
 
       unawaited(
         InternetAddress.lookup(host).then((addresses) {
@@ -364,6 +405,21 @@ class NetworkApi {
         }
       }
 
+      if (!context.isHostAllowed(host)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {
+              'ok': false,
+              'host': host,
+              'port': port,
+              'reachable': false,
+              'error': '域名不在白名单内: $host',
+            }
+          ]);
+        }
+        return 0;
+      }
+
       final stopwatch = Stopwatch()..start();
       unawaited(
         Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
@@ -417,6 +473,21 @@ class NetworkApi {
         if (ls.type(4) == LuaType.luaFunction) {
           cbRef = callbacks.ref(4);
         }
+      }
+
+      if (!context.isHostAllowed(host)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {
+              'host': host,
+              'port': port,
+              'open': false,
+              'latencyMs': 0,
+              'error': '域名不在白名单内: $host',
+            }
+          ]);
+        }
+        return 0;
       }
 
       final stopwatch = Stopwatch()..start();

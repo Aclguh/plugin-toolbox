@@ -18,6 +18,7 @@ class PluginManifest {
   final String ui;    // e.g. "ui/main.ui.json"
   final List<Map<String, dynamic>> settings;
   final int storageQuotaMb;
+  final List<String>? allowedDomains;
 
   const PluginManifest({
     required this.id,
@@ -34,6 +35,7 @@ class PluginManifest {
     required this.ui,
     this.settings = const [],
     this.storageQuotaMb = 50,
+    this.allowedDomains,
   });
 
   /// 安全解析清单。
@@ -60,6 +62,14 @@ class PluginManifest {
         .whereType<PluginPermission>()
         .toList();
 
+    final allowedDomainsRaw = json['allowedDomains'] is List
+        ? json['allowedDomains'] as List<dynamic>
+        : null;
+    final allowedDomains = allowedDomainsRaw
+        ?.map((d) => d.toString().trim().toLowerCase())
+        .where((d) => d.isNotEmpty)
+        .toList();
+
     return PluginManifest(
       id: requiredField('id'),
       name: requiredField('name'),
@@ -80,6 +90,7 @@ class PluginManifest {
       storageQuotaMb: (json['storageQuotaMb'] is num)
           ? (json['storageQuotaMb'] as num).toInt()
           : 50,
+      allowedDomains: allowedDomains,
     );
   }
 
@@ -98,6 +109,7 @@ class PluginManifest {
         'ui': ui,
         'settings': settings,
         'storageQuotaMb': storageQuotaMb,
+        if (allowedDomains != null) 'allowedDomains': allowedDomains,
       };
 
   static PluginManifest fromJsonString(String source) {

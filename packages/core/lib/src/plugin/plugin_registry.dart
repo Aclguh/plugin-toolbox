@@ -140,6 +140,9 @@ class PluginRegistry {
         storageQuotaMb: plugin is DynamicPlugin
             ? plugin.manifest.storageQuotaMb
             : 50,
+        allowedDomains: plugin is DynamicPlugin
+            ? plugin.manifest.allowedDomains
+            : null,
       );
       await plugin.initialize(context);
       _initializedPlugins.add(plugin.id);

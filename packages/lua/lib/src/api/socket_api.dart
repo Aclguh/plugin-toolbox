@@ -82,6 +82,14 @@ class SocketApi {
         ls.pop(1);
       }
 
+      if (!context.isHostAllowed(host)) {
+        if (onErrorRef != null) {
+          callbacks.invoke(onErrorRef, ['', '域名不在白名单内: $host']);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
       final socketId = 'tcp_${_nextId++}';
       _pendingTcp.add(socketId);
 
@@ -278,6 +286,11 @@ class SocketApi {
           ls.pop(1);
         }
       } else {
+        ls.pushBoolean(false);
+        return 1;
+      }
+
+      if (!context.isHostAllowed(host)) {
         ls.pushBoolean(false);
         return 1;
       }

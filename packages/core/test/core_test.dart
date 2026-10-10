@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 void main() {
@@ -63,6 +64,66 @@ void main() {
       expect(json['id'], 'test_plugin');
       expect(json['category'], 'calculator');
       expect(json['permissions'], ['clipboard']);
+    });
+
+    test('PluginManifest 支持 allowedDomains 域名白名单解析与序列化', () {
+      final json = {
+        'id': 'net_plugin',
+        'name': 'Net Plugin',
+        'allowedDomains': ['api.example.com', '*.github.com', 'MY-API.ORG'],
+      };
+      final manifest = PluginManifest.fromJson(json);
+      expect(manifest.allowedDomains, [
+        'api.example.com',
+        '*.github.com',
+        'my-api.org',
+      ]);
+      expect(manifest.toJson()['allowedDomains'], [
+        'api.example.com',
+        '*.github.com',
+        'my-api.org',
+      ]);
+    });
+
+    test('PluginContext.isHostAllowed 支持精确匹配、通配符与端口兼容', () {
+      final ctx = PluginContext(
+        pluginId: 'csp_test',
+        storage: PluginStorageImpl(namespace: 'csp_test'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+        allowedDomains: ['api.example.com', '*.github.com', 'internal.lan'],
+      );
+
+      // 精确匹配与大小写不敏感
+      expect(ctx.isHostAllowed('api.example.com'), isTrue);
+      expect(ctx.isHostAllowed('API.EXAMPLE.COM'), isTrue);
+
+      // 携带端口
+      expect(ctx.isHostAllowed('api.example.com:443'), isTrue);
+      expect(ctx.isHostAllowed('internal.lan:8080'), isTrue);
+
+      // 通配符与子域匹配
+      expect(ctx.isHostAllowed('github.com'), isTrue);
+      expect(ctx.isHostAllowed('raw.github.com'), isTrue);
+      expect(ctx.isHostAllowed('sub.raw.github.com'), isTrue);
+
+      // 未授权域名与内网 IP 拦截
+      expect(ctx.isHostAllowed('evil.com'), isFalse);
+      expect(ctx.isHostAllowed('notgithub.com'), isFalse);
+      expect(ctx.isHostAllowed('192.168.1.1'), isFalse);
+      expect(ctx.isHostAllowed('127.0.0.1:8000'), isFalse);
+
+      // 无白名单限制时默认全量放行
+      final unconfinedCtx = PluginContext(
+        pluginId: 'unconfined',
+        storage: PluginStorageImpl(namespace: 'unconfined'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      expect(unconfinedCtx.isHostAllowed('any-domain.com'), isTrue);
+      expect(unconfinedCtx.isHostAllowed('192.168.1.1'), isTrue);
     });
 
     test('AppEvent 具有正确的 Equatable 值对象等价语义 (P3-1)', () {
