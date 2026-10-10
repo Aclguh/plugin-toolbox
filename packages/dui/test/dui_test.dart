@@ -228,6 +228,36 @@ void main() {
       expect(find.byType(Image), findsOneWidget);
     });
 
+    testWidgets('Image src 支持响应式状态插值, 状态变更触发更新与沙箱拦截', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(
+        state: state,
+        eventHandler: handler,
+        pluginRootDir: Directory.systemTemp,
+      );
+
+      final node = {
+        'type': 'Image',
+        'props': {'src': '{{state.imagePath}}'},
+      };
+
+      // 1. 初始状态为空，插值后为空字符串，被安全校验拦截不渲染 Image
+      await tester.pumpWidget(buildHost(renderer, node));
+      expect(find.byType(Image), findsNothing);
+
+      // 2. 更新为合法相对路径，响应式重新构建并显示 Image
+      state.set('imagePath', 'test_avatar.png');
+      await tester.pump();
+      expect(find.byType(Image), findsOneWidget);
+
+      // 3. 更新为越权穿越路径，重新拦截并不渲染 Image
+      state.set('imagePath', '../../sensitive.txt');
+      await tester.pump();
+      expect(find.byType(Image), findsNothing);
+    });
+
+
     testWidgets('Container color 属性渲染背景色, 非法值降级为无色不崩溃', (tester) async {
       final state = DuiState();
       final handler = DuiEventHandler(state: state, executor: MockActionExecutor());

@@ -831,23 +831,36 @@ class DuiRenderer {
   }
 
   Widget _imageWidget(DuiNodeContext node) {
-    final src = node.props['src']?.toString() ?? '';
+    final rawSrc = node.props['src']?.toString() ?? '';
     final rootDir = node.renderer.pluginRootDir;
-    // 路径穿越防御：src 必须归一化后仍严格位于插件沙箱根目录之内，
-    // 否则 (例如 "../../etc/passwd") 直接拒绝渲染
-    if (rootDir == null ||
-        src.isEmpty ||
-        !SandboxPath.isSafeSubpath(rootDir.path, src)) {
-      return const SizedBox.shrink();
+    final keys = DuiState.extractKeys(rawSrc);
+
+    Widget buildImage() {
+      final src = state.interpolate(rawSrc);
+      // 路径穿越防御：src 必须归一化后仍严格位于插件沙箱根目录之内，
+      // 否则 (例如 "../../etc/passwd") 直接拒绝渲染
+      if (rootDir == null ||
+          src.isEmpty ||
+          !SandboxPath.isSafeSubpath(rootDir.path, src)) {
+        return const SizedBox.shrink();
+      }
+      return Image.file(
+        File('${rootDir.path}/$src'),
+        width: node.width,
+        height: node.height,
+        fit: BoxFit.contain,
+        cacheWidth: 256,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      );
     }
-    return Image.file(
-      File('${rootDir.path}/$src'),
-      width: node.width,
-      height: node.height,
-      fit: BoxFit.contain,
-      cacheWidth: 256,
-      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-    );
+
+    if (keys.isNotEmpty) {
+      return ListenableBuilder(
+        listenable: state.listenableForKeys(keys),
+        builder: (_, __) => buildImage(),
+      );
+    }
+    return buildImage();
   }
 
   CrossAxisAlignment _parseCrossAxis(String? val) {
@@ -919,9 +932,11 @@ class _BoundTextFieldState extends State<_BoundTextField> {
       final oldSelection = _controller.selection;
       _controller.text = widget.initialText;
       // 保持光标位置（限制在合法文本区间内），防止外部状态更新时光标跳跃至末尾或丢失
-      final newOffset =
-          oldSelection.baseOffset.clamp(0, widget.initialText.length);
-      _controller.selection = TextSelection.collapsed(offset: newOffset);
+      if (oldSelection.isValid && oldSelection.baseOffset >= 0) {
+        final newOffset =
+            oldSelection.baseOffset.clamp(0, widget.initialText.length);
+        _controller.selection = TextSelection.collapsed(offset: newOffset);
+      }
     }
   }
 
