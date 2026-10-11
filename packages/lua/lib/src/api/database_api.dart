@@ -201,11 +201,30 @@ class _SandboxDatabaseEngine {
                     .map((item) => Map<String, dynamic>.from(item as Map))
                     .toList(),
               ));
+          return;
         }
       } catch (_) {
-        _tables = {};
+        // 主文件损坏，尝试从备份恢复
       }
     }
+
+    final bakFile = File('${dbFile.path}.bak');
+    if (await bakFile.exists()) {
+      try {
+        final content = await bakFile.readAsString();
+        final decoded = json.decode(content);
+        if (decoded is Map<String, dynamic>) {
+          _tables = decoded.map((k, v) => MapEntry(
+                k,
+                (v as List)
+                    .map((item) => Map<String, dynamic>.from(item as Map))
+                    .toList(),
+              ));
+          return;
+        }
+      } catch (_) {}
+    }
+    _tables = {};
   }
 
   void _schedulePersist() {
@@ -221,7 +240,20 @@ class _SandboxDatabaseEngine {
         await dbFile.parent.create(recursive: true);
       }
       final payload = json.encode(_tables);
-      await dbFile.writeAsString(payload);
+      final tempFile = File('${dbFile.path}.tmp');
+      await tempFile.writeAsString(payload, flush: true);
+
+      final bakFile = File('${dbFile.path}.bak');
+      if (await dbFile.exists()) {
+        try {
+          if (await bakFile.exists()) await bakFile.delete();
+          await dbFile.copy(bakFile.path);
+        } catch (_) {}
+        try {
+          await dbFile.delete();
+        } catch (_) {}
+      }
+      await tempFile.rename(dbFile.path);
     } catch (_) {}
   }
 
@@ -253,7 +285,19 @@ class _SandboxDatabaseEngine {
         if (!dbFile.parent.existsSync()) {
           dbFile.parent.createSync(recursive: true);
         }
-        dbFile.writeAsStringSync(json.encode(_tables));
+        final tempFile = File('${dbFile.path}.tmp');
+        tempFile.writeAsStringSync(json.encode(_tables), flush: true);
+        final bakFile = File('${dbFile.path}.bak');
+        if (dbFile.existsSync()) {
+          try {
+            if (bakFile.existsSync()) bakFile.deleteSync();
+            dbFile.copySync(bakFile.path);
+          } catch (_) {}
+          try {
+            dbFile.deleteSync();
+          } catch (_) {}
+        }
+        tempFile.renameSync(dbFile.path);
         _isDirty = false;
       } catch (_) {}
     }
@@ -642,9 +686,68 @@ class _SandboxDatabaseEngine {
     return null;
   }
 
+  static List<String> _splitWhereConditions(String whereClause) {
+    final list = <String>[];
+    final buffer = StringBuffer();
+    bool inQuote = false;
+    String quoteChar = '';
+    int parenDepth = 0;
+
+    int i = 0;
+    while (i < whereClause.length) {
+      final ch = whereClause[i];
+      if (inQuote) {
+        buffer.write(ch);
+        if (ch == quoteChar) {
+          if (i + 1 < whereClause.length && whereClause[i + 1] == quoteChar) {
+            buffer.write(whereClause[i + 1]);
+            i++;
+          } else {
+            inQuote = false;
+          }
+        }
+        i++;
+      } else {
+        if (ch == "'" || ch == '"') {
+          inQuote = true;
+          quoteChar = ch;
+          buffer.write(ch);
+          i++;
+        } else if (ch == '(') {
+          parenDepth++;
+          buffer.write(ch);
+          i++;
+        } else if (ch == ')') {
+          if (parenDepth > 0) parenDepth--;
+          buffer.write(ch);
+          i++;
+        } else if (parenDepth == 0 &&
+            (i == 0 || RegExp(r'\s').hasMatch(whereClause[i - 1])) &&
+            whereClause.substring(i).toUpperCase().startsWith('AND') &&
+            (i + 3 >= whereClause.length ||
+                RegExp(r'\s').hasMatch(whereClause[i + 3]))) {
+          final trimmed = buffer.toString().trim();
+          if (trimmed.isNotEmpty) {
+            list.add(trimmed);
+          }
+          buffer.clear();
+          i += 3;
+        } else {
+          buffer.write(ch);
+          i++;
+        }
+      }
+    }
+    final remaining = buffer.toString().trim();
+    if (remaining.isNotEmpty) {
+      list.add(remaining);
+    }
+    return list;
+  }
+
   bool _matchesWhere(
       Map<String, dynamic> row, String whereClause, List<dynamic> params) {
-    final conditions = whereClause.split(RegExp(r'\s+AND\s+', caseSensitive: false));
+    final conditions = _splitWhereConditions(whereClause);
     int paramIdx = 0;
     for (final cond in conditions) {
       if (!_evaluateCondition(row, cond.trim(), params, () => paramIdx++)) {
@@ -711,9 +814,49 @@ class _SandboxDatabaseEngine {
   }
 
   static String _cleanSql(String raw) {
-    var s = raw.replaceAll(RegExp(r'--[^\r\n]*'), ' ');
-    s = s.replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), ' ');
-    return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final buffer = StringBuffer();
+    bool inQuote = false;
+    String quoteChar = '';
+    int i = 0;
+    while (i < raw.length) {
+      final ch = raw[i];
+      if (inQuote) {
+        buffer.write(ch);
+        if (ch == quoteChar) {
+          if (i + 1 < raw.length && raw[i + 1] == quoteChar) {
+            buffer.write(raw[i + 1]);
+            i++;
+          } else {
+            inQuote = false;
+          }
+        }
+        i++;
+      } else {
+        if (ch == "'" || ch == '"') {
+          inQuote = true;
+          quoteChar = ch;
+          buffer.write(ch);
+          i++;
+        } else if (ch == '-' && i + 1 < raw.length && raw[i + 1] == '-') {
+          i += 2;
+          while (i < raw.length && raw[i] != '\n' && raw[i] != '\r') {
+            i++;
+          }
+          buffer.write(' ');
+        } else if (ch == '/' && i + 1 < raw.length && raw[i + 1] == '*') {
+          i += 2;
+          while (i + 1 < raw.length && !(raw[i] == '*' && raw[i + 1] == '/')) {
+            i++;
+          }
+          i += 2;
+          buffer.write(' ');
+        } else {
+          buffer.write(ch);
+          i++;
+        }
+      }
+    }
+    return buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   static Map<String, String> _parseSetAssignments(String setPart) {

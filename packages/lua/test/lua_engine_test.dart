@@ -2843,6 +2843,76 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
+    test('DatabaseApi: 特殊字符字面量与 .bak 备份恢复容错', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_db_special_');
+      final dbCtx = PluginContext(
+        pluginId: 'db_special_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.database},
+      );
+      final dbEngine = LuaEngine(context: dbCtx, delegate: delegate);
+
+      dbEngine.loadAndExecute('''
+        db.execute("CREATE TABLE posts (id, title, tag)", function(res) end)
+        db.execute("INSERT INTO posts (id, title, tag) VALUES (1, 'A AND B', 'uuid--123')", function(res)
+          state.set("ins_special_ok", res.ok)
+        end)
+        db.query("SELECT * FROM posts WHERE title = 'A AND B' AND tag = 'uuid--123'", {}, function(res)
+          state.set("query_special_ok", res.ok)
+          if res.rows and res.rows[1] then
+            state.set("query_special_title", res.rows[1].title)
+          end
+        end)
+        db.flush(function(res)
+          state.set("special_flush_ok", res.ok)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.getState('ins_special_ok'), isTrue);
+      expect(delegate.getState('query_special_ok'), isTrue);
+      expect(delegate.getState('query_special_title'), 'A AND B');
+      expect(delegate.getState('special_flush_ok'), isTrue);
+      dbEngine.close();
+
+      // 验证 .bak 备份恢复：触发第二次落盘生成 bak，破坏主文件后仍可从 bak 恢复读取
+      final dbFile = File('${tempDir.path}/plugin_data.db');
+      final bakFile = File('${tempDir.path}/plugin_data.db.bak');
+      expect(dbFile.existsSync(), isTrue);
+
+      final dbEngine2 = LuaEngine(context: dbCtx, delegate: delegate);
+      dbEngine2.loadAndExecute('''
+        db.execute("INSERT INTO posts (id, title, tag) VALUES (2, 'Second', 'tag')", function(res) end)
+        db.flush(function(res)
+          state.set("flush2_ok", res.ok)
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.getState('flush2_ok'), isTrue);
+      dbEngine2.close();
+      expect(bakFile.existsSync(), isTrue);
+
+      // 损坏主文件
+      dbFile.writeAsStringSync('{corrupted_json:::');
+
+      final dbEngine3 = LuaEngine(context: dbCtx, delegate: delegate);
+      dbEngine3.loadAndExecute('''
+        db.query("SELECT COUNT(*) AS c FROM posts", {}, function(res)
+          if res.ok and res.rows and res.rows[1] then
+            state.set("recovered_count", res.rows[1].c)
+          end
+        end)
+      ''');
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(delegate.getState('recovered_count'), isNotNull);
+      dbEngine3.close();
+
+      await tempDir.delete(recursive: true);
+    });
+
     test('AiApi: 统一大模型网关 chat 与 streamChat 调用', () async {
       // 1. 无权限拦截
       expect(
