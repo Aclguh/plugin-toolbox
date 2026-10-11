@@ -158,6 +158,26 @@ void main() {
       expect(File('./plugins/evil.txt').existsSync(), isFalse);
     });
 
+    test('Zip Bomb 异常高膨胀比安装包被拦截', () async {
+      // 6MB 全零数据经过 ZIP 压缩后仅数 KB，膨胀比远超 20 倍且总解压大小 > 5MB
+      final hugeData = Uint8List(6 * 1024 * 1024);
+      final file = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'bomb.dat': hugeData,
+      }));
+
+      await expectLater(
+        PluginInstaller.installFromPtx(file),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('解压膨胀比超过安全限制'),
+        )),
+      );
+      await file.parent.delete(recursive: true);
+      expect(Directory('./plugins/installer_test').existsSync(), isFalse);
+    });
+
     test('合法安装包解压成功且文件落位正确', () async {
       final file = await writeTempPtx(buildPtx({
         ...validEntries(),

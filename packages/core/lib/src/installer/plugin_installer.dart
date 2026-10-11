@@ -11,6 +11,9 @@ import '../sandbox/sandbox_path.dart';
 
 class PluginInstaller {
   static const int maxPackageSizeBytes = 10 * 1024 * 1024; // 10MB
+  static const int maxUncompressedSizeBytes = 50 * 1024 * 1024; // 50MB
+  static const int maxInflationRatio = 20; // 膨胀比上限
+  static const int inflationCheckThresholdBytes = 5 * 1024 * 1024; // 5MB 以上开始校验膨胀比
   static final RegExp _validIdPattern = RegExp(r'^[a-z0-9_]{3,50}$');
 
   /// 从给定的 .ptx 文件路径进行解析与安装
@@ -69,16 +72,29 @@ class PluginInstaller {
     }
     await targetDir.create(recursive: true);
 
-    // 5. 解压所有文件到沙箱目录
+    // 5. 解压所有文件到沙箱目录 (防范 Zip Slip 路径穿越与 Zip Bomb 膨胀攻击)
+    int totalExtractedBytes = 0;
     for (final file in archive) {
       final filename = file.name;
       // 防御 Zip Slip 路径穿越攻击：由生产沙箱校验器统一拦截
       // `..` 穿越、POSIX/Windows 绝对路径与 UNC 路径等所有逃逸向量。
       if (!SandboxPath.isSafeRelativeEntry(filename)) {
+        await targetDir.delete(recursive: true);
         throw FormatException('检测到非法的包内相对路径: $filename');
       }
       if (file.isFile) {
         final data = file.content as List<int>;
+        totalExtractedBytes += data.length;
+        if (totalExtractedBytes > maxUncompressedSizeBytes) {
+          await targetDir.delete(recursive: true);
+          throw const FormatException('解压展开体积超限 (超过 50MB)，疑似恶意解压炸弹');
+        }
+        if (length > 0 &&
+            totalExtractedBytes > inflationCheckThresholdBytes &&
+            (totalExtractedBytes / length) > maxInflationRatio) {
+          await targetDir.delete(recursive: true);
+          throw const FormatException('解压膨胀比超过安全限制 (20倍)，疑似恶意解压炸弹');
+        }
         final outFile = File('${targetDir.path}/$filename');
         await outFile.parent.create(recursive: true);
         await outFile.writeAsBytes(data);
