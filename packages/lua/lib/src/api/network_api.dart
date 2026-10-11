@@ -116,7 +116,10 @@ class NetworkApi {
       }
 
       unawaited(
-        http.get(uri, headers: headers).then((response) {
+        http
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 15))
+            .then((response) {
           handleResponse(response, cbRef);
         }).catchError((Object e) {
           handleError(e, cbRef);
@@ -163,7 +166,10 @@ class NetworkApi {
       }
 
       unawaited(
-        http.post(uri, headers: headers, body: body).then((response) {
+        http
+            .post(uri, headers: headers, body: body)
+            .timeout(const Duration(seconds: 15))
+            .then((response) {
           handleResponse(response, cbRef);
         }).catchError((Object e) {
           handleError(e, cbRef);
@@ -204,7 +210,10 @@ class NetworkApi {
       }
 
       unawaited(
-        http.put(uri, headers: headers, body: body).then((response) {
+        http
+            .put(uri, headers: headers, body: body)
+            .timeout(const Duration(seconds: 15))
+            .then((response) {
           handleResponse(response, cbRef);
         }).catchError((Object e) {
           handleError(e, cbRef);
@@ -244,7 +253,10 @@ class NetworkApi {
       }
 
       unawaited(
-        http.delete(uri, headers: headers).then((response) {
+        http
+            .delete(uri, headers: headers)
+            .timeout(const Duration(seconds: 15))
+            .then((response) {
           handleResponse(response, cbRef);
         }).catchError((Object e) {
           handleError(e, cbRef);
@@ -311,8 +323,9 @@ class NetworkApi {
         req.body = body;
       }
 
+      final client = http.Client();
       unawaited(
-        http.Client()
+        client
             .send(req)
             .then(http.Response.fromStream)
             .timeout(Duration(milliseconds: timeoutMs))
@@ -320,6 +333,8 @@ class NetworkApi {
           handleResponse(res, cbRef);
         }).catchError((Object e) {
           handleError(e, cbRef);
+        }).whenComplete(() {
+          client.close();
         }),
       );
       return 0;
