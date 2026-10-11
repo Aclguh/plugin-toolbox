@@ -380,6 +380,62 @@ void main() {
       expect(broker.hasService('math_tool', 'add'), isFalse);
     });
 
+    test('PluginIpcBroker 支持独立实例化与依赖注入隔离', () async {
+      final customBroker = PluginIpcBroker();
+      customBroker.registerService('service_a', 'echo', (arg) async => 'echo:$arg');
+      expect(customBroker.hasService('service_a', 'echo'), isTrue);
+      expect(PluginIpcBroker.instance.hasService('service_a', 'echo'), isFalse);
+
+      final res = await customBroker.call(
+        callerPluginId: 'c',
+        targetPluginId: 'service_a',
+        functionName: 'echo',
+        args: 'hello',
+      );
+      expect(res['ok'], isTrue);
+      expect(res['result'], 'echo:hello');
+    });
+
+    test('PluginRegistry 停用插件与自定义权限状态机及注销清理', () async {
+      final reg = PluginRegistry(
+        storageFactory: const PluginStorageFactory(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+      );
+      const manifest = PluginManifest(
+        id: 'p_test',
+        name: 'P Test',
+        version: '1.0.0',
+        description: 'd',
+        author: 'a',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [PluginPermission.camera, PluginPermission.storage],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      );
+      final plugin = DynamicPlugin(manifest: manifest, rootDir: Directory('.'));
+      reg.register(plugin);
+
+      // 加载停用集合与自定义权限覆盖
+      reg.loadDisabledPlugins({'p_test'});
+      expect(reg.disabledPluginIds, contains('p_test'));
+
+      reg.loadCustomPermissions({
+        'p_test': {PluginPermission.storage},
+      });
+      expect(reg.getCustomPermissions('p_test'), {PluginPermission.storage});
+
+      // 重新启用
+      await reg.setEnabled('p_test', true);
+      expect(reg.disabledPluginIds.contains('p_test'), isFalse);
+
+      // 注销后清理相关映射
+      await reg.unregister('p_test');
+      expect(reg.getCustomPermissions('p_test'), isNull);
+      expect(reg.disabledPluginIds.contains('p_test'), isFalse);
+    });
+
     test('TypeConverter 支持数值、布尔与多格式十六进制颜色安全转换', () {
       expect(TypeConverter.tryDouble('12.34'), 12.34);
       expect(TypeConverter.tryDouble(56), 56.0);

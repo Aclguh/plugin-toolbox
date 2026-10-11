@@ -408,4 +408,67 @@ void main() {
     expect(find.text('插件已停用'), findsOneWidget);
     expect(find.text('前往插件管理'), findsOneWidget);
   });
+
+  testWidgets('通过路由直达未初始化的动态插件时自愈初始化并安全展示', (WidgetTester tester) async {
+    final mockPlugin = createMockPlugin('deep_link_p', '直达插件');
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final registry = container.read(pluginRegistryProvider);
+    registry.register(mockPlugin);
+    expect(registry.isInitialized('deep_link_p'), isFalse);
+
+    final router = container.read(appRouterProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/plugin/deep_link_p');
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(registry.isInitialized('deep_link_p'), isTrue);
+    expect(find.text('直达插件'), findsOneWidget);
+  });
+
+  testWidgets('PluginRegistryNotifier 启用停用与自定义权限持久化', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final container = ProviderContainer(overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    addTearDown(container.dispose);
+
+    final notifier = container.read(pluginRegistryProvider.notifier);
+    final registry = container.read(pluginRegistryProvider);
+    final mockPlugin = createMockPlugin('perm_p', '权限测试插件');
+    registry.register(mockPlugin);
+
+    // 设置停用并持久化
+    await notifier.setEnabled('perm_p', false);
+    expect(registry.disabledPluginIds, contains('perm_p'));
+    expect(prefs.getStringList('plugin_toolbox_disabled_plugins'), contains('perm_p'));
+
+    // 设置自定义权限并持久化
+    await notifier.setCustomPermissions('perm_p', {PluginPermission.camera});
+    expect(registry.getCustomPermissions('perm_p'), contains(PluginPermission.camera));
+    expect(
+      prefs.getStringList('plugin_toolbox_permissions_perm_p'),
+      contains('camera'),
+    );
+
+    // 重新启用
+    await notifier.setEnabled('perm_p', true);
+    expect(registry.disabledPluginIds.contains('perm_p'), isFalse);
+    expect(prefs.getStringList('plugin_toolbox_disabled_plugins'), isEmpty);
+  });
 }

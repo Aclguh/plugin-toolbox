@@ -45,6 +45,8 @@ class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
   StreamSubscription<AppEvent>? _subscription;
 
   static const _orderKey = 'plugin_toolbox_plugin_order';
+  static const _disabledKey = 'plugin_toolbox_disabled_plugins';
+  static const _customPermissionsPrefix = 'plugin_toolbox_permissions_';
 
   @override
   bool updateShouldNotify(PluginRegistry old, PluginRegistry current) => true;
@@ -63,6 +65,43 @@ class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
     try {
       await _prefs.setStringList(_orderKey, state.pluginOrder);
     } catch (_) {}
+  }
+
+  Future<void> saveDisabledPlugins() async {
+    try {
+      await _prefs.setStringList(
+        _disabledKey,
+        state.disabledPluginIds.toList(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> saveCustomPermissions(
+      String pluginId, Set<PluginPermission> permissions) async {
+    try {
+      final permNames = permissions.map((p) => p.name).toList();
+      await _prefs.setStringList(
+          '$_customPermissionsPrefix$pluginId', permNames);
+    } catch (_) {}
+  }
+
+  Future<void> removeCustomPermissions(String pluginId) async {
+    try {
+      await _prefs.remove('$_customPermissionsPrefix$pluginId');
+    } catch (_) {}
+  }
+
+  Future<void> setEnabled(String id, bool enabled) async {
+    await state.setEnabled(id, enabled);
+    state = state;
+    await saveDisabledPlugins();
+  }
+
+  Future<void> setCustomPermissions(
+      String pluginId, Set<PluginPermission> permissions) async {
+    state.setCustomPermissions(pluginId, permissions);
+    state = state;
+    await saveCustomPermissions(pluginId, permissions);
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
@@ -205,14 +244,33 @@ final appInitFutureProvider = FutureProvider<void>((ref) async {
   final installedPlugins = await PluginLoader.loadAllInstalledPlugins();
   registry.registerAll(installedPlugins);
 
-  // 3. 加载持久化的插件排序
+  // 3. 加载持久化的插件排序、已禁用插件集合与自定义权限配置
   try {
     final savedOrder = prefs.getStringList(PluginRegistryNotifier._orderKey);
     if (savedOrder != null && savedOrder.isNotEmpty) {
       registry.loadOrder(savedOrder);
     }
-  } catch (_) {}
 
-  // 4. 初始化所有插件
-  await registry.initializeAll();
+    final savedDisabled =
+        prefs.getStringList(PluginRegistryNotifier._disabledKey);
+    if (savedDisabled != null && savedDisabled.isNotEmpty) {
+      registry.loadDisabledPlugins(savedDisabled.toSet());
+    }
+
+    final permissionsMap = <String, Set<PluginPermission>>{};
+    for (final plugin in installedPlugins) {
+      final permNames = prefs.getStringList(
+          '${PluginRegistryNotifier._customPermissionsPrefix}${plugin.id}');
+      if (permNames != null) {
+        final perms = permNames
+            .map(PluginPermission.fromString)
+            .whereType<PluginPermission>()
+            .toSet();
+        permissionsMap[plugin.id] = perms;
+      }
+    }
+    if (permissionsMap.isNotEmpty) {
+      registry.loadCustomPermissions(permissionsMap);
+    }
+  } catch (_) {}
 });

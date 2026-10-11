@@ -108,9 +108,7 @@ class PluginManagerPage extends ConsumerWidget {
       // 注册并初始化全部获授权项 (同 ID 覆盖即插件更新)
       for (final plugin in pluginsToRegister) {
         registry.register(plugin);
-      }
-      if (pluginsToRegister.isNotEmpty) {
-        await registry.initializeAll();
+        await registry.initializePlugin(plugin.id);
       }
 
       // 触发 UI 刷新
@@ -308,6 +306,10 @@ class PluginManagerPage extends ConsumerWidget {
       final registry = ref.read(pluginRegistryProvider);
       await registry.unregister(plugin.id);
       await ref.read(pluginRegistryProvider.notifier).saveOrder();
+      await ref.read(pluginRegistryProvider.notifier).saveDisabledPlugins();
+      await ref
+          .read(pluginRegistryProvider.notifier)
+          .removeCustomPermissions(plugin.id);
       ref.read(pluginRegistryProvider.notifier).refresh();
 
       if (context.mounted) {
@@ -405,14 +407,22 @@ class PluginManagerPage extends ConsumerWidget {
                         ),
                         subtitle: Text(perm.description),
                         value: isGranted,
-                        onChanged: (enabled) {
+                        onChanged: (enabled) async {
+                          final current = Set<PluginPermission>.from(
+                            dynamicPlugin?.context?.grantedPermissions ??
+                                declaredPermissions,
+                          );
+                          if (enabled) {
+                            current.add(perm);
+                          } else {
+                            current.remove(perm);
+                          }
                           setDialogState(() {
-                            if (enabled) {
-                              dynamicPlugin?.context?.grantedPermissions.add(perm);
-                            } else {
-                              dynamicPlugin?.context?.grantedPermissions.remove(perm);
-                            }
+                            dynamicPlugin?.context?.setGrantedPermissions(current);
                           });
+                          await ref
+                              .read(pluginRegistryProvider.notifier)
+                              .setCustomPermissions(plugin.id, current);
                         },
                       );
                     }),
@@ -618,8 +628,9 @@ class PluginManagerPage extends ConsumerWidget {
                     trailing: Switch(
                       value: isEnabled,
                       onChanged: (val) async {
-                        await registry.setEnabled(plugin.id, val);
-                        ref.read(pluginRegistryProvider.notifier).refresh();
+                        await ref
+                            .read(pluginRegistryProvider.notifier)
+                            .setEnabled(plugin.id, val);
                       },
                     ),
                     onTap: () => _showPluginDetails(context, ref, plugin),

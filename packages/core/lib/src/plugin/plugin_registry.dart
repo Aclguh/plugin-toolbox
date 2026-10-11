@@ -5,6 +5,7 @@ import '../event/event_bus.dart';
 import '../event/app_event.dart';
 import '../storage/plugin_storage.dart';
 import '../model/plugin_category.dart';
+import '../model/plugin_permission.dart';
 import 'tool_plugin.dart';
 import 'dynamic_plugin.dart';
 import 'plugin_context.dart';
@@ -24,6 +25,7 @@ class PluginRegistry {
   final Map<String, ToolPlugin> _plugins = {};
   final Set<String> _disabledPlugins = {};
   final Set<String> _initializedPlugins = {};
+  final Map<String, Set<PluginPermission>> _customPermissions = {};
 
   /// 排序与排列细节委托给独立控制器，注册中心只保留生命周期职责
   final PluginListController _orderController = PluginListController();
@@ -39,10 +41,37 @@ class PluginRegistry {
   }
 
   List<String> get pluginOrder => _orderController.order;
+  Set<String> get disabledPluginIds => Set.unmodifiable(_disabledPlugins);
 
   void loadOrder(List<String> savedOrder) {
     _orderController.loadOrder(_plugins.keys.toSet(), savedOrder);
     _invalidateCaches();
+  }
+
+  void loadDisabledPlugins(Iterable<String> disabledIds) {
+    _disabledPlugins.clear();
+    _disabledPlugins.addAll(disabledIds);
+    _invalidateCaches();
+  }
+
+  void loadCustomPermissions(Map<String, Set<PluginPermission>> permissionsMap) {
+    _customPermissions.clear();
+    for (final entry in permissionsMap.entries) {
+      _customPermissions[entry.key] = Set.from(entry.value);
+    }
+  }
+
+  Set<PluginPermission>? getCustomPermissions(String pluginId) {
+    final perms = _customPermissions[pluginId];
+    return perms != null ? Set.unmodifiable(perms) : null;
+  }
+
+  void setCustomPermissions(String pluginId, Set<PluginPermission> permissions) {
+    _customPermissions[pluginId] = Set.from(permissions);
+    final plugin = _plugins[pluginId];
+    if (plugin is DynamicPlugin && plugin.context != null) {
+      plugin.context!.setGrantedPermissions(permissions);
+    }
   }
 
   void reorder(int oldIndex, int newIndex) {
@@ -92,6 +121,7 @@ class PluginRegistry {
         _initializedPlugins.remove(pluginId);
       }
       _disabledPlugins.remove(pluginId);
+      _customPermissions.remove(pluginId);
       _invalidateCaches();
       if (plugin is DynamicPlugin) {
         // 注册中心不直接触碰文件系统：发出卸载请求，由安装器监听执行沙箱清理
@@ -128,14 +158,21 @@ class PluginRegistry {
 
   Future<void> _initPlugin(ToolPlugin plugin) async {
     try {
+      final Set<PluginPermission> initialPermissions;
+      if (_customPermissions.containsKey(plugin.id)) {
+        initialPermissions = Set.from(_customPermissions[plugin.id]!);
+      } else if (plugin is DynamicPlugin) {
+        initialPermissions = plugin.manifest.permissions.toSet();
+      } else {
+        initialPermissions = {};
+      }
+
       final context = PluginContext(
         pluginId: plugin.id,
         storage: storageFactory.create(plugin.id),
         eventBus: eventBus,
         logger: _logger,
-        grantedPermissions: plugin is DynamicPlugin
-            ? plugin.manifest.permissions.toSet()
-            : {},
+        grantedPermissions: initialPermissions,
         rootDir: plugin is DynamicPlugin ? plugin.rootDir : null,
         storageQuotaMb: plugin is DynamicPlugin
             ? plugin.manifest.storageQuotaMb

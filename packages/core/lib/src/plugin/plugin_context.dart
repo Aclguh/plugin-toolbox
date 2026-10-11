@@ -48,6 +48,13 @@ class PluginContext {
   /// 检查插件是否已被授予指定权限 [perm]
   bool hasPermission(PluginPermission perm) => grantedPermissions.contains(perm);
 
+  /// 动态更新插件已被授予的权限集合
+  void setGrantedPermissions(Set<PluginPermission> permissions) {
+    grantedPermissions
+      ..clear()
+      ..addAll(permissions);
+  }
+
   /// 检查目标主机 [host] 是否在允许访问的域名白名单中
   bool isHostAllowed(String host) {
     if (allowedDomains == null || allowedDomains!.isEmpty) {

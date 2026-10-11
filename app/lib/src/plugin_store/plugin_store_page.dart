@@ -159,7 +159,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       // 同 ID 覆盖即插件更新：注册中心会弃用旧实例并重新初始化
       final registry = ref.read(pluginRegistryProvider);
       registry.register(outcome.plugin);
-      await registry.initializeAll();
+      await registry.initializePlugin(outcome.plugin.id);
       ref.read(pluginRegistryProvider.notifier).refresh();
       await ref.read(pluginRegistryProvider.notifier).saveOrder();
 
