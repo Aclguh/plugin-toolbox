@@ -11,8 +11,13 @@ import 'store_service.dart';
 const String kPluginStoreOwner = 'Aclguh';
 const String kPluginStoreRepository = 'PTX-plugins';
 
-/// 目录锚定的分支或标签；发布插件时改用语义化版本标签可让目录与产物稳定同源。
-const String kPluginStoreRef = 'master';
+/// 目录锚定的分支、标签或提交哈希；发布插件时改用语义化版本标签或具体 commit SHA 可让目录与产物稳定同源。
+///
+/// 注意：jsDelivr Data API (`data.jsdelivr.com`) 对分支名称（如 `master`）具有长达 1 年的强缓存
+/// (max-age=31536000)，且其 Purge 机制仅针对静态文件 CDN (`cdn.jsdelivr.net`)，无法清理 API 清单缓存。
+/// 若锚定为 `master`，将持续返回首次建立缓存时的 47 个插件历史快照；
+/// 锚定为最新发布的提交哈希 (commit SHA) 或 release tag 可彻底绕开陈旧缓存，实时获取仓库全部 130 款生态插件。
+const String kPluginStoreRef = 'd8e4e63b71a0a4fd4b4c7b001b735c3864e68734';
 
 /// 商店页依赖的服务。测试通过 override 注入内存替身，避免真实网络请求。
 final pluginStoreServiceProvider = Provider<PluginStoreService>((ref) {
