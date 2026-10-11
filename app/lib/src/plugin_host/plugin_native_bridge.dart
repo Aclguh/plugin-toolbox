@@ -34,12 +34,15 @@ class PluginNativeBridge {
 
   void dispose() {
     if (_torchOn) {
+      _torchOn = false;
       setTorch(false);
     }
     if (_screenKeepOn) {
+      _screenKeepOn = false;
       setKeepScreenOn(false);
     }
     if (_brightnessModified) {
+      _brightnessModified = false;
       resetBrightness();
     }
     stopSensor('all');
@@ -73,11 +76,13 @@ class PluginNativeBridge {
   Future<bool> setTorch(bool enabled) async {
     _torchOn = enabled;
     try {
-      await _nativeChannel.invokeMethod<bool>('setTorch', {'enabled': enabled});
-      return true;
+      final res =
+          await _nativeChannel.invokeMethod<bool>('setTorch', {'enabled': enabled});
+      return res ?? true;
     } catch (e, st) {
       _logError('setTorch', e, st);
-      return true;
+      _torchOn = !enabled;
+      return false;
     }
   }
 

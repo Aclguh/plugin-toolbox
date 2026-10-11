@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
@@ -66,6 +67,20 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
 
   Future<void> _startPlugin() async {
     try {
+      // 0. 上下文就绪安全防线（阻断异步路由跳转或直接挂载时的竞态条件）
+      if (widget.plugin.context == null) {
+        await widget.plugin.initialize(PluginContext(
+          pluginId: widget.plugin.id,
+          storage: const PluginStorageFactory().create(widget.plugin.id),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: widget.plugin.manifest.permissions.toSet(),
+          rootDir: widget.plugin.rootDir,
+          storageQuotaMb: widget.plugin.manifest.storageQuotaMb,
+          allowedDomains: widget.plugin.manifest.allowedDomains,
+        ));
+      }
+
       // 1. 读取并解析 UI JSON 描述（异步读取，避免阻塞 UI 线程）
       final uiJsonStr = await widget.plugin.uiDefinitionFile.readAsString();
       final decoded = json.decode(uiJsonStr);
