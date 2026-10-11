@@ -466,6 +466,36 @@ void main() {
       expect(editableText.controller.selection.baseOffset, 2);
     });
 
+    testWidgets('TextField didUpdateWidget 在输入法组合态 (isComposingRangeValid) 下不覆盖输入', (tester) async {
+      final state = DuiState();
+      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'TextField',
+        'ref': 'composing_ref',
+        'props': {},
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+      final textFieldFinder = find.byType(TextField);
+      final editableText = tester.widget<EditableText>(
+        find.descendant(of: textFieldFinder, matching: find.byType(EditableText)),
+      );
+
+      // 模拟输入法正在拼音打字中 (设置 composing range 为 [0, 4])
+      editableText.controller.value = const TextEditingValue(
+        text: 'piny',
+        composing: TextRange(start: 0, end: 4),
+        selection: TextSelection.collapsed(offset: 4),
+      );
+
+      // 外部异步状态尝试更新，应被组合态保护拦截
+      state.set('composing_ref', 'external');
+      await tester.pump();
+      expect(editableText.controller.text, 'piny');
+    });
+
     test('DuiState extractKeys 与 key-level 局部通知 (P2-1)', () {
       final state = DuiState();
       expect(DuiState.extractKeys('Hello {{state.user}}, count: {{state.count}}'),

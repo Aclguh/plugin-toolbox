@@ -32,21 +32,32 @@ class DuiCanvas extends StatelessWidget {
     );
   }
 
+  static final _commandsCache = <String, List<Map<String, dynamic>>>{};
+  static const int _maxCacheSize = 50;
+
   static List<Map<String, dynamic>> _parseCommands(dynamic raw) {
     if (raw == null) return const [];
     if (raw is List) {
       return raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     }
     if (raw is String) {
+      final cached = _commandsCache[raw];
+      if (cached != null) return cached;
+
       final trimmed = raw.trim();
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
           final decoded = json.decode(trimmed);
           if (decoded is List) {
-            return decoded
+            final parsed = decoded
                 .whereType<Map>()
                 .map((m) => Map<String, dynamic>.from(m))
                 .toList();
+            if (_commandsCache.length >= _maxCacheSize) {
+              _commandsCache.remove(_commandsCache.keys.first);
+            }
+            _commandsCache[raw] = parsed;
+            return parsed;
           }
         } catch (_) {}
       }

@@ -90,26 +90,41 @@ class DuiChart extends StatelessWidget {
     );
   }
 
+  static final _valuesCache = <String, List<double>>{};
+  static final _labelsCache = <String, List<String>>{};
+  static const int _maxCacheSize = 50;
+
   static List<double> _parseValues(dynamic raw) {
     if (raw == null) return const [];
     if (raw is List) {
       return raw.map((e) => DuiUtils.tryDouble(e) ?? 0.0).toList();
     }
     if (raw is String) {
+      final cached = _valuesCache[raw];
+      if (cached != null) return cached;
+
       final trimmed = raw.trim();
+      List<double> result = const [];
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
           final decoded = jsonDecode(trimmed);
           if (decoded is List) {
-            return decoded.map((e) => DuiUtils.tryDouble(e) ?? 0.0).toList();
+            result = decoded.map((e) => DuiUtils.tryDouble(e) ?? 0.0).toList();
           }
         } catch (_) {}
       }
-      return trimmed
-          .split(',')
-          .map((s) => DuiUtils.tryDouble(s.trim()))
-          .whereType<double>()
-          .toList();
+      if (result.isEmpty && !trimmed.startsWith('[')) {
+        result = trimmed
+            .split(',')
+            .map((s) => DuiUtils.tryDouble(s.trim()))
+            .whereType<double>()
+            .toList();
+      }
+      if (_valuesCache.length >= _maxCacheSize) {
+        _valuesCache.remove(_valuesCache.keys.first);
+      }
+      _valuesCache[raw] = result;
+      return result;
     }
     if (raw is Map) {
       final vals = raw['values'] ?? raw['data'];
@@ -123,16 +138,27 @@ class DuiChart extends StatelessWidget {
       return raw.map((e) => e.toString()).toList();
     }
     if (raw is String) {
+      final cached = _labelsCache[raw];
+      if (cached != null) return cached;
+
       final trimmed = raw.trim();
+      List<String> result = const [];
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
           final decoded = jsonDecode(trimmed);
           if (decoded is List) {
-            return decoded.map((e) => e.toString()).toList();
+            result = decoded.map((e) => e.toString()).toList();
           }
         } catch (_) {}
       }
-      return trimmed.split(',').map((s) => s.trim()).toList();
+      if (result.isEmpty && !trimmed.startsWith('[')) {
+        result = trimmed.split(',').map((s) => s.trim()).toList();
+      }
+      if (_labelsCache.length >= _maxCacheSize) {
+        _labelsCache.remove(_labelsCache.keys.first);
+      }
+      _labelsCache[raw] = result;
+      return result;
     }
     return List.generate(count, (i) => '${i + 1}');
   }

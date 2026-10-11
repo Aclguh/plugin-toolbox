@@ -327,6 +327,8 @@ class _BoundTextFieldState extends State<BoundTextField> {
   @override
   void didUpdateWidget(covariant BoundTextField oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // 若输入法处于拼音组合输入态，不中断当前选词组合
+    if (_controller.value.isComposingRangeValid) return;
     if (widget.initialText != _controller.text) {
       final oldSelection = _controller.selection;
       _controller.text = widget.initialText;
