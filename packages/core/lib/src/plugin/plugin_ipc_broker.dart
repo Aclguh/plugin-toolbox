@@ -5,9 +5,10 @@ import 'dart:async';
 /// 维护各插件注册暴露的公共服务接口，协调插件间的异步 RPC 调用与管道传值，
 /// 严格限定于内存中已加载/已启用的插件上下文，隔离非法的跨插件越权访问。
 class PluginIpcBroker {
-  PluginIpcBroker._();
+  PluginIpcBroker();
 
-  static final PluginIpcBroker instance = PluginIpcBroker._();
+  /// 默认共享经纪人实例（支持依赖注入与测试替换）
+  static PluginIpcBroker instance = PluginIpcBroker();
 
   final Map<String, Future<dynamic> Function(dynamic args)> _handlers = {};
 
