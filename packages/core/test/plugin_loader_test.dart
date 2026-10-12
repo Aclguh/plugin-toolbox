@@ -125,6 +125,47 @@ void main() {
       );
       expect(plugins, isEmpty);
     });
+
+    test('`.` 前缀的隐藏目录（安装器暂存/备份残留）被跳过', () async {
+      final pluginsDir = Directory('${tempDir.path}/plugins');
+      await pluginsDir.create();
+
+      final manifestJson = {
+        'id': 'demo_tool',
+        'name': 'Demo Tool',
+        'version': '1.0.0',
+        'description': 'd',
+        'author': 'Tester',
+        'type': 'lua',
+        'category': 'utility',
+        'entry': 'main.lua',
+        'ui': 'ui/main.ui.json',
+      };
+
+      // 正常插件
+      final pluginDir = Directory('${pluginsDir.path}/demo_tool');
+      await pluginDir.create();
+      await File('${pluginDir.path}/plugin.json')
+          .writeAsString(jsonEncode(manifestJson));
+
+      // 安装器崩溃残留的暂存目录（内含完整 plugin.json，若不排除会被重复加载）
+      final stagingDir = Directory('${pluginsDir.path}/.demo_tool.staging');
+      await stagingDir.create();
+      await File('${stagingDir.path}/plugin.json')
+          .writeAsString(jsonEncode(manifestJson));
+      // 替换失败回滚时的备份目录
+      final backupDir = Directory('${pluginsDir.path}/.demo_tool.backup');
+      await backupDir.create();
+      await File('${backupDir.path}/plugin.json')
+          .writeAsString(jsonEncode(manifestJson));
+
+      final plugins = await PluginLoader.loadAllInstalledPlugins(
+        baseDirectory: pluginsDir,
+      );
+
+      expect(plugins.length, 1);
+      expect(plugins.first.id, 'demo_tool');
+    });
   });
 }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,17 +35,24 @@ abstract class PluginStoreSource {
 /// 实测极易触发 403 限流；jsDelivr 的清单接口一次请求即可拿到整仓全部插件
 /// 的路径、体积与内容哈希，且无此类配额限制。
 ///
-/// 注意：jsDelivr Data API 对分支名称具有长效强缓存，生产环境中应通过指定
-/// 语义化标签或提交哈希（commit SHA）锚定目录，以确保及时感知插件增删变动。
+/// 注意：jsDelivr Data API 对分支名称（如 `master`）具有长达 1 年的强缓存，
+/// 且官方 Purge API 无法清除清单缓存——锚定分支名将持续拿到首次缓存时的
+/// 历史快照。因此 [ref] 不提供默认值，调用方必须显式锚定语义化发布标签
+/// （如 `v1.0.0`）或提交哈希（commit SHA），确保目录与安装包指向同一份
+/// 可预期的提交，并能随发布及时感知插件增删变动。
 ///
-/// 缓存策略：清单接口返回的每个文件都带内容哈希，用它作为缓存键——
-/// 插件源码未变化时刷新目录不再重复下载 plugin.json（同版本目录二次刷新
-/// 只需 1 次请求），体积信息也直接来自清单，无需额外探测。
+/// 完整性校验：清单接口返回的每个文件都带内容哈希（SHA-256），[downloadPackage]
+/// 下载完成后会重新计算字节哈希并与清单值比对，不匹配即拒绝——CDN 节点或
+/// 中间人篡改产物时不会进入安装流程。
+///
+/// 缓存策略：清单哈希同时作为缓存键——插件源码未变化时刷新目录不再重复
+/// 下载 plugin.json（同版本目录二次刷新只需 1 次请求），体积信息也直接来自
+/// 清单，无需额外探测。
 class JsDelivrPluginStoreSource implements PluginStoreSource {
   JsDelivrPluginStoreSource({
     required this.owner,
     required this.repository,
-    this.ref = 'master',
+    required this.ref,
     this.sourceDirectory = 'plugin-source',
     this.distDirectory = 'dist',
     this.maxPackageBytes = 10 * 1024 * 1024,
@@ -62,7 +70,8 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
   /// 仓库名
   final String repository;
 
-  /// 分支或标签；语义化版本标签（如 `v1.0.0`）可让目录与安装包稳定指向同一份提交
+  /// 锚定的发布标签或提交哈希（不使用分支名，规避 jsDelivr 对分支的长效
+  /// 强缓存）；语义化版本标签（如 `v1.0.0`）可让目录与安装包稳定指向同一份提交
   final String ref;
 
   /// 插件源码目录名（版本与简介的权威来源）
@@ -185,7 +194,26 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
         '安装包过大 ($bytes 字节，上限 ${maxPackageBytes ~/ (1024 * 1024)}MB)',
       );
     }
+    _verifyPackageHash(entry, bytes);
     return bytes;
+  }
+
+  /// 用清单接口给出的内容哈希校验下载字节，防供应链篡改。
+  ///
+  /// 采取 fail-closed 策略：清单缺少哈希字段时同样拒绝——无法验证完整性的
+  /// 字节一律不进入安装流程（宁可下载失败，也不放行可能被篡改的产物）。
+  /// jsDelivr 的哈希为 SHA-256 的 base64，比对时兼容十六进制形式。
+  static void _verifyPackageHash(PluginStoreEntry entry, Uint8List bytes) {
+    final expected = entry.packageHash?.trim();
+    if (expected == null || expected.isEmpty) {
+      throw PluginStoreException('安装包 ${entry.id}.ptx 缺少内容哈希，已拒绝下载未经完整性校验的文件');
+    }
+    final digest = sha256.convert(bytes);
+    final matched = expected.toLowerCase() == digest.toString() ||
+        expected == base64.encode(digest.bytes);
+    if (!matched) {
+      throw PluginStoreException('安装包 ${entry.id}.ptx 内容哈希校验失败，文件可能已被篡改，已拒绝安装');
+    }
   }
 
   /// 读取安装包内容中的清单与顶层条目名。
@@ -213,7 +241,8 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
     return _validateManifest(body, id: id);
   }
 
-  Map<String, dynamic> _validateManifest(Map<String, dynamic> manifest, {required String id}) {
+  Map<String, dynamic> _validateManifest(Map<String, dynamic> manifest,
+      {required String id}) {
     if ((manifest['id']?.toString() ?? '').isEmpty ||
         (manifest['name']?.toString() ?? '').isEmpty) {
       throw const PluginStoreException('plugin.json 缺少必填字段 id / name');
@@ -244,13 +273,15 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
       minAppVersion: manifest['minAppVersion']?.toString(),
       packageName: packageFile?.baseName,
       packageSizeBytes: packageFile?.size,
+      packageHash: packageFile?.hash,
       packageApiUrl: packageFile == null
           ? null
           : '$_cdnBase/$owner/$repository@$ref/${packageFile.cdnPath}',
       packageUrl: packageFile == null
           ? null
           : '$_cdnBase/$owner/$repository@$ref/${packageFile.cdnPath}',
-      manifestApiUrl: '$_cdnBase/$owner/$repository@$ref/${manifestFile.cdnPath}',
+      manifestApiUrl:
+          '$_cdnBase/$owner/$repository@$ref/${manifestFile.cdnPath}',
       sourcePath: '$sourceDirectory/$id',
     );
   }

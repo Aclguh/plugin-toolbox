@@ -16,7 +16,8 @@ class PermissionManager {
   }
 
   /// 为插件 [pluginId] 授予一组权限 [permissions]（支持重复授权幂等）
-  void grantPermissions(String pluginId, Iterable<PluginPermission> permissions) {
+  void grantPermissions(
+      String pluginId, Iterable<PluginPermission> permissions) {
     _grantedPermissions.putIfAbsent(pluginId, () => {}).addAll(permissions);
   }
 

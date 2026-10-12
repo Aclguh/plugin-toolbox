@@ -49,34 +49,42 @@ class PluginStorageImpl implements PluginStorage {
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   @override
-  Future<String?> getString(String key) async => (await _prefs).getString(_key(key));
+  Future<String?> getString(String key) async =>
+      (await _prefs).getString(_key(key));
 
   @override
-  Future<bool> setString(String key, String value) async => (await _prefs).setString(_key(key), value);
+  Future<bool> setString(String key, String value) async =>
+      (await _prefs).setString(_key(key), value);
 
   @override
   Future<bool?> getBool(String key) async => (await _prefs).getBool(_key(key));
 
   @override
-  Future<bool> setBool(String key, bool value) async => (await _prefs).setBool(_key(key), value);
+  Future<bool> setBool(String key, bool value) async =>
+      (await _prefs).setBool(_key(key), value);
 
   @override
   Future<int?> getInt(String key) async => (await _prefs).getInt(_key(key));
 
   @override
-  Future<bool> setInt(String key, int value) async => (await _prefs).setInt(_key(key), value);
+  Future<bool> setInt(String key, int value) async =>
+      (await _prefs).setInt(_key(key), value);
 
   @override
-  Future<double?> getDouble(String key) async => (await _prefs).getDouble(_key(key));
+  Future<double?> getDouble(String key) async =>
+      (await _prefs).getDouble(_key(key));
 
   @override
-  Future<bool> setDouble(String key, double value) async => (await _prefs).setDouble(_key(key), value);
+  Future<bool> setDouble(String key, double value) async =>
+      (await _prefs).setDouble(_key(key), value);
 
   @override
-  Future<List<String>?> getStringList(String key) async => (await _prefs).getStringList(_key(key));
+  Future<List<String>?> getStringList(String key) async =>
+      (await _prefs).getStringList(_key(key));
 
   @override
-  Future<bool> setStringList(String key, List<String> value) async => (await _prefs).setStringList(_key(key), value);
+  Future<bool> setStringList(String key, List<String> value) async =>
+      (await _prefs).setStringList(_key(key), value);
 
   @override
   Future<bool> remove(String key) async => (await _prefs).remove(_key(key));
@@ -107,5 +115,6 @@ class PluginStorageFactory {
   const PluginStorageFactory();
 
   /// 为指定插件 [pluginId] 创建命名空间隔离的持久化存储对象
-  PluginStorage create(String pluginId) => PluginStorageImpl(namespace: pluginId);
+  PluginStorage create(String pluginId) =>
+      PluginStorageImpl(namespace: pluginId);
 }

@@ -129,7 +129,8 @@ void main() {
     test('AppEvent 具有正确的 Equatable 值对象等价语义 (P3-1)', () {
       final now = DateTime.now();
       final event1 = PluginInstalledEvent('p1', timestamp: now);
-      final event2 = PluginInstalledEvent('p1', timestamp: now.add(const Duration(seconds: 1)));
+      final event2 = PluginInstalledEvent('p1',
+          timestamp: now.add(const Duration(seconds: 1)));
       final event3 = PluginInstalledEvent('p2');
 
       // 相同业务载荷 (pluginId) 判等为 true，即使发生时刻 timestamp 不同
@@ -215,7 +216,8 @@ void main() {
       eventBus.dispose();
     });
 
-    test('same-id re-register re-initializes the new instance (插件更新场景)', () async {
+    test('same-id re-register re-initializes the new instance (插件更新场景)',
+        () async {
       final registry = PluginRegistry(
         eventBus: EventBusImpl(),
         storageFactory: const PluginStorageFactory(),
@@ -332,11 +334,14 @@ void main() {
 
     test('PluginPermission 支持全新扩展权限解析', () {
       expect(PluginPermission.fromString('screen'), PluginPermission.screen);
-      expect(PluginPermission.fromString('location'), PluginPermission.location);
-      expect(PluginPermission.fromString('bluetooth'), PluginPermission.bluetooth);
+      expect(
+          PluginPermission.fromString('location'), PluginPermission.location);
+      expect(
+          PluginPermission.fromString('bluetooth'), PluginPermission.bluetooth);
       expect(PluginPermission.fromString('nfc'), PluginPermission.nfc);
       expect(PluginPermission.fromString('ai'), PluginPermission.ai);
-      expect(PluginPermission.fromString('database'), PluginPermission.database);
+      expect(
+          PluginPermission.fromString('database'), PluginPermission.database);
       expect(PluginPermission.fromString('db'), PluginPermission.database);
       expect(PluginPermission.fromString('ipc'), PluginPermission.ipc);
     });
@@ -382,7 +387,8 @@ void main() {
 
     test('PluginIpcBroker 支持独立实例化与依赖注入隔离', () async {
       final customBroker = PluginIpcBroker();
-      customBroker.registerService('service_a', 'echo', (arg) async => 'echo:$arg');
+      customBroker.registerService(
+          'service_a', 'echo', (arg) async => 'echo:$arg');
       expect(customBroker.hasService('service_a', 'echo'), isTrue);
       expect(PluginIpcBroker.instance.hasService('service_a', 'echo'), isFalse);
 
@@ -462,5 +468,3 @@ void main() {
     });
   });
 }
-
-

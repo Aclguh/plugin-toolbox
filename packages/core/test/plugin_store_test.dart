@@ -2,10 +2,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// 测试统一锚定的发布标签（生产禁用分支名，规避 jsDelivr 分支强缓存）
+const testRef = 'v1.0.0';
 
 /// 记录请求并按注册的响应回放的测试用 HTTP 客户端。
 class FakeHttpClient extends http.BaseClient {
@@ -34,29 +38,63 @@ http.Response jsonResponse(Object payload, {int status = 200}) =>
       'content-type': 'application/json; charset=utf-8',
     });
 
-Map<String, dynamic> flatFile(String name, {required String hash, int? size}) => {
+Map<String, dynamic> flatFile(String name, {required String hash, int? size}) =>
+    {
       'name': name,
       'hash': hash,
       'size': size ?? 100,
     };
 
-const _flatListing = {
-  'default': 'master',
-  'files': [
-    {'name': '/.gitignore', 'hash': 'h_gitignore', 'size': 20},
-    {'name': '/README.md', 'hash': 'h_readme', 'size': 500},
-    // 正常插件: 清单 + 安装包齐备
-    {'name': '/plugin-source/base64_tool/plugin.json', 'hash': 'h_b64_manifest', 'size': 355},
-    {'name': '/plugin-source/base64_tool/main.lua', 'hash': 'h_b64_lua', 'size': 900},
-    {'name': '/dist/base64_tool.ptx', 'hash': 'h_b64_ptx', 'size': 2246},
-    // 目录名与清单 id 不一致的脏数据, 应被跳过
-    {'name': '/plugin-source/broken_tool/plugin.json', 'hash': 'h_broken', 'size': 100},
-    // 尚未打包: 有清单没有产物, 但仍应出现在目录中(安装按钮给出缺失提示)
-    {'name': '/plugin-source/unpacked_tool/plugin.json', 'hash': 'h_unpacked', 'size': 120},
-    // 嵌套目录不应被误认为插件目录
-    {'name': '/plugin-source/base64_tool/ui/main.ui.json', 'hash': 'h_b64_ui', 'size': 400},
-  ],
-};
+/// 计算 jsDelivr 清单接口风格的内容哈希（SHA-256 的 base64）
+String jsDelivrHashOf(List<int> bytes) =>
+    base64.encode(sha256.convert(bytes).bytes);
+
+/// 假 CDN 固定使用的安装包字节（ZIP 含打包时间戳，逐次构建字节会漂移，
+/// 而清单哈希必须稳定对应一份字节，因此整组测试共享同一份预构建产物）
+final Uint8List fakePtxBytes = buildPtx(id: 'base64_tool', version: '1.1.0');
+
+Map<String, dynamic> flatListing() => {
+      'default': 'master',
+      'files': [
+        {'name': '/.gitignore', 'hash': 'h_gitignore', 'size': 20},
+        {'name': '/README.md', 'hash': 'h_readme', 'size': 500},
+        // 正常插件: 清单 + 安装包齐备
+        {
+          'name': '/plugin-source/base64_tool/plugin.json',
+          'hash': 'h_b64_manifest',
+          'size': 355
+        },
+        {
+          'name': '/plugin-source/base64_tool/main.lua',
+          'hash': 'h_b64_lua',
+          'size': 900
+        },
+        // dist 产物哈希按真实字节计算, 使目录条目可通过下载完整性校验
+        {
+          'name': '/dist/base64_tool.ptx',
+          'hash': jsDelivrHashOf(fakePtxBytes),
+          'size': 2246
+        },
+        // 目录名与清单 id 不一致的脏数据, 应被跳过
+        {
+          'name': '/plugin-source/broken_tool/plugin.json',
+          'hash': 'h_broken',
+          'size': 100
+        },
+        // 尚未打包: 有清单没有产物, 但仍应出现在目录中(安装按钮给出缺失提示)
+        {
+          'name': '/plugin-source/unpacked_tool/plugin.json',
+          'hash': 'h_unpacked',
+          'size': 120
+        },
+        // 嵌套目录不应被误认为插件目录
+        {
+          'name': '/plugin-source/base64_tool/ui/main.ui.json',
+          'hash': 'h_b64_ui',
+          'size': 400
+        },
+      ],
+    };
 
 const _base64Manifest = '''
 {
@@ -98,7 +136,7 @@ FakeHttpClient buildFakeCdn({bool rateLimited = false, bool offline = false}) {
     }
     final url = request.url.toString();
     if (url.contains('data.jsdelivr.com')) {
-      return jsonResponse(_flatListing);
+      return jsonResponse(flatListing());
     }
     if (url.endsWith('/plugin-source/base64_tool/plugin.json')) {
       return http.Response(_base64Manifest, 200,
@@ -114,7 +152,7 @@ FakeHttpClient buildFakeCdn({bool rateLimited = false, bool offline = false}) {
     }
     if (url.endsWith('/dist/base64_tool.ptx')) {
       return http.Response.bytes(
-        buildPtx(id: 'base64_tool', version: '1.1.0'),
+        fakePtxBytes,
         200,
         headers: {'content-type': 'application/octet-stream'},
       );
@@ -158,7 +196,11 @@ Uint8List buildPtx({
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
 
-PluginStoreEntry entryWith({String id = 'base64_tool', String? packageUrl}) =>
+PluginStoreEntry entryWith({
+  String id = 'base64_tool',
+  String? packageUrl,
+  String? packageHash,
+}) =>
     PluginStoreEntry(
       id: id,
       name: 'Base64 编解码',
@@ -169,6 +211,7 @@ PluginStoreEntry entryWith({String id = 'base64_tool', String? packageUrl}) =>
       permissions: const [],
       packageName: '$id.ptx',
       packageSizeBytes: 20,
+      packageHash: packageHash,
       packageUrl: packageUrl,
       manifestApiUrl: 'https://cdn.jsdelivr.net/x/plugin.json',
       sourcePath: 'plugin-source/$id',
@@ -182,9 +225,12 @@ void main() {
   group('PluginStoreSemantics 版本比较与安装态判定', () {
     test('标准三段的版本号比较', () {
       expect(PluginStoreSemantics.compareVersions('1.2.3', '1.2.3'), 0);
-      expect(PluginStoreSemantics.compareVersions('1.2.4', '1.2.3'), greaterThan(0));
-      expect(PluginStoreSemantics.compareVersions('1.2.3', '1.3.0'), lessThan(0));
-      expect(PluginStoreSemantics.compareVersions('2.0.0', '1.9.9'), greaterThan(0));
+      expect(PluginStoreSemantics.compareVersions('1.2.4', '1.2.3'),
+          greaterThan(0));
+      expect(
+          PluginStoreSemantics.compareVersions('1.2.3', '1.3.0'), lessThan(0));
+      expect(PluginStoreSemantics.compareVersions('2.0.0', '1.9.9'),
+          greaterThan(0));
     });
 
     test('缺失段补零、允许 v 前缀与构建号/预发布后缀', () {
@@ -195,9 +241,11 @@ void main() {
     });
 
     test('无法解析的脏版本号按 0 处理而不抛错', () {
-      expect(PluginStoreSemantics.compareVersions('not-a-version', '0.0.1'), lessThan(0));
+      expect(PluginStoreSemantics.compareVersions('not-a-version', '0.0.1'),
+          lessThan(0));
       // `1a` 整段非数字 -> 归零, 因此 1a.2.3 视为 0.2.3
-      expect(PluginStoreSemantics.compareVersions('1a.2.3', '0.2.4'), lessThan(0));
+      expect(
+          PluginStoreSemantics.compareVersions('1a.2.3', '0.2.4'), lessThan(0));
       expect(PluginStoreSemantics.compareVersions('1a.2.3', '0.2.3'), 0);
       expect(PluginStoreSemantics.compareVersions('', '1.0.0'), lessThan(0));
     });
@@ -216,7 +264,10 @@ void main() {
         );
 
     test('resolveState 区分未安装 / 可更新 / 已是最新', () {
-      final installed = [manifest('base64_tool', '1.0.0'), manifest('hash_tool', '1.1.0')];
+      final installed = [
+        manifest('base64_tool', '1.0.0'),
+        manifest('hash_tool', '1.1.0')
+      ];
 
       expect(
         PluginStoreSemantics.resolveState(
@@ -266,8 +317,10 @@ void main() {
       expect(PluginStoreSemantics.meetsMinAppVersion('0.1.0', ''), isTrue);
       expect(PluginStoreSemantics.meetsMinAppVersion('0.1.0', '0.1.0'), isTrue);
       expect(PluginStoreSemantics.meetsMinAppVersion('0.2.0', '0.1.0'), isTrue);
-      expect(PluginStoreSemantics.meetsMinAppVersion('0.1.0', '0.2.0'), isFalse);
-      expect(PluginStoreSemantics.meetsMinAppVersion('dev-build', '0.1.0'), isFalse);
+      expect(
+          PluginStoreSemantics.meetsMinAppVersion('0.1.0', '0.2.0'), isFalse);
+      expect(PluginStoreSemantics.meetsMinAppVersion('dev-build', '0.1.0'),
+          isFalse);
     });
   });
 
@@ -277,6 +330,7 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: httpClient,
       );
 
@@ -296,14 +350,20 @@ void main() {
       expect(entry.packageName, 'base64_tool.ptx');
       expect(entry.packageSizeBytes, 2246);
       expect(entry.packageSizeLabel, '2.2 KB');
-      expect(entry.packageUrl, contains('cdn.jsdelivr.net/gh/owner/repo@master/dist/base64_tool.ptx'));
+      expect(entry.packageHash, jsDelivrHashOf(fakePtxBytes),
+          reason: '目录条目必须携带清单接口给出的内容哈希，供下载后校验完整性');
+      expect(
+          entry.packageUrl,
+          contains(
+              'cdn.jsdelivr.net/gh/owner/repo@$testRef/dist/base64_tool.ptx'));
       expect(entry.sourcePath, 'plugin-source/base64_tool');
-      expect(catalog.revision, 'master');
+      expect(catalog.revision, testRef);
 
       // 尚未打包的插件仍在目录中, 但没有下载地址
       final unpacked = catalog.entries[1];
       expect(unpacked.id, 'unpacked_tool');
       expect(unpacked.packageUrl, isNull);
+      expect(unpacked.packageHash, isNull);
       expect(unpacked.packageSizeLabel, '未知');
 
       // 清单 id 与目录名不一致的脏数据被跳过, 且不阻断整次拉取
@@ -319,6 +379,7 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: httpClient,
         preferences: prefs,
       );
@@ -332,6 +393,7 @@ void main() {
       final restarted = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: secondHttpClient,
         preferences: prefs,
       );
@@ -345,12 +407,14 @@ void main() {
 
     test('清单缓存损坏时静默降级为全量拉取', () async {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('plugin_store_cache_owner_repo_master', 'not-json{{{');
+      await prefs.setString(
+          'plugin_store_cache_owner_repo_$testRef', 'not-json{{{');
 
       final httpClient = buildFakeCdn();
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: httpClient,
         preferences: prefs,
       );
@@ -364,6 +428,7 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: buildFakeCdn(rateLimited: true),
       );
 
@@ -378,6 +443,7 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: buildFakeCdn(offline: true),
       );
 
@@ -392,39 +458,104 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
-        httpClient: FakeHttpClient((_) async => jsonResponse({'files': 'oops'})),
+        ref: testRef,
+        httpClient:
+            FakeHttpClient((_) async => jsonResponse({'files': 'oops'})),
       );
 
-      await expectLater(source.fetchCatalog(), throwsA(isA<PluginStoreException>()));
+      await expectLater(
+          source.fetchCatalog(), throwsA(isA<PluginStoreException>()));
     });
   });
 
   group('JsDelivrPluginStoreSource 安装包下载', () {
-    test('下载并返回原始字节', () async {
+    test('目录条目经完整性校验后下载并返回原始字节', () async {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: buildFakeCdn(),
       );
 
-      final bytes = await source.downloadPackage(entryWith(
-        packageUrl: 'https://cdn.jsdelivr.net/gh/owner/repo@master/dist/base64_tool.ptx',
-      ));
+      final catalog = await source.fetchCatalog();
+      final bytes = await source.downloadPackage(catalog.entries.first);
 
-      expect(PluginManifest.fromJsonString(
-        utf8.decode(
-          ZipDecoder()
-              .decodeBytes(bytes)
-              .findFile('plugin.json')!
-              .content as List<int>,
-        ),
-      ).version, '1.1.0');
+      expect(bytes, fakePtxBytes);
+      expect(
+          PluginManifest.fromJsonString(
+            utf8.decode(
+              ZipDecoder().decodeBytes(bytes).findFile('plugin.json')!.content
+                  as List<int>,
+            ),
+          ).version,
+          '1.1.0');
+    });
+
+    test('哈希为 base64 或十六进制形式时均判定一致', () async {
+      final source = JsDelivrPluginStoreSource(
+        owner: 'owner',
+        repository: 'repo',
+        ref: testRef,
+        httpClient: buildFakeCdn(),
+      );
+      const url =
+          'https://cdn.jsdelivr.net/gh/owner/repo@$testRef/dist/base64_tool.ptx';
+
+      final viaBase64 = await source.downloadPackage(entryWith(
+        packageUrl: url,
+        packageHash: base64.encode(sha256.convert(fakePtxBytes).bytes),
+      ));
+      expect(viaBase64, fakePtxBytes);
+
+      final viaHex = await source.downloadPackage(entryWith(
+        packageUrl: url,
+        packageHash: sha256.convert(fakePtxBytes).toString(),
+      ));
+      expect(viaHex, fakePtxBytes);
+    });
+
+    test('下载字节与清单哈希不匹配时判定被篡改并拒绝', () async {
+      final source = JsDelivrPluginStoreSource(
+        owner: 'owner',
+        repository: 'repo',
+        ref: testRef,
+        httpClient: buildFakeCdn(),
+      );
+
+      await expectLater(
+        source.downloadPackage(entryWith(
+          packageUrl:
+              'https://cdn.jsdelivr.net/gh/owner/repo@$testRef/dist/base64_tool.ptx',
+          packageHash: jsDelivrHashOf(utf8.encode('tampered content')),
+        )),
+        throwsA(isA<PluginStoreException>()
+            .having((e) => e.message, 'message', contains('哈希校验失败'))),
+      );
+    });
+
+    test('条目缺少内容哈希时 fail-closed 拒绝下载', () async {
+      final source = JsDelivrPluginStoreSource(
+        owner: 'owner',
+        repository: 'repo',
+        ref: testRef,
+        httpClient: buildFakeCdn(),
+      );
+
+      await expectLater(
+        source.downloadPackage(entryWith(
+          packageUrl:
+              'https://cdn.jsdelivr.net/gh/owner/repo@$testRef/dist/base64_tool.ptx',
+        )),
+        throwsA(isA<PluginStoreException>()
+            .having((e) => e.message, 'message', contains('缺少内容哈希'))),
+      );
     });
 
     test('未打包的条目没有下载地址时给出明确错误', () async {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         httpClient: buildFakeCdn(),
       );
 
@@ -439,13 +570,15 @@ void main() {
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
+        ref: testRef,
         maxPackageBytes: 4,
         httpClient: buildFakeCdn(),
       );
 
       await expectLater(
         source.downloadPackage(entryWith(
-          packageUrl: 'https://cdn.jsdelivr.net/gh/owner/repo@master/dist/base64_tool.ptx',
+          packageUrl:
+              'https://cdn.jsdelivr.net/gh/owner/repo@$testRef/dist/base64_tool.ptx',
         )),
         throwsA(isA<PluginStoreException>()
             .having((e) => e.message, 'message', contains('过大'))),
@@ -485,11 +618,11 @@ void main() {
       final junk = utf8.encode('return nil');
       archive.addFile(ArchiveFile('main.lua', junk.length, junk));
       expect(
-        () => inspectPluginPackage(Uint8List.fromList(ZipEncoder().encode(archive)!)),
+        () => inspectPluginPackage(
+            Uint8List.fromList(ZipEncoder().encode(archive)!)),
         throwsA(isA<PluginStoreException>()
             .having((e) => e.message, 'message', contains('plugin.json'))),
       );
     });
   });
 }
-

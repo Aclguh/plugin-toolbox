@@ -10,7 +10,8 @@ void main() {
     });
 
     test('未授权插件查询返回 false，权限集合为空', () {
-      expect(manager.hasPermission('unknown_plugin', PluginPermission.storage), isFalse);
+      expect(manager.hasPermission('unknown_plugin', PluginPermission.storage),
+          isFalse);
       expect(manager.getPermissions('unknown_plugin'), isEmpty);
     });
 
@@ -29,23 +30,32 @@ void main() {
       );
 
       manager.initializeForPlugin(manifest);
-      expect(manager.hasPermission('test_plugin', PluginPermission.storage), isTrue);
-      expect(manager.hasPermission('test_plugin', PluginPermission.clipboard), isTrue);
-      expect(manager.hasPermission('test_plugin', PluginPermission.network), isFalse);
-      expect(manager.getPermissions('test_plugin'), containsAll([
-        PluginPermission.storage,
-        PluginPermission.clipboard,
-      ]));
+      expect(manager.hasPermission('test_plugin', PluginPermission.storage),
+          isTrue);
+      expect(manager.hasPermission('test_plugin', PluginPermission.clipboard),
+          isTrue);
+      expect(manager.hasPermission('test_plugin', PluginPermission.network),
+          isFalse);
+      expect(
+          manager.getPermissions('test_plugin'),
+          containsAll([
+            PluginPermission.storage,
+            PluginPermission.clipboard,
+          ]));
     });
 
     test('grantPermissions 动态增补权限且具备幂等性', () {
       manager.grantPermissions('plugin_a', [PluginPermission.network]);
-      expect(manager.hasPermission('plugin_a', PluginPermission.network), isTrue);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.network), isTrue);
 
       // 重复授权保持幂等，不产生重复或异常
-      manager.grantPermissions('plugin_a', [PluginPermission.network, PluginPermission.storage]);
-      expect(manager.hasPermission('plugin_a', PluginPermission.network), isTrue);
-      expect(manager.hasPermission('plugin_a', PluginPermission.storage), isTrue);
+      manager.grantPermissions(
+          'plugin_a', [PluginPermission.network, PluginPermission.storage]);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.network), isTrue);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.storage), isTrue);
       expect(manager.getPermissions('plugin_a').length, 2);
     });
 
@@ -56,12 +66,20 @@ void main() {
       ]);
 
       manager.revokePermission('plugin_a', PluginPermission.network);
-      expect(manager.hasPermission('plugin_a', PluginPermission.network), isFalse);
-      expect(manager.hasPermission('plugin_a', PluginPermission.storage), isTrue);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.network), isFalse);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.storage), isTrue);
 
       // 撤销未授权权限不抛异常
-      expect(() => manager.revokePermission('plugin_a', PluginPermission.clipboard), returnsNormally);
-      expect(() => manager.revokePermission('non_existent', PluginPermission.network), returnsNormally);
+      expect(
+          () =>
+              manager.revokePermission('plugin_a', PluginPermission.clipboard),
+          returnsNormally);
+      expect(
+          () => manager.revokePermission(
+              'non_existent', PluginPermission.network),
+          returnsNormally);
     });
 
     test('clearForPlugin 清理全部权限', () {
@@ -71,8 +89,10 @@ void main() {
       ]);
 
       manager.clearForPlugin('plugin_a');
-      expect(manager.hasPermission('plugin_a', PluginPermission.network), isFalse);
-      expect(manager.hasPermission('plugin_a', PluginPermission.storage), isFalse);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.network), isFalse);
+      expect(
+          manager.hasPermission('plugin_a', PluginPermission.storage), isFalse);
       expect(manager.getPermissions('plugin_a'), isEmpty);
     });
 
@@ -83,13 +103,18 @@ void main() {
       expect(() => perms.add(PluginPermission.network), throwsUnsupportedError);
     });
 
-    test('PluginPermission 字符串解析支持系统权限 (torch, sensor, notification, biometrics, microphone)', () {
+    test(
+        'PluginPermission 字符串解析支持系统权限 (torch, sensor, notification, biometrics, microphone)',
+        () {
       expect(PluginPermission.fromString('torch'), PluginPermission.torch);
       expect(PluginPermission.fromString('TORCH'), PluginPermission.torch);
       expect(PluginPermission.fromString('sensor'), PluginPermission.sensor);
-      expect(PluginPermission.fromString('notification'), PluginPermission.notification);
-      expect(PluginPermission.fromString('biometrics'), PluginPermission.biometrics);
-      expect(PluginPermission.fromString('microphone'), PluginPermission.microphone);
+      expect(PluginPermission.fromString('notification'),
+          PluginPermission.notification);
+      expect(PluginPermission.fromString('biometrics'),
+          PluginPermission.biometrics);
+      expect(PluginPermission.fromString('microphone'),
+          PluginPermission.microphone);
       expect(PluginPermission.fromString('unknown_perm'), isNull);
     });
   });

@@ -46,7 +46,8 @@ class PluginContext {
   });
 
   /// 检查插件是否已被授予指定权限 [perm]
-  bool hasPermission(PluginPermission perm) => grantedPermissions.contains(perm);
+  bool hasPermission(PluginPermission perm) =>
+      grantedPermissions.contains(perm);
 
   /// 动态更新插件已被授予的权限集合
   void setGrantedPermissions(Set<PluginPermission> permissions) {
@@ -92,18 +93,54 @@ class PluginContext {
     return _cachedUsedBytes!;
   }
 
+  /// 同步兜底扫描：Lua 宿主绑定层（fs_api）以同步链路调用
+  /// [checkStorageQuota]，无法 await，因此同步读路径必须保留一个
+  /// 同步实现作为兜底。具备异步上下文的调用方应优先使用
+  /// [scanUsedBytes] 预热/刷新缓存，避免主线程同步磁盘 IO。
   int _calculateDiskUsedBytes() {
     if (rootDir == null) return 0;
     int bytes = 0;
     try {
       if (rootDir!.existsSync()) {
-        for (final entity in rootDir!.listSync(recursive: true, followLinks: false)) {
+        for (final entity
+            in rootDir!.listSync(recursive: true, followLinks: false)) {
           if (entity is File) {
             bytes += entity.lengthSync();
           }
         }
       }
     } catch (_) {}
+    return bytes;
+  }
+
+  /// 异步递归扫描沙箱已占用字节数并刷新内存缓存。
+  ///
+  /// 与同步兜底路径语义一致，但全程使用异步流式 IO，不阻塞主线程；
+  /// 调用后可安全地经 [currentUsedBytes] / [checkStorageQuota] 读取结果。
+  Future<int> scanUsedBytes() async {
+    final dir = rootDir;
+    if (dir == null) {
+      _cachedUsedBytes = 0;
+      return 0;
+    }
+    int bytes = 0;
+    try {
+      if (await dir.exists()) {
+        await for (final entity
+            in dir.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            try {
+              bytes += await entity.length();
+            } on FileSystemException {
+              // 扫描期间文件被并发删除时跳过该条目，不中断整体统计
+            }
+          }
+        }
+      }
+    } on FileSystemException {
+      // 目录被并发移除时按 0 处理，与同步兜底路径的容灾语义一致
+    }
+    _cachedUsedBytes = bytes;
     return bytes;
   }
 

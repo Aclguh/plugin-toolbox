@@ -54,7 +54,8 @@ class PluginRegistry {
     _invalidateCaches();
   }
 
-  void loadCustomPermissions(Map<String, Set<PluginPermission>> permissionsMap) {
+  void loadCustomPermissions(
+      Map<String, Set<PluginPermission>> permissionsMap) {
     _customPermissions.clear();
     for (final entry in permissionsMap.entries) {
       _customPermissions[entry.key] = Set.from(entry.value);
@@ -66,7 +67,8 @@ class PluginRegistry {
     return perms != null ? Set.unmodifiable(perms) : null;
   }
 
-  void setCustomPermissions(String pluginId, Set<PluginPermission> permissions) {
+  void setCustomPermissions(
+      String pluginId, Set<PluginPermission> permissions) {
     _customPermissions[pluginId] = Set.from(permissions);
     final plugin = _plugins[pluginId];
     if (plugin is DynamicPlugin && plugin.context != null) {
@@ -174,17 +176,16 @@ class PluginRegistry {
         logger: _logger,
         grantedPermissions: initialPermissions,
         rootDir: plugin is DynamicPlugin ? plugin.rootDir : null,
-        storageQuotaMb: plugin is DynamicPlugin
-            ? plugin.manifest.storageQuotaMb
-            : 50,
-        allowedDomains: plugin is DynamicPlugin
-            ? plugin.manifest.allowedDomains
-            : null,
+        storageQuotaMb:
+            plugin is DynamicPlugin ? plugin.manifest.storageQuotaMb : 50,
+        allowedDomains:
+            plugin is DynamicPlugin ? plugin.manifest.allowedDomains : null,
       );
       await plugin.initialize(context);
       _initializedPlugins.add(plugin.id);
     } catch (e, st) {
-      _logger.e('Failed to init plugin [${plugin.id}]', error: e, stackTrace: st);
+      _logger.e('Failed to init plugin [${plugin.id}]',
+          error: e, stackTrace: st);
     }
   }
 
@@ -210,8 +211,8 @@ class PluginRegistry {
   List<ToolPlugin> get enabledPlugins {
     final cached = _cachedEnabled;
     if (cached != null) return cached;
-    _cachedEnabled =
-        List.unmodifiable(allPlugins.where((p) => !_disabledPlugins.contains(p.id)));
+    _cachedEnabled = List.unmodifiable(
+        allPlugins.where((p) => !_disabledPlugins.contains(p.id)));
     return _cachedEnabled!;
   }
 

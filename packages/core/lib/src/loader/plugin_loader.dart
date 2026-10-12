@@ -33,10 +33,17 @@ class PluginLoader {
     }
 
     final loadedList = <DynamicPlugin>[];
-    final entities = pluginsBaseDir.listSync();
+    // 启动路径使用异步流式列举，避免插件较多时 listSync 阻塞主线程
+    final entities = await pluginsBaseDir.list().toList();
 
     for (final entity in entities) {
       if (entity is Directory) {
+        final dirName = entity.path.split(RegExp(r'[\\/]')).last;
+        // 跳过 `.` 前缀的隐藏目录：安装器的暂存/备份目录（.<id>.staging /
+        // .<id>.backup）与目标目录同父级，崩溃残留不得被误当插件重复加载
+        if (dirName.startsWith('.')) {
+          continue;
+        }
         final manifestFile = File('${entity.path}/plugin.json');
         if (await manifestFile.exists()) {
           try {

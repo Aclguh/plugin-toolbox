@@ -15,6 +15,7 @@ class PluginStoreEntry {
     this.minAppVersion,
     this.packageName,
     this.packageSizeBytes,
+    this.packageHash,
     this.packageApiUrl,
     this.packageUrl,
     required this.manifestApiUrl,
@@ -51,6 +52,11 @@ class PluginStoreEntry {
   /// 远端 .ptx 体积（字节，取自 GitHub contents 元数据）
   final int? packageSizeBytes;
 
+  /// 远端 .ptx 的内容哈希（jsDelivr 清单接口给出的 SHA-256 base64，
+  /// 兼容十六进制形式）。下载完成后据此校验字节完整性：
+  /// 为 null 时下载方应拒绝放行未经完整性校验的安装包（fail-closed）。
+  final String? packageHash;
+
   /// 远端 .ptx 的 Contents API 地址（携带 ref，锚定目录快照对应的提交）
   final String? packageApiUrl;
 
@@ -84,6 +90,7 @@ class PluginStoreEntry {
         'minAppVersion': minAppVersion,
         'packageName': packageName,
         'packageSizeBytes': packageSizeBytes,
+        'packageHash': packageHash,
         'packageApiUrl': packageApiUrl,
         'packageUrl': packageUrl,
         'manifestApiUrl': manifestApiUrl,

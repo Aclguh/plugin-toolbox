@@ -124,8 +124,8 @@ void main() {
     });
 
     test('非 ZIP 格式的安装包被拒绝并抛出 FormatException', () async {
-      final file = await writeTempPtx(Uint8List.fromList(
-          List<int>.generate(1024, (i) => i % 256)));
+      final file = await writeTempPtx(
+          Uint8List.fromList(List<int>.generate(1024, (i) => i % 256)));
 
       await expectLater(
         PluginInstaller.installFromPtx(file),
@@ -176,6 +176,130 @@ void main() {
       );
       await file.parent.delete(recursive: true);
       expect(Directory('./plugins/installer_test').existsSync(), isFalse);
+      // 流式解压中止后暂存目录必须一并清理，不得残留
+      expect(
+          Directory('./plugins/.installer_test.staging').existsSync(), isFalse);
+    });
+
+    test('声明解压体积超限的条目在解压前即被拦截', () async {
+      // 单条目声明解压 51MB > 50MB 上限，凭 ZIP 中央目录前置拦截，
+      // 全零内容压缩后仅数十 KB，无需真实解压即可判定
+      final file = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'oversized.dat': Uint8List(51 * 1024 * 1024),
+      }));
+
+      await expectLater(
+        PluginInstaller.installFromPtx(file),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('解压展开体积超限'),
+        )),
+      );
+      await file.parent.delete(recursive: true);
+      expect(Directory('./plugins/installer_test').existsSync(), isFalse);
+      expect(
+          Directory('./plugins/.installer_test.staging').existsSync(), isFalse);
+    });
+
+    test('条目数超限的安装包在解压前被拦截', () async {
+      final entries = validEntries();
+      for (var i = 0; i < PluginInstaller.maxEntryCount; i++) {
+        entries['filler/$i.txt'] = utf8Bytes('$i');
+      }
+      final file = await writeTempPtx(buildPtx(entries));
+
+      await expectLater(
+        PluginInstaller.installFromPtx(file),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('条目数超限'),
+        )),
+      );
+      await file.parent.delete(recursive: true);
+      expect(Directory('./plugins/installer_test').existsSync(), isFalse);
+    });
+
+    test('升级安装解压失败时旧版本插件完整保留', () async {
+      // 先安装 v1.0.0 正常版本
+      final v1 = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'version.txt': utf8Bytes('v1'),
+      }));
+      final installed = await PluginInstaller.installFromPtx(v1);
+      expect(File('${installed.rootDir.path}/version.txt').readAsStringSync(),
+          'v1');
+      await v1.parent.delete(recursive: true);
+
+      // 再尝试用同 ID 的炸弹包升级，必须失败且旧版本不受任何影响
+      final bomb = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'bomb.dat': Uint8List(6 * 1024 * 1024),
+      }));
+      await expectLater(
+        PluginInstaller.installFromPtx(bomb),
+        throwsFormatException,
+      );
+      await bomb.parent.delete(recursive: true);
+
+      expect(
+          File('${installed.rootDir.path}/plugin.json').existsSync(), isTrue);
+      expect(File('${installed.rootDir.path}/version.txt').readAsStringSync(),
+          'v1',
+          reason: '升级失败不得丢失已安装的旧版本插件');
+      // 暂存目录必须清理，备份目录在替换未发生时本就不应存在
+      expect(
+          Directory('./plugins/.installer_test.staging').existsSync(), isFalse);
+      expect(
+          Directory('./plugins/.installer_test.backup').existsSync(), isFalse);
+    });
+
+    test('升级安装成功时原子替换且旧版独有文件被移除', () async {
+      // v1 带一个旧版独有的遗留文件
+      final v1 = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'legacy.dat': utf8Bytes('legacy'),
+      }));
+      final installed = await PluginInstaller.installFromPtx(v1);
+      expect(File('${installed.rootDir.path}/legacy.dat').existsSync(), isTrue);
+      await v1.parent.delete(recursive: true);
+
+      // v2 不含 legacy.dat，新增 new.dat
+      final v2 = await writeTempPtx(buildPtx({
+        ...validEntries(),
+        'new.dat': utf8Bytes('new'),
+      }));
+      final upgraded = await PluginInstaller.installFromPtx(v2);
+      await v2.parent.delete(recursive: true);
+
+      expect(upgraded.rootDir.path, installed.rootDir.path);
+      expect(File('${upgraded.rootDir.path}/new.dat').existsSync(), isTrue);
+      expect(File('${upgraded.rootDir.path}/legacy.dat').existsSync(), isFalse,
+          reason: '原子替换应整体换目录，旧版独有文件不得残留');
+      // 成功后暂存与备份目录都必须清理
+      expect(
+          Directory('./plugins/.installer_test.staging').existsSync(), isFalse);
+      expect(
+          Directory('./plugins/.installer_test.backup').existsSync(), isFalse);
+    });
+
+    test('上次安装崩溃残留的暂存目录会被清理并正常安装', () async {
+      // 模拟崩溃残留：暂存目录里丢一份垃圾文件
+      final staleStaging = Directory('./plugins/.installer_test.staging');
+      await staleStaging.create(recursive: true);
+      await File('${staleStaging.path}/stale.junk').writeAsString('stale');
+
+      final file = await writeTempPtx(buildPtx(validEntries()));
+      final plugin = await PluginInstaller.installFromPtx(file);
+      await file.parent.delete(recursive: true);
+
+      expect(plugin.id, 'installer_test');
+      expect(File('${plugin.rootDir.path}/plugin.json').existsSync(), isTrue);
+      expect(File('${plugin.rootDir.path}/stale.junk').existsSync(), isFalse,
+          reason: '残留的暂存垃圾不得混入正式安装目录');
+      expect(staleStaging.existsSync(), isFalse);
     });
 
     test('合法安装包解压成功且文件落位正确', () async {
@@ -222,16 +346,16 @@ void main() {
           'name': 'No Id',
           'type': 'lua',
         }),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message, 'message', contains('id'))),
+        throwsA(isA<FormatException>()
+            .having((e) => e.message, 'message', contains('id'))),
       );
     });
 
     test('缺少必填字段 name 抛出明确 FormatException', () {
       expect(
         () => PluginManifest.fromJson({'id': 'some_plugin'}),
-        throwsA(isA<FormatException>().having(
-            (e) => e.message, 'message', contains('name'))),
+        throwsA(isA<FormatException>()
+            .having((e) => e.message, 'message', contains('name'))),
       );
     });
 
@@ -321,7 +445,8 @@ void main() {
 
     test('PluginInstaller 支持注入 baseDirectory 独立安装与卸载', () async {
       final customBaseDir = await tempDirFactory.createTemp('custom_plugins_');
-      final ptxFile = await writeTempPtx(buildPtx(validEntries(id: 'injected_test')));
+      final ptxFile =
+          await writeTempPtx(buildPtx(validEntries(id: 'injected_test')));
 
       final plugin = await PluginInstaller.installFromPtx(
         ptxFile,
@@ -333,10 +458,60 @@ void main() {
       expect(await File('${plugin.rootDir.path}/plugin.json').exists(), isTrue);
 
       // 验证 uninstall 支持注入 baseDirectory
-      await PluginInstaller.uninstall('injected_test', baseDirectory: customBaseDir);
+      await PluginInstaller.uninstall('injected_test',
+          baseDirectory: customBaseDir);
       expect(await plugin.rootDir.exists(), isFalse);
 
       await customBaseDir.delete(recursive: true);
+    });
+
+    test('PluginContext.scanUsedBytes 异步扫描刷新缓存且与配额判定一致', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_scan_test');
+      // 写入两级目录共 100KB 文件
+      await Directory('${tempDir.path}/sub').create(recursive: true);
+      await File('${tempDir.path}/a.bin')
+          .writeAsBytes(List<int>.filled(60 * 1024, 1));
+      await File('${tempDir.path}/sub/b.bin')
+          .writeAsBytes(List<int>.filled(40 * 1024, 2));
+
+      final ctx = PluginContext(
+        pluginId: 'scan_test',
+        storage: PluginStorageImpl(namespace: 'scan_test'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+        rootDir: tempDir,
+        storageQuotaMb: 1, // 1MB 配额
+      );
+
+      // 异步扫描返回精确字节数并刷新缓存（当前缓存为空）
+      final scanned = await ctx.scanUsedBytes();
+      expect(scanned, 100 * 1024);
+      expect(ctx.currentUsedBytes, 100 * 1024,
+          reason: '扫描后同步读路径必须命中缓存，不再触发磁盘 IO');
+
+      // 配额判定与扫描结果一致：再写 1MB 超限，再写 900KB 在配额内
+      expect(ctx.checkStorageQuota(1024 * 1024), isFalse);
+      expect(ctx.checkStorageQuota(900 * 1024), isTrue);
+
+      // 文件变动后重新异步扫描，缓存同步更新
+      await File('${tempDir.path}/a.bin').delete();
+      final rescanned = await ctx.scanUsedBytes();
+      expect(rescanned, 40 * 1024);
+      expect(ctx.currentUsedBytes, 40 * 1024);
+
+      // rootDir 为 null 时扫描返回 0 且配额恒放行
+      final noDirCtx = PluginContext(
+        pluginId: 'scan_none',
+        storage: PluginStorageImpl(namespace: 'scan_none'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      expect(await noDirCtx.scanUsedBytes(), 0);
+      expect(noDirCtx.checkStorageQuota(1024 * 1024 * 1024), isTrue);
+
+      await tempDir.delete(recursive: true);
     });
   });
 }

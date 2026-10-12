@@ -15,7 +15,7 @@ class PluginManifest {
   final String? icon;
   final List<PluginPermission> permissions;
   final String entry; // e.g. "main.lua"
-  final String ui;    // e.g. "ui/main.ui.json"
+  final String ui; // e.g. "ui/main.ui.json"
   final List<Map<String, dynamic>> settings;
   final int storageQuotaMb;
   final List<String>? allowedDomains;

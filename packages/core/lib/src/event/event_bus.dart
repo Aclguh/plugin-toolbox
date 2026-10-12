@@ -61,8 +61,8 @@ class EventBusImpl implements EventBus {
         .where((e) => e is T)
         .cast<T>()
         .handleError((error, stackTrace) {
-          _logger.w('EventBus 监听流捕获内部异常: $error', stackTrace: stackTrace);
-        });
+      _logger.w('EventBus 监听流捕获内部异常: $error', stackTrace: stackTrace);
+    });
   }
 
   @override

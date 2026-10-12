@@ -17,7 +17,8 @@ class SandboxPath {
     if (relativeSubpath.contains(RegExp(r'\.{2,}'))) return false;
     if (isAbsolutePath(relativeSubpath)) return false;
 
-    final cleanBase = basePath.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
+    final cleanBase =
+        basePath.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
     final fullPath = '$cleanBase/${relativeSubpath.replaceAll('\\', '/')}';
     final resolved = <String>[];
     for (final seg in fullPath.split('/')) {
@@ -29,7 +30,8 @@ class SandboxPath {
         resolved.add(seg);
       }
     }
-    final baseSegments = cleanBase.split('/').where((s) => s.isNotEmpty).toList();
+    final baseSegments =
+        cleanBase.split('/').where((s) => s.isNotEmpty).toList();
     if (resolved.length < baseSegments.length) return false;
     for (int i = 0; i < baseSegments.length; i++) {
       if (resolved[i] != baseSegments[i]) return false;
