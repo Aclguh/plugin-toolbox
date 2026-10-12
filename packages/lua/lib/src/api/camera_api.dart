@@ -3,6 +3,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
+import 'sandbox_utils.dart';
 
 /// `camera` — 摄像头与扫码识别 API。
 class CameraApi {
@@ -64,16 +65,7 @@ class CameraApi {
         return 0;
       }
       final relPath = ls.checkString(1) ?? '';
-      final rootDir = context.rootDir;
-      if (rootDir == null) {
-        ls.error2('沙箱未挂载: 当前插件上下文缺少 rootDir');
-        return 0;
-      }
-      if (!SandboxPath.isSafeSubpath(rootDir.path, relPath)) {
-        ls.error2('非法路径: 禁止逃逸沙箱 ($relPath)');
-        return 0;
-      }
-      final fullPath = '${rootDir.path}/$relPath';
+      final fullPath = resolveSandboxPath(ls, context, relPath);
 
       final cbRef = callbacks.ref(2);
       unawaited(

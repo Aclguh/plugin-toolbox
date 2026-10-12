@@ -7,6 +7,10 @@ import '../lua_callback_invoker.dart';
 /// 弥补 Lua 缺少原生异步定时的缺陷，支持倒计时、周期心跳与延迟任务。
 /// 由宿主统一管理句柄并在引擎关闭时注销，杜绝后台内存泄漏。
 class TimerApi {
+  /// setInterval 最小间隔：0/1ms 级周期定时器会把事件循环打满形成忙等，
+  /// 冻结 UI 并耗尽电量，统一抬升至一帧周期（16ms）
+  static const int minIntervalMs = 16;
+
   final Map<int, Timer> _activeTimers = {};
   final Map<int, int> _timerCallbackRefs = {};
   int _nextId = 1;
@@ -47,7 +51,9 @@ class TimerApi {
 
       final timerId = _nextId++;
       _timerCallbackRefs[timerId] = cbRef;
-      _activeTimers[timerId] = Timer.periodic(Duration(milliseconds: ms), (t) {
+      final effectiveMs = ms < minIntervalMs ? minIntervalMs : ms;
+      _activeTimers[timerId] =
+          Timer.periodic(Duration(milliseconds: effectiveMs), (t) {
         callbacks.invoke(cbRef, []);
       });
 

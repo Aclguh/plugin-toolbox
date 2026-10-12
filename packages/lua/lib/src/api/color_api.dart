@@ -58,8 +58,9 @@ class ColorApi {
           : ((ls.checkInteger(4) ?? 255).clamp(0, 255)).toInt();
 
       String pad(int v) => v.toRadixString(16).padLeft(2, '0').toUpperCase();
-      final hex =
-          a != null ? '#${pad(a)}${pad(r)}${pad(g)}${pad(b)}' : '#${pad(r)}${pad(g)}${pad(b)}';
+      final hex = a != null
+          ? '#${pad(a)}${pad(r)}${pad(g)}${pad(b)}'
+          : '#${pad(r)}${pad(g)}${pad(b)}';
       ls.pushString(hex);
       return 1;
     });

@@ -2,19 +2,29 @@ import 'dart:io';
 import 'dart:ui' show Brightness, FlutterView, PlatformDispatcher, Size;
 
 import 'package:lua_dardo/lua.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_engine.dart';
 
 /// `system` — 设备与运行环境基础信息（只读，无隐私敏感权限门槛）。
 ///
 /// 仅暴露非敏感的公开信息（系统版本 / CPU 核数 / 语言区域 / 屏幕尺寸等），
 /// 支撑"设备信息查看"类插件；文件系统、传感器、通话等敏感能力不在此面。
+/// 写操作（屏幕常亮/亮度调节）与 `screen` API 对齐，统一要求 screen 权限。
 class SystemApi {
   static void bind(
-    LuaState ls, [
+    LuaState ls,
+    PluginContext context, [
     LuaHostDelegate? delegate,
     dynamic callbacks,
   ]) {
     ls.newTable();
+
+    // 屏幕写操作权限门控，与 screen_api.dart 保持一致
+    void checkScreenPermission(LuaState ls) {
+      if (!context.hasPermission(PluginPermission.screen)) {
+        ls.error2('权限不足: 插件未声明 screen 权限');
+      }
+    }
 
     // system.platform()
     ls.pushDartFunction((ls) {
@@ -253,6 +263,7 @@ class SystemApi {
 
     // system.setKeepScreenOn(enabled [, callback])
     ls.pushDartFunction((ls) {
+      checkScreenPermission(ls);
       final enabled = ls.toBoolean(1);
       int? cbRef;
       if (callbacks != null && ls.type(2) == LuaType.luaFunction) {
@@ -275,6 +286,7 @@ class SystemApi {
 
     // system.setBrightness(brightness [, callback])
     ls.pushDartFunction((ls) {
+      checkScreenPermission(ls);
       final brightness = ls.toNumber(1).clamp(0.0, 1.0);
       int? cbRef;
       if (callbacks != null && ls.type(2) == LuaType.luaFunction) {

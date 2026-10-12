@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:lua_dardo/lua.dart';
@@ -12,6 +13,16 @@ import '../lua_callback_invoker.dart';
 /// 具备完整的 RESTful 请求（GET/POST/PUT/DELETE/REQUEST）、自定义请求头、
 /// 独立回调支持与超时控制；同时向后兼容旧版写入全局状态与全局函数机制。
 class NetworkApi {
+  /// 单次请求默认超时（各 I/O 阶段独立计时）
+  static const int defaultTimeoutMs = 15000;
+
+  /// 302 等重定向的最大跟随跳数；每跳目标 host 都重新走白名单校验，
+  /// 防止白名单域被利用作跳板跳转至任意外域
+  static const int maxRedirectHops = 5;
+
+  /// 响应体大小上限（10MB），恶意服务端无限输出不得耗尽宿主内存
+  static const int maxResponseBytes = 10 * 1024 * 1024;
+
   static void bind(
     LuaState ls,
     PluginContext context,
@@ -86,11 +97,139 @@ class NetworkApi {
       }
     }
 
+    // 读取响应流并施加大小上限：预检 contentLength，读取中实时截断保护
+    Future<List<int>> readLimited(
+        http.ByteStream stream, int? declaredLength, int timeoutMs) async {
+      if (declaredLength != null && declaredLength > maxResponseBytes) {
+        await stream.drain<void>();
+        throw Exception('响应体超出大小上限 (${maxResponseBytes ~/ (1024 * 1024)}MB)');
+      }
+      final builder = BytesBuilder(copy: false);
+      await for (final chunk
+          in stream.timeout(Duration(milliseconds: timeoutMs))) {
+        if (builder.length + chunk.length > maxResponseBytes) {
+          throw Exception('响应体超出大小上限 (${maxResponseBytes ~/ (1024 * 1024)}MB)');
+        }
+        builder.add(chunk);
+      }
+      return builder.takeBytes();
+    }
+
+    // 禁用自动重定向的统一请求入口：收到 3xx 时逐跳解析 Location，
+    // 每跳目标 host 重新过白名单后才继续请求，并对响应体施加大小上限。
+    Future<http.Response> sendChecked(
+      String method,
+      Uri uri,
+      Map<String, String> headers,
+      String? body,
+      int timeoutMs,
+    ) async {
+      var currentUri = uri;
+      var currentMethod = method.toUpperCase();
+      var currentHeaders = Map<String, String>.of(headers);
+      String? currentBody = body;
+      final client = http.Client();
+      try {
+        for (var hop = 0;; hop++) {
+          final req = http.Request(currentMethod, currentUri)
+            ..followRedirects = false
+            ..maxRedirects = 0
+            ..headers.addAll(currentHeaders);
+          if (currentBody != null &&
+              currentMethod != 'GET' &&
+              currentMethod != 'HEAD') {
+            req.body = currentBody;
+          }
+
+          final streamed =
+              await client.send(req).timeout(Duration(milliseconds: timeoutMs));
+          final status = streamed.statusCode;
+          final isRedirect = status == 301 ||
+              status == 302 ||
+              status == 303 ||
+              status == 307 ||
+              status == 308;
+          final location = streamed.headers['location'];
+
+          if (isRedirect && location != null && location.isNotEmpty) {
+            await streamed.stream.drain<void>();
+            if (hop >= maxRedirectHops) {
+              throw Exception('重定向跳数超限 (>$maxRedirectHops)');
+            }
+            final nextUri = currentUri.resolve(location);
+            if (!context.isHostAllowed(nextUri.host)) {
+              throw Exception('重定向目标域名不在白名单内: ${nextUri.host}');
+            }
+            // 303（及浏览器惯例的 301/302 非 GET）改写为 GET 并丢弃请求体
+            if (status == 303 ||
+                ((status == 301 || status == 302) &&
+                    currentMethod != 'GET' &&
+                    currentMethod != 'HEAD')) {
+              currentMethod = 'GET';
+              currentBody = null;
+              currentHeaders = Map.of(currentHeaders)
+                ..removeWhere((k, v) =>
+                    k.toLowerCase() == 'content-type' ||
+                    k.toLowerCase() == 'content-length');
+            }
+            currentUri = nextUri;
+            continue;
+          }
+
+          final bodyBytes = await readLimited(
+              streamed.stream, streamed.contentLength, timeoutMs);
+          return http.Response.bytes(
+            bodyBytes,
+            status,
+            request: streamed.request,
+            headers: streamed.headers,
+            isRedirect: streamed.isRedirect,
+            persistentConnection: streamed.persistentConnection,
+            reasonPhrase: streamed.reasonPhrase,
+          );
+        }
+      } finally {
+        client.close();
+      }
+    }
+
+    // 解析 URL 并过首跳白名单后派发请求（get/post/put/delete/request 共用）
+    void dispatch(
+      LuaState ls, {
+      required String method,
+      required String url,
+      Map<String, String> headers = const {},
+      String? body,
+      int timeoutMs = defaultTimeoutMs,
+      int? cbRef,
+    }) {
+      final Uri uri;
+      try {
+        uri = Uri.parse(url);
+      } on FormatException catch (e) {
+        ls.error2('URL 不合法: $e');
+        return;
+      }
+
+      if (!context.isHostAllowed(uri.host)) {
+        handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return;
+      }
+
+      unawaited(
+        sendChecked(method, uri, headers, body, timeoutMs).then((response) {
+          handleResponse(response, cbRef);
+        }).catchError((Object e) {
+          handleError(e, cbRef);
+        }),
+      );
+    }
+
     // network.get(url [, headers | callback, callback])
     ls.pushDartFunction((ls) {
       checkPermission(ls);
       final url = ls.checkString(1) ?? '';
-      Map<String, String>? headers;
+      Map<String, String> headers = const {};
       int? cbRef;
 
       if (ls.type(2) == LuaType.luaFunction) {
@@ -102,29 +241,7 @@ class NetworkApi {
         }
       }
 
-      final Uri uri;
-      try {
-        uri = Uri.parse(url);
-      } on FormatException catch (e) {
-        ls.error2('URL 不合法: $e');
-        return 0;
-      }
-
-      if (!context.isHostAllowed(uri.host)) {
-        handleError('域名不在白名单内: ${uri.host}', cbRef);
-        return 0;
-      }
-
-      unawaited(
-        http
-            .get(uri, headers: headers)
-            .timeout(const Duration(seconds: 15))
-            .then((response) {
-          handleResponse(response, cbRef);
-        }).catchError((Object e) {
-          handleError(e, cbRef);
-        }),
-      );
+      dispatch(ls, method: 'GET', url: url, headers: headers, cbRef: cbRef);
       return 0;
     });
     ls.setField(-2, 'get');
@@ -152,29 +269,8 @@ class NetworkApi {
         }
       }
 
-      final Uri uri;
-      try {
-        uri = Uri.parse(url);
-      } on FormatException catch (e) {
-        ls.error2('URL 不合法: $e');
-        return 0;
-      }
-
-      if (!context.isHostAllowed(uri.host)) {
-        handleError('域名不在白名单内: ${uri.host}', cbRef);
-        return 0;
-      }
-
-      unawaited(
-        http
-            .post(uri, headers: headers, body: body)
-            .timeout(const Duration(seconds: 15))
-            .then((response) {
-          handleResponse(response, cbRef);
-        }).catchError((Object e) {
-          handleError(e, cbRef);
-        }),
-      );
+      dispatch(ls,
+          method: 'POST', url: url, headers: headers, body: body, cbRef: cbRef);
       return 0;
     });
     ls.setField(-2, 'post');
@@ -196,29 +292,8 @@ class NetworkApi {
         }
       }
 
-      final Uri uri;
-      try {
-        uri = Uri.parse(url);
-      } on FormatException catch (e) {
-        ls.error2('URL 不合法: $e');
-        return 0;
-      }
-
-      if (!context.isHostAllowed(uri.host)) {
-        handleError('域名不在白名单内: ${uri.host}', cbRef);
-        return 0;
-      }
-
-      unawaited(
-        http
-            .put(uri, headers: headers, body: body)
-            .timeout(const Duration(seconds: 15))
-            .then((response) {
-          handleResponse(response, cbRef);
-        }).catchError((Object e) {
-          handleError(e, cbRef);
-        }),
-      );
+      dispatch(ls,
+          method: 'PUT', url: url, headers: headers, body: body, cbRef: cbRef);
       return 0;
     });
     ls.setField(-2, 'put');
@@ -227,7 +302,7 @@ class NetworkApi {
     ls.pushDartFunction((ls) {
       checkPermission(ls);
       final url = ls.checkString(1) ?? '';
-      Map<String, String>? headers;
+      Map<String, String> headers = const {};
       int? cbRef;
 
       if (ls.type(2) == LuaType.luaFunction) {
@@ -239,29 +314,7 @@ class NetworkApi {
         }
       }
 
-      final Uri uri;
-      try {
-        uri = Uri.parse(url);
-      } on FormatException catch (e) {
-        ls.error2('URL 不合法: $e');
-        return 0;
-      }
-
-      if (!context.isHostAllowed(uri.host)) {
-        handleError('域名不在白名单内: ${uri.host}', cbRef);
-        return 0;
-      }
-
-      unawaited(
-        http
-            .delete(uri, headers: headers)
-            .timeout(const Duration(seconds: 15))
-            .then((response) {
-          handleResponse(response, cbRef);
-        }).catchError((Object e) {
-          handleError(e, cbRef);
-        }),
-      );
+      dispatch(ls, method: 'DELETE', url: url, headers: headers, cbRef: cbRef);
       return 0;
     });
     ls.setField(-2, 'delete');
@@ -278,7 +331,7 @@ class NetworkApi {
       String method = 'GET';
       Map<String, String> headers = {};
       String? body;
-      int timeoutMs = 15000;
+      int timeoutMs = defaultTimeoutMs;
 
       ls.getField(1, 'url');
       if (ls.isString(-1)) url = ls.toStr(-1) ?? '';
@@ -304,38 +357,14 @@ class NetworkApi {
 
       final cbRef = callbacks.ref(2);
 
-      final Uri uri;
-      try {
-        uri = Uri.parse(url);
-      } on FormatException catch (e) {
-        ls.error2('URL 不合法: $e');
-        return 0;
-      }
-
-      if (!context.isHostAllowed(uri.host)) {
-        handleError('域名不在白名单内: ${uri.host}', cbRef);
-        return 0;
-      }
-
-      final req = http.Request(method, uri);
-      req.headers.addAll(headers);
-      if (body != null) {
-        req.body = body;
-      }
-
-      final client = http.Client();
-      unawaited(
-        client
-            .send(req)
-            .then(http.Response.fromStream)
-            .timeout(Duration(milliseconds: timeoutMs))
-            .then((res) {
-          handleResponse(res, cbRef);
-        }).catchError((Object e) {
-          handleError(e, cbRef);
-        }).whenComplete(() {
-          client.close();
-        }),
+      dispatch(
+        ls,
+        method: method,
+        url: url,
+        headers: headers,
+        body: body,
+        timeoutMs: timeoutMs,
+        cbRef: cbRef,
       );
       return 0;
     });

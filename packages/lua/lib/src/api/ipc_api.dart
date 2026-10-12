@@ -31,7 +31,8 @@ class IpcApi {
 
       if (ls.type(3) == LuaType.luaFunction) {
         cbRef = callbacks.ref(3);
-      } else if (ls.type(3) != LuaType.luaNil && ls.type(3) != LuaType.luaNone) {
+      } else if (ls.type(3) != LuaType.luaNil &&
+          ls.type(3) != LuaType.luaNone) {
         ls.pushValue(3);
         args = LuaValueCodec.pop(ls);
         if (ls.type(4) == LuaType.luaFunction) {

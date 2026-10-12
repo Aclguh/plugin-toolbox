@@ -4,6 +4,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
+import 'sandbox_utils.dart';
 
 /// `share` — 系统分享 API。
 ///
@@ -30,16 +31,7 @@ class ShareApi {
     // 严格受限于插件独立沙箱目录，经 [SandboxPath.isSafeSubpath] 校验防路径穿越。
     ls.pushDartFunction((ls) {
       final relPath = ls.checkString(1) ?? '';
-      final rootDir = context.rootDir;
-      if (rootDir == null) {
-        ls.error2('沙箱未挂载: 当前插件上下文缺少 rootDir');
-        return 0;
-      }
-      if (!SandboxPath.isSafeSubpath(rootDir.path, relPath)) {
-        ls.error2('非法路径: 禁止逃逸沙箱 ($relPath)');
-        return 0;
-      }
-      final fullPath = '${rootDir.path}/$relPath';
+      final fullPath = resolveSandboxPath(ls, context, relPath);
       final file = File(fullPath);
       if (!file.existsSync()) {
         ls.error2('文件不存在: $relPath');
@@ -68,19 +60,18 @@ class ShareApi {
         delegate
             .shareFile(fullPath, mimeType: mimeType, subject: subject)
             .then((success) {
-              if (cbRef != null) {
-                callbacks?.invokeAndRelease(cbRef, [success]);
-              } else {
-                delegate.onStateChanged('__share_file_result', success);
-              }
-            })
-            .catchError((Object err) {
-              if (cbRef != null) {
-                callbacks?.invokeAndRelease(cbRef, [false, err.toString()]);
-              } else {
-                delegate.onStateChanged('__share_file_result', false);
-              }
-            }),
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [success]);
+          } else {
+            delegate.onStateChanged('__share_file_result', success);
+          }
+        }).catchError((Object err) {
+          if (cbRef != null) {
+            callbacks?.invokeAndRelease(cbRef, [false, err.toString()]);
+          } else {
+            delegate.onStateChanged('__share_file_result', false);
+          }
+        }),
       );
       return 0;
     });

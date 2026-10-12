@@ -136,7 +136,10 @@ class DocumentApi {
       final row = rows[r];
       for (int c = 0; c < row.length; c++) {
         final val = row[c];
-        if (val.contains(',') || val.contains('"') || val.contains('\n') || val.contains('\r')) {
+        if (val.contains(',') ||
+            val.contains('"') ||
+            val.contains('\n') ||
+            val.contains('\r')) {
           sb.write('"');
           sb.write(val.replaceAll('"', '""'));
           sb.write('"');
@@ -171,7 +174,8 @@ class DocumentApi {
             inList = false;
           }
           final lang = trimmed.substring(3).trim();
-          sb.write('<pre><code${lang.isNotEmpty ? ' class="language-$lang"' : ''}>');
+          sb.write(
+              '<pre><code${lang.isNotEmpty ? ' class="language-$lang"' : ''}>');
           inCodeBlock = true;
         }
         continue;
@@ -207,7 +211,10 @@ class DocumentApi {
         while (level < trimmed.length && trimmed[level] == '#') {
           level++;
         }
-        if (level >= 1 && level <= 6 && trimmed.length > level && trimmed[level] == ' ') {
+        if (level >= 1 &&
+            level <= 6 &&
+            trimmed.length > level &&
+            trimmed[level] == ' ') {
           final content = _parseInline(trimmed.substring(level + 1));
           sb.writeln('<h$level>$content</h$level>');
           continue;
@@ -240,15 +247,20 @@ class DocumentApi {
   static String _parseInline(String text) {
     String res = _escapeHtml(text);
     // 行内代码 `code`
-    res = res.replaceAllMapped(RegExp(r'`([^`]+)`'), (m) => '<code>${m[1]}</code>');
+    res = res.replaceAllMapped(
+        RegExp(r'`([^`]+)`'), (m) => '<code>${m[1]}</code>');
     // 加粗 **bold**
-    res = res.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => '<strong>${m[1]}</strong>');
+    res = res.replaceAllMapped(
+        RegExp(r'\*\*([^*]+)\*\*'), (m) => '<strong>${m[1]}</strong>');
     // 斜体 *italic*
-    res = res.replaceAllMapped(RegExp(r'\*([^*]+)\*'), (m) => '<em>${m[1]}</em>');
+    res =
+        res.replaceAllMapped(RegExp(r'\*([^*]+)\*'), (m) => '<em>${m[1]}</em>');
     // 删除线 ~~del~~
-    res = res.replaceAllMapped(RegExp(r'~~([^~]+)~~'), (m) => '<del>${m[1]}</del>');
+    res = res.replaceAllMapped(
+        RegExp(r'~~([^~]+)~~'), (m) => '<del>${m[1]}</del>');
     // 链接 [text](url)
-    res = res.replaceAllMapped(RegExp(r'\[([^\]]+)\]\(([^)]+)\)'), (m) => '<a href="${m[2]}">${m[1]}</a>');
+    res = res.replaceAllMapped(RegExp(r'\[([^\]]+)\]\(([^)]+)\)'),
+        (m) => '<a href="${m[2]}">${m[1]}</a>');
     return res;
   }
 

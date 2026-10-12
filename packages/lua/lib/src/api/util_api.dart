@@ -30,10 +30,11 @@ class UtilApi {
     // util.formatTime(timestampMs [, pattern]) -> string
     ls.pushDartFunction((ls) {
       final ms = ls.checkInteger(1) ?? 0;
-      final pattern = ls.optString(2, 'yyyy-MM-dd HH:mm:ss') ?? 'yyyy-MM-dd HH:mm:ss';
+      final pattern =
+          ls.optString(2, 'yyyy-MM-dd HH:mm:ss') ?? 'yyyy-MM-dd HH:mm:ss';
       try {
-        final formatted = DateFormat(pattern)
-            .format(DateTime.fromMillisecondsSinceEpoch(ms));
+        final formatted =
+            DateFormat(pattern).format(DateTime.fromMillisecondsSinceEpoch(ms));
         ls.pushString(formatted);
         return 1;
       } catch (e) {
@@ -46,7 +47,8 @@ class UtilApi {
     // util.parseTime(timeStr [, pattern]) -> timestampMs | nil
     ls.pushDartFunction((ls) {
       final timeStr = ls.checkString(1) ?? '';
-      final pattern = ls.optString(2, 'yyyy-MM-dd HH:mm:ss') ?? 'yyyy-MM-dd HH:mm:ss';
+      final pattern =
+          ls.optString(2, 'yyyy-MM-dd HH:mm:ss') ?? 'yyyy-MM-dd HH:mm:ss';
       try {
         final dt = DateFormat(pattern).parse(timeStr);
         ls.pushInteger(dt.millisecondsSinceEpoch);

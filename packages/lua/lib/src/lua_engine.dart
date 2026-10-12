@@ -418,11 +418,31 @@ class LuaEngine {
   /// `os.execute`/`os.remove`/`io` 文件操作可执行任意系统命令与读写任意文件，
   /// `require`/`dofile`/`loadfile` 可从磁盘加载任意脚本，`debug`/`package`
   /// 可触达虚拟机内部。全部置 nil 以彻底封堵沙箱逃逸面。
+  ///
+  /// `load`/`loadstring`/`string.dump` 一并封禁：lua_dardo 的 `load` 实现
+  /// 忽略 mode 参数、始终接受二进制块，无法限制为仅文本（mode='t'），
+  /// 保留它们即可加载手工构造的字节码绕过全部源码层校验。
   void _registerSecuritySandbox() {
-    for (final lib in ['os', 'io', 'debug', 'package', 'require', 'dofile', 'loadfile']) {
+    for (final lib in [
+      'os',
+      'io',
+      'debug',
+      'package',
+      'require',
+      'dofile',
+      'loadfile',
+      'load',
+      'loadstring',
+    ]) {
       _ls.pushNil();
       _ls.setGlobal(lib);
     }
+    // string.dump 可将函数序列化为字节码供 load 回灌，单独摘除该字段
+    if (_ls.getGlobal('string') == LuaType.luaTable) {
+      _ls.pushNil();
+      _ls.setField(-2, 'dump');
+    }
+    _ls.pop(1);
   }
 
   /// 注册所有受白名单权限控制的宿主 API
@@ -443,7 +463,7 @@ class LuaEngine {
     JsonApi.bind(_ls);
     HashApi.bind(_ls);
     UtilApi.bind(_ls);
-    SystemApi.bind(_ls, delegate, _callbacks!);
+    SystemApi.bind(_ls, context, delegate, _callbacks!);
     HapticApi.bind(_ls, delegate);
     UiApi.bind(_ls, delegate);
     ShareApi.bind(_ls, delegate, context, _callbacks!);

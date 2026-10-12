@@ -141,7 +141,8 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   Future<String?> scanBarcode({String? prompt}) async => mockScannedCode;
 
   @override
-  Future<String?> decodeBarcodeFromImage(String filePath) async => mockDecodedCode;
+  Future<String?> decodeBarcodeFromImage(String filePath) async =>
+      mockDecodedCode;
 
   @override
   Future<bool> startSensor(String type) async {
@@ -609,7 +610,8 @@ class InMemoryPluginStorage implements PluginStorage {
   }
 
   @override
-  Future<List<String>?> getStringList(String key) async => _data[key] as List<String>?;
+  Future<List<String>?> getStringList(String key) async =>
+      _data[key] as List<String>?;
 
   @override
   Future<bool> setStringList(String key, List<String> value) async {
@@ -643,7 +645,10 @@ void main() {
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
-        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.clipboard,
+          PluginPermission.storage
+        },
       );
       engine = LuaEngine(context: context, delegate: delegate);
     });
@@ -744,7 +749,10 @@ void main() {
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
-        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.clipboard,
+          PluginPermission.storage
+        },
       );
       engine = LuaEngine(context: context, delegate: delegate);
     });
@@ -855,7 +863,10 @@ void main() {
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
-        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.clipboard,
+          PluginPermission.storage
+        },
       );
       engine = LuaEngine(context: context, delegate: delegate);
     });
@@ -874,8 +885,8 @@ void main() {
         }
         return null;
       });
-      addTearDown(() => TestDefaultBinaryMessengerBinding.instance
-          .defaultBinaryMessenger
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null));
 
       engine.loadAndExecute('''
@@ -1011,7 +1022,10 @@ void main() {
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
-        grantedPermissions: {PluginPermission.clipboard, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.clipboard,
+          PluginPermission.storage
+        },
       );
       engine = LuaEngine(context: context, delegate: delegate);
     });
@@ -1051,7 +1065,9 @@ void main() {
       expect(parsed['n'], 3);
       expect(parsed['arr'], [1, 2, 3]);
       expect(parsed['flag'], true);
-      expect(parsed['nested'], {'inner': [1, 2]});
+      expect(parsed['nested'], {
+        'inner': [1, 2]
+      });
     });
 
     test('json.encode 标量与空表', () {
@@ -1081,8 +1097,8 @@ void main() {
       ''');
 
       // null 值依 Lua 表语义表现为键缺失 (赋 nil 即删除键)
-      final obj = engine.callFunction('dec',
-          ['{"a":[1,2,{"b":null}],"s":"x","f":1.5,"ok":true}']);
+      final obj = engine.callFunction(
+          'dec', ['{"a":[1,2,{"b":null}],"s":"x","f":1.5,"ok":true}']);
       expect(obj, {
         'a': [1, 2, {}],
         's': 'x',
@@ -1176,7 +1192,8 @@ void main() {
         haptic.selection()
         haptic.vibrate()
       ''');
-      expect(delegate.haptics, ['light', 'medium', 'heavy', 'selection', 'vibrate']);
+      expect(delegate.haptics,
+          ['light', 'medium', 'heavy', 'selection', 'vibrate']);
     });
 
     test('UiApi 软键盘收起与 Toast 委派给宿主', () {
@@ -1249,7 +1266,10 @@ void main() {
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
-        grantedPermissions: {PluginPermission.photoLibrary, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.photoLibrary,
+          PluginPermission.storage
+        },
       );
       final mediaEngine = LuaEngine(context: mediaCtx, delegate: delegate);
       delegate.pickedImageResult = 'data/test.jpg';
@@ -1396,7 +1416,8 @@ void main() {
       expect(delegate.getState('exported_ok'), true);
     });
 
-    test('FsApi 异步非阻塞读写 (readFile, writeFile, readFileAsync, writeFileAsync)', () async {
+    test('FsApi 异步非阻塞读写 (readFile, writeFile, readFileAsync, writeFileAsync)',
+        () async {
       final tempDir = Directory.systemTemp.createTempSync('ptx_fs_async_test_');
       addTearDown(() {
         if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
@@ -1804,12 +1825,14 @@ void main() {
       ''');
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(delegate.getState('scanned_via_cb'), 'https://example.com/mock-qr');
+      expect(
+          delegate.getState('scanned_via_cb'), 'https://example.com/mock-qr');
 
       // 默认状态写入方式
       camEngine.loadAndExecute('camera.scan()');
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(delegate.getState('__scanned_code'), 'https://example.com/mock-qr');
+      expect(
+          delegate.getState('__scanned_code'), 'https://example.com/mock-qr');
     });
 
     test('CameraApi & VisionApi: 离线图片条码解码与沙箱防护', () async {
@@ -1831,11 +1854,13 @@ void main() {
 
       // 1. 路径穿越拦截
       expect(
-        () => visionEngine.loadAndExecute('vision.decodeBarcode("../../secret.png")'),
+        () => visionEngine
+            .loadAndExecute('vision.decodeBarcode("../../secret.png")'),
         throwsException,
       );
       expect(
-        () => visionEngine.loadAndExecute('camera.decodeImage("../../secret.png")'),
+        () => visionEngine
+            .loadAndExecute('camera.decodeImage("../../secret.png")'),
         throwsException,
       );
 
@@ -2177,7 +2202,8 @@ void main() {
       );
       final noNetEngine = LuaEngine(context: noNetCtx, delegate: delegate);
       expect(
-        () => noNetEngine.loadAndExecute('socket.tcpConnect("127.0.0.1", 8080, {})'),
+        () => noNetEngine
+            .loadAndExecute('socket.tcpConnect("127.0.0.1", 8080, {})'),
         throwsException,
       );
       expect(
@@ -2237,7 +2263,8 @@ void main() {
       );
       final noNetEngine = LuaEngine(context: noNetCtx, delegate: delegate);
       expect(
-        () => noNetEngine.loadAndExecute('websocket.connect("ws://127.0.0.1:8080", {})'),
+        () => noNetEngine
+            .loadAndExecute('websocket.connect("ws://127.0.0.1:8080", {})'),
         throwsException,
       );
 
@@ -2346,7 +2373,8 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(delegate.getState('get_blocked_ok'), isFalse);
-      expect(delegate.getState('get_blocked_err'), contains('域名不在白名单内: evil.com'));
+      expect(
+          delegate.getState('get_blocked_err'), contains('域名不在白名单内: evil.com'));
       expect(delegate.getState('dns_blocked_ok'), isFalse);
       expect(delegate.getState('dns_blocked_err'), contains('域名不在白名单内'));
       expect(delegate.getState('tcp_blocked_err'), contains('域名不在白名单内'));
@@ -2524,7 +2552,8 @@ void main() {
     });
 
     test('FsApi: 沙箱存储配额检测超限拒绝写入', () async {
-      final tempDir = await Directory.systemTemp.createTemp('ptx_lua_quota_test');
+      final tempDir =
+          await Directory.systemTemp.createTemp('ptx_lua_quota_test');
       // 配额设为 0MB，任何写入均被拒绝
       final quotaCtx = PluginContext(
         pluginId: 'quota_fs_test',
@@ -2587,7 +2616,8 @@ void main() {
     test('LocationApi: 权限控制与定位数据获取', () async {
       // 1. 无权限拦截
       expect(
-        () => engine.loadAndExecute('location.getCurrentPosition(function() end)'),
+        () => engine
+            .loadAndExecute('location.getCurrentPosition(function() end)'),
         throwsException,
       );
 
@@ -2916,7 +2946,8 @@ void main() {
     test('AiApi: 统一大模型网关 chat 与 streamChat 调用', () async {
       // 1. 无权限拦截
       expect(
-        () => engine.loadAndExecute('ai.chat({ messages = {} }, function() end)'),
+        () =>
+            engine.loadAndExecute('ai.chat({ messages = {} }, function() end)'),
         throwsException,
       );
 
@@ -2976,7 +3007,8 @@ void main() {
         logger: Logger(),
         grantedPermissions: {PluginPermission.ipc},
       );
-      final providerEngine = LuaEngine(context: providerCtx, delegate: delegate);
+      final providerEngine =
+          LuaEngine(context: providerCtx, delegate: delegate);
 
       providerEngine.loadAndExecute('''
         plugin.export("doubleNumber", function(num)
@@ -3020,7 +3052,8 @@ void main() {
       );
     });
 
-    test('VisionApi.recognizeText 离线 OCR 与 SystemApi.getInitialShare 初始分享', () async {
+    test('VisionApi.recognizeText 离线 OCR 与 SystemApi.getInitialShare 初始分享',
+        () async {
       final tempDir = await Directory.systemTemp.createTemp('ptx_ocr_test_');
       final ocrCtx = PluginContext(
         pluginId: 'ocr_test',
@@ -3028,13 +3061,17 @@ void main() {
         eventBus: EventBusImpl(),
         logger: Logger(),
         rootDir: tempDir,
-        grantedPermissions: {PluginPermission.photoLibrary, PluginPermission.storage},
+        grantedPermissions: {
+          PluginPermission.photoLibrary,
+          PluginPermission.storage
+        },
       );
       final ocrEngine = LuaEngine(context: ocrCtx, delegate: delegate);
 
       // 1. 路径穿越拦截
       expect(
-        () => ocrEngine.loadAndExecute('vision.recognizeText("../../secret.png")'),
+        () => ocrEngine
+            .loadAndExecute('vision.recognizeText("../../secret.png")'),
         throwsException,
       );
 
@@ -3059,4 +3096,3 @@ void main() {
     });
   });
 }
-

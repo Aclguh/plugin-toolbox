@@ -83,17 +83,17 @@ class DialogApi {
       unawaited(
         delegate
             .pickDate(
-              initialDate: initialDate,
-              firstDate: firstDate,
-              lastDate: lastDate,
-            )
+          initialDate: initialDate,
+          firstDate: firstDate,
+          lastDate: lastDate,
+        )
             .then((selectedDate) {
-              if (cbRef != null) {
-                callbacks.invokeAndRelease(cbRef, [selectedDate]);
-              } else {
-                delegate.onStateChanged('__dialog_date', selectedDate);
-              }
-            }),
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [selectedDate]);
+          } else {
+            delegate.onStateChanged('__dialog_date', selectedDate);
+          }
+        }),
       );
       return 0;
     });
@@ -314,6 +314,5 @@ class DialogApi {
     ls.setField(-2, 'bottomSheet');
 
     ls.setGlobal('dialog');
-
   }
 }

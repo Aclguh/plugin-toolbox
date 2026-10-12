@@ -3,6 +3,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
+import 'sandbox_utils.dart';
 
 /// `image` — 图像处理与元数据 API (压缩 / 裁剪 / 格式转换 / EXIF 擦除)。
 class ImageApi {
@@ -20,23 +21,14 @@ class ImageApi {
       }
     }
 
-    String resolveSafeFullPath(LuaState ls, String relPath) {
-      final rootDir = context.rootDir;
-      if (rootDir == null) {
-        ls.error2('沙箱未挂载: 当前插件上下文缺少 rootDir');
-        return '';
-      }
-      if (!SandboxPath.isSafeSubpath(rootDir.path, relPath)) {
-        ls.error2('非法路径: 禁止逃逸沙箱 ($relPath)');
-        return '';
-      }
-      return '${rootDir.path}/$relPath';
-    }
+    String resolveSafeFullPath(LuaState ls, String relPath) =>
+        resolveSandboxPath(ls, context, relPath);
 
     String defaultTarget(String srcRel, String suffix, String ext) {
       final lastSlash = srcRel.lastIndexOf('/');
       final dir = lastSlash >= 0 ? srcRel.substring(0, lastSlash + 1) : '';
-      final fileName = lastSlash >= 0 ? srcRel.substring(lastSlash + 1) : srcRel;
+      final fileName =
+          lastSlash >= 0 ? srcRel.substring(lastSlash + 1) : srcRel;
       final dot = fileName.lastIndexOf('.');
       final name = dot >= 0 ? fileName.substring(0, dot) : fileName;
       return '$dir${name}_$suffix.$ext';
@@ -86,7 +78,8 @@ class ImageApi {
         cbRef = callbacks.ref(4);
       }
 
-      final effectiveTargetRel = targetRel ?? defaultTarget(relPath, 'compressed', 'jpg');
+      final effectiveTargetRel =
+          targetRel ?? defaultTarget(relPath, 'compressed', 'jpg');
       final fullDest = resolveSafeFullPath(ls, effectiveTargetRel);
 
       unawaited(
@@ -129,11 +122,14 @@ class ImageApi {
         cbRef = callbacks.ref(7);
       }
 
-      final effectiveTargetRel = targetRel ?? defaultTarget(relPath, 'cropped', 'png');
+      final effectiveTargetRel =
+          targetRel ?? defaultTarget(relPath, 'cropped', 'png');
       final fullDest = resolveSafeFullPath(ls, effectiveTargetRel);
 
       unawaited(
-        delegate.cropImage(fullSrc, fullDest, x: x, y: y, width: w, height: h).then((ok) {
+        delegate
+            .cropImage(fullSrc, fullDest, x: x, y: y, width: w, height: h)
+            .then((ok) {
           final res = ok ? effectiveTargetRel : null;
           if (cbRef != null) {
             callbacks.invokeAndRelease(cbRef, [res]);
@@ -170,7 +166,8 @@ class ImageApi {
       }
 
       final ext = format == 'jpeg' ? 'jpg' : format;
-      final effectiveTargetRel = targetRel ?? defaultTarget(relPath, 'converted', ext);
+      final effectiveTargetRel =
+          targetRel ?? defaultTarget(relPath, 'converted', ext);
       final fullDest = resolveSafeFullPath(ls, effectiveTargetRel);
 
       unawaited(
@@ -209,7 +206,8 @@ class ImageApi {
         cbRef = callbacks.ref(3);
       }
 
-      final effectiveTargetRel = targetRel ?? defaultTarget(relPath, 'clean', 'jpg');
+      final effectiveTargetRel =
+          targetRel ?? defaultTarget(relPath, 'clean', 'jpg');
       final fullDest = resolveSafeFullPath(ls, effectiveTargetRel);
 
       unawaited(

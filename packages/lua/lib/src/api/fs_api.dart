@@ -7,6 +7,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
+import 'sandbox_utils.dart';
 
 /// `fs` — 沙箱文件系统 API。
 ///
@@ -27,18 +28,13 @@ class FsApi {
       }
     }
 
-    String resolveSafePath(LuaState ls, String relPath) {
-      final rootDir = context.rootDir;
-      if (rootDir == null) {
-        ls.error2('沙箱未挂载: 当前插件上下文缺少 rootDir');
-        return '';
-      }
-      if (!SandboxPath.isSafeSubpath(rootDir.path, relPath)) {
-        ls.error2('非法路径: 禁止逃逸沙箱 ($relPath)');
-        return '';
-      }
-      return '${rootDir.path}/$relPath';
-    }
+    String resolveSafePath(LuaState ls, String relPath) =>
+        resolveSandboxPath(ls, context, relPath);
+
+    // 受保护的核心清单（plugin.json/manifest.json）禁止插件覆写，
+    // 必须走归一化绝对路径比较，防止 './plugin.json' 绕过等值判断静默提权。
+    bool isProtected(String relPath) =>
+        isProtectedSandboxFile(context, relPath);
 
     // fs.readFile(relPath [, callback]) -> string | nil, error
     ls.pushDartFunction((ls) {
@@ -127,7 +123,7 @@ class FsApi {
       final fullPath = resolveSafePath(ls, relPath);
 
       // 保护清单和元数据不被篡改
-      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+      if (isProtected(relPath)) {
         if (cbRef != null) {
           callbacks.invokeAndRelease(cbRef, [false, '受保护的核心清单禁止覆写']);
           return 0;
@@ -138,7 +134,8 @@ class FsApi {
 
       if (!context.checkStorageQuota(content.length)) {
         if (cbRef != null) {
-          callbacks.invokeAndRelease(cbRef, [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
+          callbacks.invokeAndRelease(cbRef,
+              [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
           return 0;
         }
         ls.error2('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
@@ -204,13 +201,14 @@ class FsApi {
       }
 
       final callbackRef = cbRef;
-      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+      if (isProtected(relPath)) {
         callbacks.invokeAndRelease(callbackRef, [false, '受保护的核心清单禁止覆写']);
         return 0;
       }
 
       if (!context.checkStorageQuota(content.length)) {
-        callbacks.invokeAndRelease(callbackRef, [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
+        callbacks.invokeAndRelease(callbackRef,
+            [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
         return 0;
       }
 
@@ -252,9 +250,7 @@ class FsApi {
     ls.pushDartFunction((ls) {
       checkStoragePermission(ls);
       final relPath = ls.checkString(1) ?? '';
-      if (relPath == 'plugin.json' ||
-          relPath == 'manifest.json' ||
-          relPath.isEmpty) {
+      if (isProtected(relPath) || relPath.isEmpty) {
         ls.error2('受保护的核心资源禁止删除');
         return 0;
       }
@@ -288,9 +284,8 @@ class FsApi {
         return 0;
       }
       final relDir = ls.optString(1, '') ?? '';
-      final fullDirPath = relDir.isEmpty
-          ? rootDir.path
-          : resolveSafePath(ls, relDir);
+      final fullDirPath =
+          relDir.isEmpty ? rootDir.path : resolveSafePath(ls, relDir);
 
       final dir = Directory(fullDirPath);
       if (!dir.existsSync()) {
@@ -418,7 +413,7 @@ class FsApi {
       final append = !ls.isNoneOrNil(3) && ls.toBoolean(3);
       final fullPath = resolveSafePath(ls, relPath);
 
-      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+      if (isProtected(relPath)) {
         ls.error2('受保护的核心清单禁止覆写');
         return 0;
       }
@@ -474,7 +469,7 @@ class FsApi {
       final srcRel = ls.checkString(1) ?? '';
       final destRel = ls.checkString(2) ?? '';
 
-      if (destRel == 'plugin.json' || destRel == 'manifest.json') {
+      if (isProtected(destRel)) {
         ls.error2('受保护的核心清单禁止覆写');
         return 0;
       }
@@ -518,11 +513,11 @@ class FsApi {
       final srcRel = ls.checkString(1) ?? '';
       final destRel = ls.checkString(2) ?? '';
 
-      if (srcRel == 'plugin.json' || srcRel == 'manifest.json') {
+      if (isProtected(srcRel)) {
         ls.error2('受保护的核心清单禁止移动');
         return 0;
       }
-      if (destRel == 'plugin.json' || destRel == 'manifest.json') {
+      if (isProtected(destRel)) {
         ls.error2('受保护的核心清单禁止覆写');
         return 0;
       }
@@ -700,7 +695,7 @@ class FsApi {
         }
       }
       final fullPath = resolveSafePath(ls, relPath);
-      if (relPath == 'plugin.json' || relPath == 'manifest.json') {
+      if (isProtected(relPath)) {
         if (cbRef != null) {
           callbacks.invokeAndRelease(cbRef, [false, '受保护的核心清单禁止覆写']);
           return 0;
@@ -808,7 +803,8 @@ class FsApi {
       }
       try {
         final bytes = file.readAsBytesSync();
-        final algo = ls.type(2) == LuaType.luaString ? ls.toStr(2)?.toLowerCase() : null;
+        final algo =
+            ls.type(2) == LuaType.luaString ? ls.toStr(2)?.toLowerCase() : null;
         if (algo == 'md5') {
           ls.pushString(md5.convert(bytes).toString());
           return 1;

@@ -2,12 +2,21 @@ import 'package:lua_dardo/lua.dart';
 
 /// Dart 与 Lua 虚拟机之间数据类型双向编解码转换工具
 class LuaValueCodec {
-  /// 将 Dart 动态值压入 Lua 栈顶（递归转换 Map 与 List，拦截循环引用）
-  static void push(LuaState ls, dynamic val, [Set<Object?>? visited]) {
+  /// 将 Dart 动态值压入 Lua 栈顶（递归转换 Map 与 List，拦截循环引用）。
+  ///
+  /// [allowCycles] 为 true 时循环引用降级压入 nil 而非抛异常：
+  /// 异步回调再入虚拟机的场景（[LuaCallbackInvoker]）不允许错误逃逸到
+  /// 宿主事件循环；同步调用面（callFunction）保持抛错以便脚本可探测。
+  static void push(LuaState ls, dynamic val,
+      [Set<Object?>? visited, bool allowCycles = false]) {
     // 循环引用检测：自引用集合若不拦截将在递归压栈时栈溢出
     if (val is Map || val is List) {
       final seen = visited ??= <Object?>{};
       if (seen.contains(val)) {
+        if (allowCycles) {
+          ls.pushNil();
+          return;
+        }
         throw Exception('不支持将包含循环引用的集合转换为 Lua 值');
       }
       seen.add(val);
@@ -27,14 +36,14 @@ class LuaValueCodec {
       ls.newTable();
       val.forEach((k, v) {
         ls.pushString(k.toString());
-        push(ls, v, visited);
+        push(ls, v, visited, allowCycles);
         ls.setTable(-3);
       });
     } else if (val is List) {
       ls.newTable();
       for (int i = 0; i < val.length; i++) {
         ls.pushInteger(i + 1);
-        push(ls, val[i], visited);
+        push(ls, val[i], visited, allowCycles);
         ls.setTable(-3);
       }
     } else {
@@ -122,7 +131,8 @@ class LuaValueCodec {
     }
 
     if (isSequentialArray) {
-      final list = List<dynamic>.filled(rawEntries.length, null, growable: true);
+      final list =
+          List<dynamic>.filled(rawEntries.length, null, growable: true);
       for (int i = 1; i <= rawEntries.length; i++) {
         list[i - 1] = rawEntries[i];
       }

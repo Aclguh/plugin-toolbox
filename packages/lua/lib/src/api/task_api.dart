@@ -38,7 +38,8 @@ class TaskApi {
       // task.run(script, args, { timeoutMs = 3000, budget = 500000 }, callback)
       if (ls.type(2) == LuaType.luaFunction) {
         cbRef = callbacks.ref(2);
-      } else if (ls.type(2) != LuaType.luaNil && ls.type(2) != LuaType.luaNone) {
+      } else if (ls.type(2) != LuaType.luaNil &&
+          ls.type(2) != LuaType.luaNone) {
         ls.pushValue(2);
         args = LuaValueCodec.pop(ls);
 
@@ -180,7 +181,8 @@ class TaskApi {
     final ls = LuaState.newState();
     ls.openLibs();
 
-    // 禁用危险标准库
+    // 禁用危险标准库（与 LuaEngine._registerSecuritySandbox 保持同一安全边界：
+    // load/loadstring 可加载手工字节码逃逸，string.dump 负责摘除）
     for (final lib in [
       'os',
       'io',
@@ -188,11 +190,18 @@ class TaskApi {
       'package',
       'require',
       'dofile',
-      'loadfile'
+      'loadfile',
+      'load',
+      'loadstring',
     ]) {
       ls.pushNil();
       ls.setGlobal(lib);
     }
+    if (ls.getGlobal('string') == LuaType.luaTable) {
+      ls.pushNil();
+      ls.setField(-2, 'dump');
+    }
+    ls.pop(1);
 
     // 注入安全的工具库
     CodecApi.bind(ls);

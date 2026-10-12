@@ -50,8 +50,14 @@ class SensorApi {
     // sensor.isAvailable(type) -> bool
     ls.pushDartFunction((ls) {
       checkSensorPermission(ls);
-      final type = (ls.optString(1, 'accelerometer') ?? 'accelerometer').toLowerCase();
-      final supported = ['accelerometer', 'gyroscope', 'magnetometer', 'compass'];
+      final type =
+          (ls.optString(1, 'accelerometer') ?? 'accelerometer').toLowerCase();
+      final supported = [
+        'accelerometer',
+        'gyroscope',
+        'magnetometer',
+        'compass'
+      ];
       ls.pushBoolean(supported.contains(type));
       return 1;
     });

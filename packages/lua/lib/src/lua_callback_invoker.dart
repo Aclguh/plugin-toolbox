@@ -55,6 +55,9 @@ class LuaCallbackInvoker {
     return LuaValueCodec.pop(_ls);
   }
 
+  /// 压入回调参数：循环引用一律降级为 nil，绝不允许异常逃逸进宿主事件循环
+  void _pushArg(Object? val) => LuaValueCodec.push(_ls, val, null, true);
+
   /// 显式注销并释放 [ref] 登记项
   void release(int ref) {
     if (_activeRefs.remove(ref)) {
@@ -90,46 +93,5 @@ class LuaCallbackInvoker {
       // pCall 失败时会压入错误信息，出栈以保持栈平衡
       _ls.pop(1);
     }
-  }
-
-  void _pushArg(Object? val, [Set<Object?>? visited]) {
-    if (val is Map || val is List) {
-      final seen = visited ??= <Object?>{};
-      if (seen.contains(val)) {
-        _ls.pushNil();
-        return;
-      }
-      seen.add(val);
-    }
-
-    if (val == null) {
-      _ls.pushNil();
-    } else if (val is bool) {
-      _ls.pushBoolean(val);
-    } else if (val is int) {
-      _ls.pushInteger(val);
-    } else if (val is double) {
-      _ls.pushNumber(val);
-    } else if (val is String) {
-      _ls.pushString(val);
-    } else if (val is Map) {
-      _ls.newTable();
-      val.forEach((k, v) {
-        _ls.pushString(k.toString());
-        _pushArg(v, visited);
-        _ls.setTable(-3);
-      });
-    } else if (val is List) {
-      _ls.newTable();
-      for (int i = 0; i < val.length; i++) {
-        _ls.pushInteger(i + 1);
-        _pushArg(val[i], visited);
-        _ls.setTable(-3);
-      }
-    } else {
-      _ls.pushString(val.toString());
-    }
-
-    visited?.remove(val);
   }
 }

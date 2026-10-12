@@ -106,7 +106,11 @@ class WebSocketApi {
       _pendingWs.add(wsId);
 
       unawaited(
-        WebSocket.connect(url, headers: customHeaders).then((ws) {
+        // 握手必须设超时：目标主机黑洞（收包不回）时 Future 永不完成，
+        // 回调句柄与 pending 状态会永久悬挂泄漏
+        WebSocket.connect(url, headers: customHeaders)
+            .timeout(const Duration(seconds: 15))
+            .then((ws) {
           if (!_pendingWs.remove(wsId)) {
             ws.close();
             return;

@@ -151,7 +151,8 @@ class BluetoothApi {
 
       if (cbRef != null) {
         delegate
-            .writeBluetoothCharacteristic(deviceId, serviceUuid, charUuid, value)
+            .writeBluetoothCharacteristic(
+                deviceId, serviceUuid, charUuid, value)
             .then((success) {
           callbacks.invokeAndRelease(cbRef, [
             {'ok': success, if (!success) 'error': '写入特征值失败'}

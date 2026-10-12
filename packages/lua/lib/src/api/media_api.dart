@@ -44,7 +44,12 @@ class MediaApi {
     ls.setField(-2, 'pickImage');
 
     // media.pickFile([callback])
+    // 与 fs.pickFile 权限对齐：选取结果会落入插件沙箱，统一要求 storage 权限
     ls.pushDartFunction((ls) {
+      if (!context.hasPermission(PluginPermission.storage)) {
+        ls.error2('权限不足: 插件未声明 storage 权限');
+        return 0;
+      }
       final cbRef = callbacks.ref(1);
       unawaited(
         delegate.pickFile().then((relPath) {

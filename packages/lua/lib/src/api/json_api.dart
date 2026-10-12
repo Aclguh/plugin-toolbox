@@ -62,7 +62,8 @@ class JsonApi {
   }
 
   /// Lua 栈上 [idx] 处的值转为 Dart 可 JSON 序列化结构（不弹出栈）
-  static dynamic _readValue(LuaState ls, int idx, Set<Object?> seen, int depth) {
+  static dynamic _readValue(
+      LuaState ls, int idx, Set<Object?> seen, int depth) {
     if (depth > maxDepth) {
       ls.error2('JSON 序列化失败: 嵌套层级超过 $maxDepth');
     }
@@ -83,7 +84,8 @@ class JsonApi {
     }
   }
 
-  static dynamic _readTable(LuaState ls, int idx, Set<Object?> seen, int depth) {
+  static dynamic _readTable(
+      LuaState ls, int idx, Set<Object?> seen, int depth) {
     // 绝对索引在 pushNil/递归期间保持稳定, next 迭代器状态挂在该表的栈槽上
     final absIdx = idx < 0 ? ls.getTop() + idx + 1 : idx;
     final identity = ls.toPointer(absIdx);
