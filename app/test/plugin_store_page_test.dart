@@ -47,7 +47,8 @@ class FakeStoreSource implements PluginStoreSource {
   }
 }
 
-Uint8List buildPtx({required String id, required String name, required String version}) {
+Uint8List buildPtx(
+    {required String id, required String name, required String version}) {
   final archive = Archive();
   void add(String path, String content) {
     final bytes = utf8.encode(content);
@@ -96,7 +97,8 @@ PluginStoreEntry storeEntry({
   );
 }
 
-ToolPlugin installedPlugin(String id, String name, String version) => DynamicPlugin(
+ToolPlugin installedPlugin(String id, String name, String version) =>
+    DynamicPlugin(
       manifest: PluginManifest(
         id: id,
         name: name,
@@ -163,7 +165,8 @@ void main() {
     return container;
   }
 
-  Future<void> pumpStore(WidgetTester tester, ProviderContainer container) async {
+  Future<void> pumpStore(
+      WidgetTester tester, ProviderContainer container) async {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -196,8 +199,16 @@ void main() {
 
   testWidgets('商店页展示线上条目的版本与简介, 并区分安装态', (WidgetTester tester) async {
     final source = FakeStoreSource(entries: [
-      storeEntry(id: 'qr_tool', name: '二维码生成', version: '1.1.0', description: '文本与链接生成二维码'),
-      storeEntry(id: 'hash_tool', name: '哈希计算器', version: '1.1.0', description: 'MD5 / SHA 摘要'),
+      storeEntry(
+          id: 'qr_tool',
+          name: '二维码生成',
+          version: '1.1.0',
+          description: '文本与链接生成二维码'),
+      storeEntry(
+          id: 'hash_tool',
+          name: '哈希计算器',
+          version: '1.1.0',
+          description: 'MD5 / SHA 摘要'),
     ]);
     final container = await createStoreContainer(source);
     container
@@ -243,7 +254,9 @@ void main() {
   testWidgets('点击安装先弹确认, 取消则不发起下载', (WidgetTester tester) async {
     final source = FakeStoreSource(
       entries: [storeEntry(id: 'qr_tool', name: '二维码生成')],
-      packages: {'qr_tool': buildPtx(id: 'qr_tool', name: '二维码生成', version: '1.1.0')},
+      packages: {
+        'qr_tool': buildPtx(id: 'qr_tool', name: '二维码生成', version: '1.1.0')
+      },
     );
     final container = await createStoreContainer(source);
 
@@ -269,9 +282,12 @@ void main() {
   testWidgets('确认后完成下载安装并注册进插件列表', (WidgetTester tester) async {
     final source = FakeStoreSource(
       entries: [storeEntry(id: 'qr_tool', name: '二维码生成')],
-      packages: {'qr_tool': buildPtx(id: 'qr_tool', name: '二维码生成', version: '1.1.0')},
+      packages: {
+        'qr_tool': buildPtx(id: 'qr_tool', name: '二维码生成', version: '1.1.0')
+      },
     );
-    final container = await createStoreContainer(source, fakeInstallerReturnsPlugin: true);
+    final container =
+        await createStoreContainer(source, fakeInstallerReturnsPlugin: true);
 
     await pumpStore(tester, container);
     await tester.tap(find.text('安装'));
@@ -287,7 +303,8 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
 
     expect(source.downloadCount, 1);
-    final registered = container.read(pluginRegistryProvider).getPlugin('qr_tool');
+    final registered =
+        container.read(pluginRegistryProvider).getPlugin('qr_tool');
     expect(registered, isNotNull);
     expect(registered!.version, '1.1.0');
     expect(find.textContaining('二维码生成 v1.1.0 已安装'), findsOneWidget);
@@ -338,4 +355,3 @@ void main() {
     expect(find.text('重新加载'), findsOneWidget);
   });
 }
-

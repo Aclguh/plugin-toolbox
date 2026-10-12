@@ -101,8 +101,10 @@ PluginStoreEntry storeEntry({
     minAppVersion: minAppVersion,
     packageName: '$id.ptx',
     packageSizeBytes: 2048,
-    packageApiUrl: 'https://api.github.com/repos/x/y/contents/dist/$id.ptx?ref=abc',
-    manifestApiUrl: 'https://api.github.com/repos/x/y/contents/plugin-source/$id/plugin.json',
+    packageApiUrl:
+        'https://api.github.com/repos/x/y/contents/dist/$id.ptx?ref=abc',
+    manifestApiUrl:
+        'https://api.github.com/repos/x/y/contents/plugin-source/$id/plugin.json',
     sourcePath: 'plugin-source/$id',
   );
 }
@@ -123,7 +125,8 @@ ToolPlugin installedPlugin(String id, String version) => DynamicPlugin(
       rootDir: Directory('.'),
     );
 
-PluginStoreCatalog catalogOf(List<PluginStoreEntry> entries) => PluginStoreCatalog(
+PluginStoreCatalog catalogOf(List<PluginStoreEntry> entries) =>
+    PluginStoreCatalog(
       entries: entries,
       revision: 'test-revision',
       fetchedAt: DateTime(2026, 1, 1),
@@ -175,7 +178,8 @@ void main() {
         appVersion: '0.1.0',
       );
 
-      expect(items.map((i) => i.id).toList(), ['new_tool', 'old_tool', 'same_tool']);
+      expect(items.map((i) => i.id).toList(),
+          ['new_tool', 'old_tool', 'same_tool']);
       expect(items[0].state, PluginStoreInstallState.notInstalled);
       expect(items[0].installedVersion, isNull);
       expect(items[1].state, PluginStoreInstallState.updateAvailable);
@@ -210,7 +214,8 @@ void main() {
       final source = FakeStoreSource(
         entries: [storeEntry(id: 'store_tool')],
         packages: {
-          'store_tool': buildPtx(id: 'store_tool', name: '商店插件', version: '1.1.0'),
+          'store_tool':
+              buildPtx(id: 'store_tool', name: '商店插件', version: '1.1.0'),
         },
       );
       final service = PluginStoreService(
@@ -227,7 +232,10 @@ void main() {
       expect(outcome.warnings, isEmpty);
 
       // 安装包解压到沙箱目录, 临时 .ptx 已清理
-      expect(File('${pluginsRoot.path}/plugins/store_tool/plugin.json').existsSync(), isTrue);
+      expect(
+          File('${pluginsRoot.path}/plugins/store_tool/plugin.json')
+              .existsSync(),
+          isTrue);
       expect(File('${tempRoot.path}/store_tool.ptx').existsSync(), isFalse);
     });
 
@@ -242,12 +250,15 @@ void main() {
         temporaryDirectoryProvider: () async => tempRoot,
       );
 
-      final outcome = await service.install(storeEntry(id: 'stale_tool', version: '2.0.0'));
+      final outcome =
+          await service.install(storeEntry(id: 'stale_tool', version: '2.0.0'));
 
       expect(outcome.versionMatched, isFalse);
       expect(outcome.warnings.single, contains('低于商店清单版本'));
       // 仍然完成安装: 提示不阻断流程
-      expect(File('${pluginsRoot.path}/plugins/stale_tool/main.lua').existsSync(), isTrue);
+      expect(
+          File('${pluginsRoot.path}/plugins/stale_tool/main.lua').existsSync(),
+          isTrue);
     });
 
     test('下载失败时不落盘、不产生半成品插件目录', () async {
@@ -263,7 +274,8 @@ void main() {
         service.install(storeEntry(id: 'broken_tool')),
         throwsA(isA<PluginStoreException>()),
       );
-      expect(Directory('${pluginsRoot.path}/plugins/broken_tool').existsSync(), isFalse);
+      expect(Directory('${pluginsRoot.path}/plugins/broken_tool').existsSync(),
+          isFalse);
       expect(File('${tempRoot.path}/broken_tool.ptx').existsSync(), isFalse);
     });
 
@@ -278,12 +290,17 @@ void main() {
         temporaryDirectoryProvider: () async => tempRoot,
       );
 
-      final first = await service.install(storeEntry(id: 'update_tool', version: '1.0.0'));
+      final first = await service
+          .install(storeEntry(id: 'update_tool', version: '1.0.0'));
       expect(first.plugin.version, '2.0.0');
 
-      final second = await service.install(storeEntry(id: 'update_tool', version: '2.0.0'));
+      final second = await service
+          .install(storeEntry(id: 'update_tool', version: '2.0.0'));
       expect(second.plugin.version, '2.0.0');
-      expect(File('${pluginsRoot.path}/plugins/update_tool/plugin.json').existsSync(), isTrue);
+      expect(
+          File('${pluginsRoot.path}/plugins/update_tool/plugin.json')
+              .existsSync(),
+          isTrue);
     });
 
     test('安装包缺少清单时抛出可展示错误并清理临时文件', () async {
@@ -294,7 +311,9 @@ void main() {
       final service = PluginStoreService(
         source: FakeStoreSource(
           entries: [storeEntry(id: 'no_manifest')],
-          packages: {'no_manifest': Uint8List.fromList(ZipEncoder().encode(archive)!)},
+          packages: {
+            'no_manifest': Uint8List.fromList(ZipEncoder().encode(archive)!)
+          },
         ),
         temporaryDirectoryProvider: () async => tempRoot,
       );
@@ -305,9 +324,9 @@ void main() {
             .having((e) => e.message, 'message', contains('plugin.json'))),
       );
       // 契约核对发生在落盘之前, 目录中不应出现任何半成品
-      expect(Directory('${pluginsRoot.path}/plugins/no_manifest').existsSync(), isFalse);
+      expect(Directory('${pluginsRoot.path}/plugins/no_manifest').existsSync(),
+          isFalse);
       expect(File('${tempRoot.path}/no_manifest.ptx').existsSync(), isFalse);
     });
   });
 }
-

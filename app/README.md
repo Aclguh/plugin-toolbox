@@ -15,6 +15,7 @@
    - 配合 Android 13+ 预测式返回（`android:enableOnBackInvokedCallback="true"`），在二级页面保护用户手势，防止误退出。
 3. **全局状态流与控制 (`flutter_riverpod`)**：
    - `pluginRegistryProvider`: 插件注册、启用状态、双向排序同步与持久化。
+   - `allPluginListProvider` / `enabledPluginListProvider`: 基于 `select` 的派生列表订阅，无关 EventBus 事件不触发页面重建。
    - `themeModeProvider`: 主题模式（品牌深色 / 清新浅色 / 跟随系统）。
    - `dynamicColorEnabledProvider`: Material You 壁纸动态取色开关控制。
    - `autoRotateProvider`: 重力旋转屏幕开关。
@@ -36,8 +37,8 @@ app/
 │   └── src/
 │       ├── app.dart          # MaterialApp 顶层容器，集成 DynamicColor 与主题监听
 │       ├── home/             # 主页网格：扁平化无分类展示，支持长按拖拽排序与自适应宽高比
-│       ├── plugin_manager/   # 插件管理中心：文件导入、启用开关、长按删除、左侧把手排序
-│       ├── plugin_host/      # 动态插件运行时宿主页面，挂载 DUI 响应式渲染树
+│       ├── plugin_manager/   # 插件管理中心：导入管线 (ptx_import.dart)、对话框组件 (plugin_manager_dialogs.dart)、启用开关与排序
+│       ├── plugin_host/      # 动态插件运行时宿主：宿主页面 + 按能力域拆分的 delegate（媒体/系统/AI）+ 原生桥接层
 │       ├── settings/         # 设置页面：外观显示设置、重力旋转、主题模式、动态取色、关于
 │       ├── router/           # 声明式路由定义与品牌化"页面未找到"错误页 (app_router.dart)
 │       └── providers/        # 全局 Riverpod 提供者与持久化调度器 (app_providers.dart)

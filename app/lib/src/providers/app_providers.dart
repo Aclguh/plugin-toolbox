@@ -23,7 +23,8 @@ final storageFactoryProvider = Provider<PluginStorageFactory>((ref) {
 });
 
 /// SharedPreferences 读取的安全容空包装：存储故障时降级为默认值，绝不崩溃
-T safeRead<T>(SharedPreferences prefs, String key, T fallback, T? Function(String) getter) {
+T safeRead<T>(SharedPreferences prefs, String key, T fallback,
+    T? Function(String) getter) {
   try {
     final value = getter(key);
     return value ?? fallback;
@@ -117,7 +118,8 @@ class PluginRegistryNotifier extends StateNotifier<PluginRegistry> {
   }
 }
 
-final pluginRegistryProvider = StateNotifierProvider<PluginRegistryNotifier, PluginRegistry>((ref) {
+final pluginRegistryProvider =
+    StateNotifierProvider<PluginRegistryNotifier, PluginRegistry>((ref) {
   final bus = ref.watch(eventBusProvider);
   final storageFactory = ref.watch(storageFactoryProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
@@ -130,6 +132,20 @@ final pluginRegistryProvider = StateNotifierProvider<PluginRegistryNotifier, Plu
   ref.onDispose(() => uninstallSub.cancel());
   return PluginRegistryNotifier(registry, prefs, eventBus: bus);
 });
+
+/// 派生 provider 以 select 订阅注册表内部缓存的列表实例：
+/// 注册表仅在注册/注销/排序/启禁用变更后才失效重建缓存列表，
+/// 因此无关 EventBus 事件不再触发首页/管理/商店 watcher 重建，
+/// 而排序与启禁用变更会重建列表实例，各页面精确联动刷新。
+final allPluginListProvider = Provider<List<ToolPlugin>>(
+  (ref) => ref.watch(pluginRegistryProvider.select((r) => r.allPlugins)),
+);
+
+/// 已启用插件列表（首页网格）：与全量列表同一数据源，
+/// 排序/启禁用变更时两处严格实时同步
+final enabledPluginListProvider = Provider<List<ToolPlugin>>(
+  (ref) => ref.watch(pluginRegistryProvider.select((r) => r.enabledPlugins)),
+);
 
 class OrientationNotifier extends StateNotifier<bool> {
   OrientationNotifier(SharedPreferences prefs)
@@ -169,7 +185,8 @@ class OrientationNotifier extends StateNotifier<bool> {
   }
 }
 
-final autoRotateProvider = StateNotifierProvider<OrientationNotifier, bool>((ref) {
+final autoRotateProvider =
+    StateNotifierProvider<OrientationNotifier, bool>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return OrientationNotifier(prefs);
 });
@@ -205,7 +222,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 }
 
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return ThemeModeNotifier(prefs);
 });
@@ -227,7 +245,8 @@ class DynamicColorNotifier extends StateNotifier<bool> {
   }
 }
 
-final dynamicColorEnabledProvider = StateNotifierProvider<DynamicColorNotifier, bool>((ref) {
+final dynamicColorEnabledProvider =
+    StateNotifierProvider<DynamicColorNotifier, bool>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return DynamicColorNotifier(prefs);
 });

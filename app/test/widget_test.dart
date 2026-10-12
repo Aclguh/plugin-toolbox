@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -50,7 +51,8 @@ ToolPlugin createMockPlugin(String id, String name) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('App launches and renders title smoke test', (WidgetTester tester) async {
+  testWidgets('App launches and renders title smoke test',
+      (WidgetTester tester) async {
     final container = await createContainer(overrides: [
       appInitFutureProvider.overrideWith((ref) async {}),
     ]);
@@ -93,7 +95,8 @@ void main() {
     );
   });
 
-  testWidgets('HomePage renders plugins in ReorderableGridView without category headers',
+  testWidgets(
+      'HomePage renders plugins in ReorderableGridView without category headers',
       (WidgetTester tester) async {
     final container = await createContainer(
       overrides: [
@@ -119,9 +122,11 @@ void main() {
     expect(find.text('Plugin 2'), findsOneWidget);
 
     // Verify ReorderableGridView is used and configured with rounded-corner dragWidgetBuilder
-    final gridView = tester.widget<ReorderableGridView>(find.byType(ReorderableGridView));
+    final gridView =
+        tester.widget<ReorderableGridView>(find.byType(ReorderableGridView));
     expect(gridView.dragWidgetBuilderV2, isNotNull);
-    final dragWidget = gridView.dragWidgetBuilderV2!.builder(0, const SizedBox(), null);
+    final dragWidget =
+        gridView.dragWidgetBuilderV2!.builder(0, const SizedBox(), null);
     expect(dragWidget, isA<Material>());
     final material = dragWidget as Material;
     expect(material.shape, isA<RoundedRectangleBorder>());
@@ -133,7 +138,8 @@ void main() {
     expect(find.text(PluginCategory.calculator.label), findsNothing);
   });
 
-  testWidgets('PluginManagerPage has left drag handle, switch, no trash icon, and long-press delete dialog',
+  testWidgets(
+      'PluginManagerPage has left drag handle, switch, no trash icon, and long-press delete dialog',
       (WidgetTester tester) async {
     final container = await createContainer();
     final registry = container.read(pluginRegistryProvider);
@@ -150,7 +156,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify ReorderableListView has rounded proxyDecorator
-    final listView = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
+    final listView =
+        tester.widget<ReorderableListView>(find.byType(ReorderableListView));
     expect(listView.proxyDecorator, isNotNull);
 
     // Verify drag indicator icon on left
@@ -193,8 +200,7 @@ void main() {
     expect(find.text('权限管理'), findsNothing);
   });
 
-  testWidgets('批量导入: 逐文件安装, 单文件失败不影响其余, 结果可汇总',
-      (WidgetTester tester) async {
+  testWidgets('批量导入: 逐文件安装, 单文件失败不影响其余, 结果可汇总', (WidgetTester tester) async {
     // 扩展名过滤
     expect(isPtxPackage('a.ptx'), isTrue);
     expect(isPtxPackage('a.PTX'), isTrue);
@@ -260,20 +266,24 @@ void main() {
     registry.register(createMockPlugin('p3', 'Plugin 3'));
 
     expect(registry.allPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
-    expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
+    expect(
+        registry.enabledPlugins.map((p) => p.id).toList(), ['p1', 'p2', 'p3']);
 
     // Reorder from Manager (move p3 to index 0)
     await notifier.reorder(2, 0);
     expect(registry.allPlugins.map((p) => p.id).toList(), ['p3', 'p1', 'p2']);
-    expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p3', 'p1', 'p2']);
+    expect(
+        registry.enabledPlugins.map((p) => p.id).toList(), ['p3', 'p1', 'p2']);
 
     // Reorder from Home (move p2 to index 0)
     await notifier.reorderEnabled(2, 0);
     expect(registry.allPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
-    expect(registry.enabledPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
+    expect(
+        registry.enabledPlugins.map((p) => p.id).toList(), ['p2', 'p3', 'p1']);
   });
 
-  testWidgets('SettingsPage allows changing theme mode and toggling dynamic color',
+  testWidgets(
+      'SettingsPage allows changing theme mode and toggling dynamic color',
       (WidgetTester tester) async {
     final container = await createContainer();
 
@@ -296,13 +306,19 @@ void main() {
     expect(find.textContaining('版本 0.2.0'), findsOneWidget);
   });
 
-  testWidgets('DynamicPluginHostPage handles missing UI file with graceful ErrorView',
+  testWidgets(
+      'DynamicPluginHostPage handles missing UI file with graceful ErrorView',
       (WidgetTester tester) async {
     final mockPlugin = createMockPlugin('missing_ui', '测试插件');
+    final container = await createContainer();
 
+    // 宿主页经 ConsumerState 读取注册表完成懒初始化，需注入 ProviderScope
     await tester.pumpWidget(
-      MaterialApp(
-        home: DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
+        ),
       ),
     );
 
@@ -319,24 +335,29 @@ void main() {
     expect(find.textContaining('插件运行错误'), findsOneWidget);
   });
 
-  testWidgets('DynamicPluginHostPage 点击返回按钮安全退出页面', (WidgetTester tester) async {
+  testWidgets('DynamicPluginHostPage 点击返回按钮安全退出页面',
+      (WidgetTester tester) async {
     final mockPlugin = createMockPlugin('back_test', '返回测试');
+    final container = await createContainer();
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          DynamicPluginHostPage(plugin: mockPlugin as DynamicPlugin),
-                    ),
-                  );
-                },
-                child: const Text('打开插件'),
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DynamicPluginHostPage(
+                            plugin: mockPlugin as DynamicPlugin),
+                      ),
+                    );
+                  },
+                  child: const Text('打开插件'),
+                ),
               ),
             ),
           ),
@@ -362,7 +383,8 @@ void main() {
     expect(find.text('返回测试'), findsNothing);
   });
 
-  testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {    final container = await createContainer(overrides: [
+  testWidgets('非法路由展示品牌化的页面未找到错误页', (WidgetTester tester) async {
+    final container = await createContainer(overrides: [
       appInitFutureProvider.overrideWith((ref) async {}),
     ]);
     final router = container.read(appRouterProvider);
@@ -439,7 +461,87 @@ void main() {
     expect(find.text('直达插件'), findsOneWidget);
   });
 
-  testWidgets('PluginRegistryNotifier 启用停用与自定义权限持久化', (WidgetTester tester) async {
+  testWidgets('路由 extra 贯通至宿主页 initialData（plugin.open 调起参数）',
+      (WidgetTester tester) async {
+    final mockPlugin = createMockPlugin('extra_p', '参数插件');
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final registry = container.read(pluginRegistryProvider);
+    registry.register(mockPlugin);
+
+    final router = container.read(appRouterProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 模拟 plugin.open 调起：extra 携带初始参数
+    unawaited(router
+        .push('/plugin/extra_p', extra: {'source': 'unit_test', 'value': 42}));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+
+    final hostPage = tester
+        .widget<DynamicPluginHostPage>(find.byType(DynamicPluginHostPage));
+    expect(hostPage.initialData, {'source': 'unit_test', 'value': 42});
+  });
+
+  test('派生 provider：无关 EventBus 事件不触发列表重建，排序双端同源同步', () async {
+    final container = await createContainer();
+    final registry = container.read(pluginRegistryProvider);
+    final notifier = container.read(pluginRegistryProvider.notifier);
+
+    registry.register(createMockPlugin('p1', 'Plugin 1'));
+    registry.register(createMockPlugin('p2', 'Plugin 2'));
+    registry.register(createMockPlugin('p3', 'Plugin 3'));
+    notifier.refresh();
+
+    final allBefore = container.read(allPluginListProvider);
+    final enabledBefore = container.read(enabledPluginListProvider);
+
+    var allNotify = 0, enabledNotify = 0;
+    container.listen(allPluginListProvider, (_, __) => allNotify++);
+    container.listen(enabledPluginListProvider, (_, __) => enabledNotify++);
+
+    // 无关事件（注册表缓存未失效）不应触发任何派生 provider 通知
+    // (container.listen 的回调异步调度，需留出真实事件循环窗口)
+    container.read(eventBusProvider).fire(PluginStateChangedEvent('p1', true));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(allNotify, 0);
+    expect(enabledNotify, 0);
+    expect(container.read(allPluginListProvider), same(allBefore));
+    expect(container.read(enabledPluginListProvider), same(enabledBefore));
+
+    // 排序变更：全量与启用列表同源同步更新
+    await notifier.reorder(2, 0);
+    await Future<void>.delayed(Duration.zero);
+    expect(allNotify, greaterThan(0));
+    expect(enabledNotify, greaterThan(0));
+    expect(container.read(allPluginListProvider).map((p) => p.id).toList(),
+        ['p3', 'p1', 'p2']);
+    expect(container.read(enabledPluginListProvider).map((p) => p.id).toList(),
+        ['p3', 'p1', 'p2']);
+
+    // 启禁用变更：启用列表联动收缩，与全量列表保持同一数据源
+    await notifier.setEnabled('p1', false);
+    await Future<void>.delayed(Duration.zero);
+    expect(registry.isEnabled('p1'), isFalse);
+    expect(container.read(enabledPluginListProvider).map((p) => p.id).toList(),
+        ['p3', 'p2']);
+    expect(container.read(allPluginListProvider).map((p) => p.id).toList(),
+        ['p3', 'p1', 'p2']);
+  });
+
+  testWidgets('PluginRegistryNotifier 启用停用与自定义权限持久化',
+      (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final container = ProviderContainer(overrides: [
@@ -456,11 +558,13 @@ void main() {
     // 设置停用并持久化
     await notifier.setEnabled('perm_p', false);
     expect(registry.disabledPluginIds, contains('perm_p'));
-    expect(prefs.getStringList('plugin_toolbox_disabled_plugins'), contains('perm_p'));
+    expect(prefs.getStringList('plugin_toolbox_disabled_plugins'),
+        contains('perm_p'));
 
     // 设置自定义权限并持久化
     await notifier.setCustomPermissions('perm_p', {PluginPermission.camera});
-    expect(registry.getCustomPermissions('perm_p'), contains(PluginPermission.camera));
+    expect(registry.getCustomPermissions('perm_p'),
+        contains(PluginPermission.camera));
     expect(
       prefs.getStringList('plugin_toolbox_permissions_perm_p'),
       contains('camera'),

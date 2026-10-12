@@ -14,7 +14,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     // 非法路由展示品牌化错误页，而非框架默认的无样式错误
-    errorBuilder: (context, state) => _RouteNotFoundPage(uri: state.uri.toString()),
+    errorBuilder: (context, state) =>
+        _RouteNotFoundPage(uri: state.uri.toString()),
     routes: [
       GoRoute(
         path: '/',
@@ -68,7 +69,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         '该插件当前处于禁用状态。如需使用，请前往插件管理中心重新启用。',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                       const SizedBox(height: 20),
@@ -83,10 +86,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             );
           }
           if (plugin is DynamicPlugin) {
-            if (!registry.isInitialized(pluginId)) {
-              registry.initializePlugin(pluginId);
-            }
-            return DynamicPluginHostPage(plugin: plugin);
+            // 插件上下文的懒初始化收敛在宿主页面 initState 内，
+            // builder 保持纯函数不做副作用，避免路由重建时重复触发初始化；
+            // state.extra 携带 plugin.open 调起的初始参数，贯通至宿主页面
+            final extra = state.extra;
+            final initialData =
+                extra is Map ? Map<String, dynamic>.from(extra) : null;
+            return DynamicPluginHostPage(
+              plugin: plugin,
+              initialData: initialData,
+            );
           }
           // 内置插件页面
           return Scaffold(

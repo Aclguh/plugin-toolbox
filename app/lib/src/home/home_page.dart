@@ -12,7 +12,8 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final init = ref.watch(appInitFutureProvider);
-    final registry = ref.watch(pluginRegistryProvider);
+    // 仅跟随启用插件列表重建：无关 EventBus 事件不再触发整页刷新
+    final plugins = ref.watch(enabledPluginListProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +38,6 @@ class HomePage extends ConsumerWidget {
       ),
       body: init.when(
         data: (_) {
-          final plugins = registry.enabledPlugins;
           if (plugins.isEmpty) {
             return Center(
               child: Column(
@@ -65,7 +65,8 @@ class HomePage extends ConsumerWidget {
             );
           }
 
-          final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+          final isPortrait =
+              MediaQuery.of(context).orientation == Orientation.portrait;
           final crossAxisCount = isPortrait ? 3 : 4;
 
           // 卡片宽高比随可用宽度动态计算：固定值在小屏会挤压文字、
@@ -89,14 +90,19 @@ class HomePage extends ConsumerWidget {
               ),
               itemCount: plugins.length,
               onReorder: (oldIndex, newIndex) async {
-                await ref.read(pluginRegistryProvider.notifier).reorderEnabled(oldIndex, newIndex);
+                await ref
+                    .read(pluginRegistryProvider.notifier)
+                    .reorderEnabled(oldIndex, newIndex);
               },
               dragWidgetBuilder: (index, child) {
                 return Material(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.8),
                       width: 1.5,
                     ),
                   ),

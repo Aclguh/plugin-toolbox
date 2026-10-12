@@ -68,15 +68,22 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
               Text(
                 '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
               ),
-              if (item.entry.permissions.any((p) => PluginPermission.fromString(p)?.isSensitive ?? false)) ...[
+              if (item.entry.permissions.any((p) =>
+                  PluginPermission.fromString(p)?.isSensitive ?? false)) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Theme.of(ctx).colorScheme.errorContainer.withValues(alpha: 0.2),
+                    color: Theme.of(ctx)
+                        .colorScheme
+                        .errorContainer
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Theme.of(ctx).colorScheme.error.withValues(alpha: 0.4),
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .error
+                          .withValues(alpha: 0.4),
                     ),
                   ),
                   child: Column(
@@ -92,10 +99,11 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                           const SizedBox(width: 6),
                           Text(
                             '敏感权限授权提醒',
-                            style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
-                                  color: Theme.of(ctx).colorScheme.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style:
+                                Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                                      color: Theme.of(ctx).colorScheme.error,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                           ),
                         ],
                       ),
@@ -134,7 +142,9 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
-              item.state == PluginStoreInstallState.updateAvailable ? '更新' : '安装',
+              item.state == PluginStoreInstallState.updateAvailable
+                  ? '更新'
+                  : '安装',
             ),
           ),
         ],
@@ -164,7 +174,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       await ref.read(pluginRegistryProvider.notifier).saveOrder();
 
       success = true;
-      final warnings = outcome.warnings.isEmpty ? '' : '（${outcome.warnings.join('；')}）';
+      final warnings =
+          outcome.warnings.isEmpty ? '' : '（${outcome.warnings.join('；')}）';
       message =
           '${item.name} v${outcome.plugin.version} ${item.state == PluginStoreInstallState.updateAvailable ? '已更新' : '已安装'}$warnings';
     } on PluginStoreException catch (e) {
@@ -196,7 +207,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   @override
   Widget build(BuildContext context) {
     final catalogAsync = ref.watch(pluginStoreCatalogProvider);
-    final registry = ref.watch(pluginRegistryProvider);
+    // 仅跟随全量插件列表重建：无关事件不再刷新商店页
+    final installedPlugins = ref.watch(allPluginListProvider);
     final service = ref.watch(pluginStoreServiceProvider);
 
     return PluginPageScaffold(
@@ -210,7 +222,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       ],
       body: Stack(
         children: [
-          Positioned.fill(child: _buildBody(catalogAsync, registry, service)),
+          Positioned.fill(
+              child: _buildBody(catalogAsync, installedPlugins, service)),
           if (_busyPlugins.isNotEmpty) _buildBusyOverlay(),
         ],
       ),
@@ -219,81 +232,80 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   Widget _buildBody(
     AsyncValue<PluginStoreCatalog> catalogAsync,
-    PluginRegistry registry,
+    List<ToolPlugin> installedPlugins,
     PluginStoreService service,
   ) {
     return catalogAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ErrorView(
-                  message: error is PluginStoreException
-                      ? error.message
-                      : '插件目录加载失败，请检查网络后重试',
-                ),
-                const SizedBox(height: 16),
-                FilledButton.tonal(
-                  onPressed: _refresh,
-                  child: const Text('重新加载'),
-                ),
-              ],
-            ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ErrorView(
+                message: error is PluginStoreException
+                    ? error.message
+                    : '插件目录加载失败，请检查网络后重试',
+              ),
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                onPressed: _refresh,
+                child: const Text('重新加载'),
+              ),
+            ],
           ),
         ),
-        data: (catalog) {
-          final items = service.buildItems(
-            catalog: catalog,
-            installedPlugins: registry.allPlugins,
-            appVersion: kHostAppVersion,
-          );
-          if (items.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.storefront_outlined,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('远端插件目录为空'),
-                    const SizedBox(height: 12),
-                    FilledButton.tonal(
-                      onPressed: _refresh,
-                      child: const Text('重新加载'),
-                    ),
-                  ],
-                ),
+      ),
+      data: (catalog) {
+        final items = service.buildItems(
+          catalog: catalog,
+          installedPlugins: installedPlugins,
+          appVersion: kHostAppVersion,
+        );
+        if (items.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.storefront_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('远端插件目录为空'),
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    onPressed: _refresh,
+                    child: const Text('重新加载'),
+                  ),
+                ],
               ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 24),
-              itemCount: items.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) return _buildHeader(catalog, items);
-                return _buildItemCard(items[index - 1]);
-              },
             ),
           );
-        },
-      );
+        }
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 24),
+            itemCount: items.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return _buildHeader(catalog, items);
+              return _buildItemCard(items[index - 1]);
+            },
+          ),
+        );
+      },
+    );
   }
 
   /// 安装进行中的页面级遮罩：阻断重复点击，并展示正在安装的插件名。
   Widget _buildBusyOverlay() {
-    final name =
-        _busyPlugins.length == 1 ? _busyPlugins.values.first : null;
+    final name = _busyPlugins.length == 1 ? _busyPlugins.values.first : null;
     return Positioned.fill(
       child: IgnorePointer(
         child: ColoredBox(
@@ -302,7 +314,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
             child: Card(
               margin: const EdgeInsets.symmetric(horizontal: 40),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -362,7 +375,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   Widget _buildItemCard(PluginStoreItem item) {
     final theme = Theme.of(context);
     final busy = _busyPlugins.containsKey(item.id);
-    final updateAvailable = item.state == PluginStoreInstallState.updateAvailable;
+    final updateAvailable =
+        item.state == PluginStoreInstallState.updateAvailable;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),

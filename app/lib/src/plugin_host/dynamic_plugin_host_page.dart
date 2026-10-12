@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -9,20 +10,36 @@ import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
 import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
+import '../providers/app_providers.dart';
 import 'plugin_native_bridge.dart';
+import 'plugin_host_ai_delegate.dart';
+import 'plugin_host_media_delegate.dart';
+import 'plugin_host_system_delegate.dart';
 
 /// 动态插件宿主页面容器
-class DynamicPluginHostPage extends StatefulWidget {
+class DynamicPluginHostPage extends ConsumerStatefulWidget {
   final DynamicPlugin plugin;
 
-  const DynamicPluginHostPage({super.key, required this.plugin});
+  /// 跨插件调起（plugin.open）携带的初始参数，经路由 extra 贯通至此
+  final Map<String, dynamic>? initialData;
+
+  const DynamicPluginHostPage({
+    super.key,
+    required this.plugin,
+    this.initialData,
+  });
 
   @override
-  State<DynamicPluginHostPage> createState() => _DynamicPluginHostPageState();
+  ConsumerState<DynamicPluginHostPage> createState() =>
+      _DynamicPluginHostPageState();
 }
 
-class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
-    with WidgetsBindingObserver
+class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
+    with
+        WidgetsBindingObserver,
+        PluginHostMediaDelegate,
+        PluginHostSystemDelegate,
+        PluginHostAiDelegate
     implements LuaHostDelegate, DuiActionExecutor {
   late final PluginNativeBridge _nativeBridge;
   late final DuiState _duiState;
@@ -35,15 +52,22 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   bool _isLoading = true;
 
   @override
+  PluginNativeBridge get nativeBridge => _nativeBridge;
+
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _nativeBridge = PluginNativeBridge(pluginRootDir: widget.plugin.rootDir);
+    _nativeBridge = PluginNativeBridge(
+      pluginRootDir: widget.plugin.rootDir,
+      storageQuotaMb: widget.plugin.manifest.storageQuotaMb,
+    );
     _duiState = DuiState();
     _eventHandler = DuiEventHandler(
       state: _duiState,
       executor: this,
-      permissionChecker: (perm) => widget.plugin.context?.hasPermission(perm) ?? false,
+      permissionChecker: (perm) =>
+          widget.plugin.context?.hasPermission(perm) ?? false,
     );
     _renderer = DuiRenderer(
       state: _duiState,
@@ -67,7 +91,13 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
 
   Future<void> _startPlugin() async {
     try {
-      // 0. 上下文就绪安全防线（阻断异步路由跳转或直接挂载时的竞态条件）
+      // 0. 上下文懒初始化收敛在页面生命周期内（路由 builder 不做副作用），
+      // 深链直达或异步跳转挂载时同样保证上下文就绪
+      final registry = ref.read(pluginRegistryProvider);
+      if (!registry.isInitialized(widget.plugin.id)) {
+        await registry.initializePlugin(widget.plugin.id);
+      }
+      // 注册表初始化失败（或直接挂载未走注册表）时的兜底上下文
       if (widget.plugin.context == null) {
         await widget.plugin.initialize(PluginContext(
           pluginId: widget.plugin.id,
@@ -92,6 +122,20 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
       // 2. 初始化 Lua 运行时
       _runner = LuaPluginRunner(plugin: widget.plugin, delegate: this);
       await _runner!.start();
+
+      // 3. 贯通跨插件调起的初始参数：预置 DUI 状态使 ${state.xxx} 绑定
+      // 可直接渲染，并派发 onLaunch 钩子让 Lua 脚本感知调起来源
+      final launchData = widget.initialData;
+      if (launchData != null && launchData.isNotEmpty) {
+        for (final entry in launchData.entries) {
+          _duiState.set(entry.key, entry.value);
+        }
+        try {
+          _runner!.dispatchAction('onLaunch', [launchData]);
+        } catch (e) {
+          showToast('onLaunch 执行错误: $e');
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -199,28 +243,33 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
   }) async {
     if (!mounted) return null;
     final controller = TextEditingController(text: defaultValue);
-    final res = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(hintText: hint),
-          autofocus: true,
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(hintText: hint),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('确定'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    return res;
+      );
+    } finally {
+      // 对话框关闭（含异常路径）后必须释放控制器，防止每次调用泄漏一个
+      // TextEditingController 及其挂载的 FocusNode 监听器
+      controller.dispose();
+    }
   }
 
   @override
@@ -238,7 +287,8 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
           final idx = entry.key;
           final item = entry.value;
           return SimpleDialogOption(
-            onPressed: () => Navigator.of(ctx).pop({'index': idx, 'text': item}),
+            onPressed: () =>
+                Navigator.of(ctx).pop({'index': idx, 'text': item}),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(item),
@@ -276,7 +326,8 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
               final item = entry.value;
               return ListTile(
                 title: Text(item, textAlign: TextAlign.center),
-                onTap: () => Navigator.of(ctx).pop({'index': idx, 'text': item}),
+                onTap: () =>
+                    Navigator.of(ctx).pop({'index': idx, 'text': item}),
               );
             }),
           ],
@@ -389,42 +440,11 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
   }
 
-  // --- LuaHostDelegate: 平台与系统能力委派至 PluginNativeBridge ---
-  @override
-  Future<void> shareText(String text, {String? subject}) =>
-      _nativeBridge.shareText(text, subject: subject);
-
-  @override
-  Future<bool> openUrl(String url) => _nativeBridge.openUrl(url);
-
-  @override
-  Future<String?> pickFile({List<String>? allowedExtensions}) =>
-      _nativeBridge.pickFile(allowedExtensions: allowedExtensions);
-
-  @override
-  Future<String?> pickImage() => _nativeBridge.pickImage();
-
-  @override
-  Future<bool> setTorch(bool enabled) => _nativeBridge.setTorch(enabled);
-
-  @override
-  bool get isTorchOn => _nativeBridge.isTorchOn;
-
-  @override
-  Future<bool> shareFile(String filePath, {String? mimeType, String? subject}) =>
-      _nativeBridge.shareFile(filePath, mimeType: mimeType, subject: subject);
-
-  @override
-  Future<bool> saveToGallery(String filePath) =>
-      _nativeBridge.saveToGallery(filePath);
-
-  @override
-  Future<bool> exportFile(String filePath, {String? defaultName}) =>
-      _nativeBridge.exportFile(filePath, defaultName: defaultName);
-
+  // 扫码与图片解码在桌面端无原生识别器时需借 showPrompt 降级模拟，
+  // 依赖页面上下文，故保留在页面层而不下沉到能力域 mixin
   @override
   Future<String?> scanBarcode({String? prompt}) async {
-    final res = await _nativeBridge.scanBarcode(prompt: prompt);
+    final res = await nativeBridge.scanBarcode(prompt: prompt);
     if (res != null) return res;
     if (!mounted) return null;
     if (!Platform.isAndroid && !Platform.isIOS) {
@@ -438,7 +458,7 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
 
   @override
   Future<String?> decodeBarcodeFromImage(String filePath) async {
-    final res = await _nativeBridge.decodeBarcodeFromImage(filePath);
+    final res = await nativeBridge.decodeBarcodeFromImage(filePath);
     if (res != null) return res;
     if (!mounted) return null;
     if (!Platform.isAndroid && !Platform.isIOS) {
@@ -449,200 +469,6 @@ class _DynamicPluginHostPageState extends State<DynamicPluginHostPage>
     }
     return null;
   }
-
-  @override
-  Future<bool> startSensor(String type) => _nativeBridge.startSensor(type);
-
-  @override
-  Future<bool> stopSensor(String type) => _nativeBridge.stopSensor(type);
-
-  @override
-  Future<Map<String, dynamic>?> getSensorData(String type) =>
-      _nativeBridge.getSensorData(type);
-
-  @override
-  Future<Map<String, dynamic>?> imageInfo(String filePath) =>
-      _nativeBridge.imageInfo(filePath);
-
-  @override
-  Future<bool> compressImage(String srcPath, String destPath, {int quality = 80}) =>
-      _nativeBridge.compressImage(srcPath, destPath, quality: quality);
-
-  @override
-  Future<bool> cropImage(String srcPath, String destPath,
-          {required int x, required int y, required int width, required int height}) =>
-      _nativeBridge.cropImage(srcPath, destPath,
-          x: x, y: y, width: width, height: height);
-
-  @override
-  Future<bool> convertImage(String srcPath, String destPath, {required String format}) =>
-      _nativeBridge.convertImage(srcPath, destPath, format: format);
-
-  @override
-  Future<bool> stripExifImage(String srcPath, String destPath) =>
-      _nativeBridge.stripExifImage(srcPath, destPath);
-
-  @override
-  Future<int> showNotification({required String title, required String body, String? payload}) =>
-      _nativeBridge.showNotification(title: title, body: body, payload: payload);
-
-  @override
-  Future<int> scheduleNotification(
-          {required String title, required String body, required int delaySeconds, String? payload}) =>
-      _nativeBridge.scheduleNotification(
-          title: title, body: body, delaySeconds: delaySeconds, payload: payload);
-
-  @override
-  Future<bool> cancelNotification(int id) =>
-      _nativeBridge.cancelNotification(id);
-
-  @override
-  Future<bool> cancelAllNotifications() =>
-      _nativeBridge.cancelAllNotifications();
-
-  @override
-  Future<bool> playAudio(String filePath) => _nativeBridge.playAudio(filePath);
-
-  @override
-  Future<bool> stopAudio() => _nativeBridge.stopAudio();
-
-  @override
-  Future<bool> playTone(double frequencyHz, int durationMs) =>
-      _nativeBridge.playTone(frequencyHz, durationMs);
-
-  @override
-  Future<bool> startAudioRecording(String destPath) =>
-      _nativeBridge.startAudioRecording(destPath);
-
-  @override
-  Future<Map<String, dynamic>?> stopAudioRecording() =>
-      _nativeBridge.stopAudioRecording();
-
-  @override
-  Future<double> getAudioDecibel() => _nativeBridge.getAudioDecibel();
-
-  @override
-  Future<bool> speakText(String text, {String? language, double? pitch, double? rate}) =>
-      _nativeBridge.speakText(text, language: language, pitch: pitch, rate: rate);
-
-  @override
-  Future<bool> stopSpeaking() => _nativeBridge.stopSpeaking();
-
-  @override
-  Future<bool> setKeepScreenOn(bool enabled) =>
-      _nativeBridge.setKeepScreenOn(enabled);
-
-  @override
-  Future<bool> setBrightness(double brightness) =>
-      _nativeBridge.setBrightness(brightness);
-
-  @override
-  Future<double> getBrightness() => _nativeBridge.getBrightness();
-
-  @override
-  Future<bool> resetBrightness() => _nativeBridge.resetBrightness();
-
-  @override
-  int get batteryLevel => 100;
-
-  @override
-  bool get isCharging => false;
-
-  @override
-  Future<bool> checkIsCharging() async => false;
-
-  @override
-  String get networkType => 'unknown';
-
-  @override
-  Future<int> getBatteryLevel() => _nativeBridge.getBatteryLevel();
-
-  @override
-  Future<String> fetchNetworkType() => _nativeBridge.fetchNetworkType();
-
-  @override
-  Future<Map<String, dynamic>?> getInitialShare() =>
-      _nativeBridge.getInitialShare();
-
-  @override
-  Future<bool> isBiometricsAvailable() =>
-      _nativeBridge.isBiometricsAvailable();
-
-  @override
-  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) =>
-      _nativeBridge.authenticateBiometrics(reason: reason);
-
-  @override
-  Future<bool> isLocationAvailable() => _nativeBridge.isLocationAvailable();
-
-  @override
-  Future<Map<String, dynamic>?> getCurrentPosition() =>
-      _nativeBridge.getCurrentPosition();
-
-  @override
-  Future<bool> isNfcAvailable() => _nativeBridge.isNfcAvailable();
-
-  @override
-  Future<Map<String, dynamic>?> readNdef() => _nativeBridge.readNdef();
-
-  @override
-  Future<bool> writeNdef(List<Map<String, dynamic>> records) =>
-      _nativeBridge.writeNdef(records);
-
-  @override
-  Future<bool> isBluetoothAvailable() =>
-      _nativeBridge.isBluetoothAvailable();
-
-  @override
-  Future<bool> startBluetoothScan(
-          void Function(Map<String, dynamic> device) onDeviceFound) =>
-      _nativeBridge.startBluetoothScan(onDeviceFound);
-
-  @override
-  Future<bool> stopBluetoothScan() => _nativeBridge.stopBluetoothScan();
-
-  @override
-  Future<bool> connectBluetooth(String deviceId) =>
-      _nativeBridge.connectBluetooth(deviceId);
-
-  @override
-  Future<bool> disconnectBluetooth(String deviceId) =>
-      _nativeBridge.disconnectBluetooth(deviceId);
-
-  @override
-  Future<String?> readBluetoothCharacteristic(
-          String deviceId, String serviceUuid, String charUuid) =>
-      _nativeBridge.readBluetoothCharacteristic(deviceId, serviceUuid, charUuid);
-
-  @override
-  Future<bool> writeBluetoothCharacteristic(
-          String deviceId, String serviceUuid, String charUuid, String value) =>
-      _nativeBridge.writeBluetoothCharacteristic(deviceId, serviceUuid, charUuid, value);
-
-  @override
-  Future<Map<String, dynamic>?> recognizeText(String filePath) =>
-      _nativeBridge.recognizeText(filePath);
-
-  @override
-  Future<bool> isAiAvailable() => _nativeBridge.isAiAvailable();
-
-  @override
-  Future<Map<String, dynamic>> aiChat({
-    required List<Map<String, dynamic>> messages,
-    String? model,
-    double? temperature,
-  }) =>
-      _nativeBridge.aiChat(
-          messages: messages, model: model, temperature: temperature);
-
-  @override
-  Stream<String> aiStreamChat({
-    required List<Map<String, dynamic>> messages,
-    String? model,
-    double? temperature,
-  }) =>
-      _nativeBridge.aiStreamChat(
-          messages: messages, model: model, temperature: temperature);
 
   @override
   Widget build(BuildContext context) {
