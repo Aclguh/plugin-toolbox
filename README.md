@@ -8,7 +8,7 @@
 
 一个高度解耦、支持热插拔的现代化 Android 工具箱应用。用户既可以导入本地 `.ptx` 插件包，也可以直接在应用内的插件商店在线安装与更新插件，无需重新编译宿主即可即时运行全新功能。
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.29+-02569B?logo=flutter)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.7+-0175C2?logo=dart)](https://dart.dev)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)](#安装与运行)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -77,7 +77,7 @@ plugin-toolbox/
 │   ├── base64_tool/      # Base64 文本编解码插件
 │   └── hash_tool/        # MD5 / SHA-1 / SHA-256 哈希计算插件
 ├── tool/                 # 独立质量工程工具套件 (verify.dart, shots.py)
-└── .github/workflows/    # CI 流水线：analyze + verify + 全模块测试
+└── .github/workflows/    # CI 流水线：format 门禁 + analyze + verify + 全模块测试 + debug 构建冒烟
 ```
 
 ### 插件加载与运行流程
@@ -190,7 +190,7 @@ python sample_plugins/pack.py base64_tool
 ### 1. 从源码编译
 
 要求环境：
-- Flutter SDK 3.29+ / Dart SDK 3.7+
+- Flutter SDK 3.47+（与 CI 钉版 3.47.0 对齐）/ Dart SDK 3.7+
 - Android SDK (API 34+), Java 17+
 - Python 3.10+ (用于质量工具与插件打包)
 
@@ -229,11 +229,11 @@ flutter build apk --release --split-per-abi
 # 1. 静态代码分析（保持 0 错误 0 警告）
 dart analyze
 
-# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，117 项断言全通过）
+# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，137 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 186 用例）
-#    packages/core 54 / packages/lua 68 / packages/dui 28 / packages/ui 6 / app 30
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 324 用例）
+#    packages/core 93 / packages/lua 113 / packages/dui 51 / packages/ui 13 / app 54
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test

@@ -30,6 +30,10 @@ jobs:
       - name: Bootstrap workspace
         run: melos bootstrap
 
+      - name: Format gate (dart format)
+        # 显式列出受门禁约束的源码目录, 排除 packages/third_party (上游 fork 保持原貌)
+        run: dart format --set-exit-if-changed app packages/core packages/lua packages/dui packages/ui tool
+
       - name: Static analysis (root)
         run: dart analyze
 
@@ -41,3 +45,7 @@ jobs:
 
       - name: Unit & widget tests (all packages)
         run: melos run test
+
+      - name: Debug APK build smoke (app)
+        working-directory: app
+        run: flutter build apk --debug

@@ -9,6 +9,9 @@ import 'dart:math';
 import '../packages/core/lib/src/sandbox/sandbox_path.dart';
 // 插件商店的版本语义同样直接断言生产实现 (纯 Dart, 无 Flutter 依赖)
 import '../packages/core/lib/src/store/plugin_store_semantics.dart';
+// M-18: 双向排序一致性直接驱动生产排序控制器 (纯 Dart, 无 Flutter 依赖),
+// 不再在脚本内复制仿真算法, 生产 reorder 行为改坏时本节立即 FAIL
+import '../packages/core/lib/src/plugin/plugin_list_controller.dart';
 
 int _pass = 0;
 int _fail = 0;
@@ -71,16 +74,6 @@ double contrastRatio(int hex1, int hex2) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/// 列表重排测试算法
-List<T> simulateReorder<T>(List<T> list, int oldIndex, int newIndex) {
-  final copy = List<T>.from(list);
-  if (oldIndex < 0 || oldIndex >= copy.length) return copy;
-  final item = copy.removeAt(oldIndex);
-  final targetIndex = (newIndex > oldIndex) ? newIndex - 1 : newIndex;
-  copy.insert(targetIndex.clamp(0, copy.length), item);
-  return copy;
-}
-
 void main() {
   print('================================================================');
   print('        PluginToolbox 本地规范与逻辑自动化验证套件 (verify.dart)');
@@ -91,8 +84,9 @@ void main() {
   final pubspecFile = File('app/pubspec.yaml');
   expect(pubspecFile.existsSync(), 'app/pubspec.yaml 存在');
   final pubspecContent = pubspecFile.readAsStringSync();
-  final versionMatch = RegExp(r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', multiLine: true)
-      .firstMatch(pubspecContent);
+  final versionMatch =
+      RegExp(r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', multiLine: true)
+          .firstMatch(pubspecContent);
   expect(versionMatch != null, 'pubspec.yaml 包含规范的版本号 X.Y.Z+N');
 
   final versionSemver = versionMatch?.group(1) ?? '';
@@ -122,10 +116,10 @@ void main() {
   const bgHex = 0x26366A; // 用户指定主背景色 #26366A
   const fontHex = 0xB4C9FF; // 用户指定主要字体色 #B4C9FF
   const cardHex = 0x1B2445; // 工具箱内槽凹陷卡片色 #1B2445
-  const primaryHex = 0x788CFF; // 把手提色 #788CFF
 
   final bgContrast = contrastRatio(fontHex, bgHex);
-  print('    主字体 #B4C9FF 与 主背景 #26366A 对比度: ${bgContrast.toStringAsFixed(2)} : 1');
+  print(
+      '    主字体 #B4C9FF 与 主背景 #26366A 对比度: ${bgContrast.toStringAsFixed(2)} : 1');
   expect(
     bgContrast >= 7.0,
     '主字体与背景对比度符合 WCAG AAA 标准 (>= 7.0:1)',
@@ -133,7 +127,8 @@ void main() {
   );
 
   final cardContrast = contrastRatio(fontHex, cardHex);
-  print('    主字体 #B4C9FF 与 卡片底色 #1B2445 对比度: ${cardContrast.toStringAsFixed(2)} : 1');
+  print(
+      '    主字体 #B4C9FF 与 卡片底色 #1B2445 对比度: ${cardContrast.toStringAsFixed(2)} : 1');
   expect(
     cardContrast >= 7.0,
     '主字体与卡片容器对比度符合 WCAG AAA 标准 (>= 7.0:1)',
@@ -141,19 +136,23 @@ void main() {
   );
 
   final colorSchemesFile = File('packages/ui/lib/src/theme/color_schemes.dart');
-  expect(colorSchemesFile.existsSync(), 'packages/ui/lib/src/theme/color_schemes.dart 存在');
+  expect(colorSchemesFile.existsSync(),
+      'packages/ui/lib/src/theme/color_schemes.dart 存在');
   final colorSchemesCode = colorSchemesFile.readAsStringSync();
 
   // 次级文字色 (onSurfaceVariant) 对卡片底色的 AAA 合规 (M-6)
   final onSurfaceVariantMatch =
-      RegExp(r'onSurfaceVariant:\s*Color\(0xFF([0-9A-Fa-f]{6})\)').allMatches(colorSchemesCode).toList();
+      RegExp(r'onSurfaceVariant:\s*Color\(\s*0xFF([0-9A-Fa-f]{6})\s*\)')
+          .allMatches(colorSchemesCode)
+          .toList();
   expect(
     onSurfaceVariantMatch.isNotEmpty &&
         onSurfaceVariantMatch.first.group(1)!.toUpperCase() == '99B2E0',
     '深色主题 onSurfaceVariant 已调亮至 #99B2E0 (WCAG AAA)',
   );
   if (onSurfaceVariantMatch.isNotEmpty) {
-    final variantHex = int.parse(onSurfaceVariantMatch.first.group(1)!, radix: 16);
+    final variantHex =
+        int.parse(onSurfaceVariantMatch.first.group(1)!, radix: 16);
     final variantContrast = contrastRatio(variantHex, cardHex);
     print(
         '    次级文字 #${onSurfaceVariantMatch.first.group(1)} 与 卡片底色 #1B2445 对比度: ${variantContrast.toStringAsFixed(2)} : 1');
@@ -209,17 +208,18 @@ void main() {
         flutterImportViolations++;
         print('    [违规] ${file.path} 依赖了 Flutter Material/Cupertino 类库');
       }
-      if (code.contains("package:plugin_toolbox_ui/")) {
+      if (code.contains('package:plugin_toolbox_ui/')) {
         uiImportViolations++;
         print('    [违规] ${file.path} 反向依赖了 UI 模块');
       }
-      if (code.contains("package:go_router/")) {
+      if (code.contains('package:go_router/')) {
         routerImportViolations++;
         print('    [违规] ${file.path} 依赖了 UI 路由框架 go_router');
       }
     }
   }
-  expectEq(flutterImportViolations, 0, 'packages/core 严禁依赖 Flutter Material/Cupertino 库 (保持领域层无样式绑定)');
+  expectEq(flutterImportViolations, 0,
+      'packages/core 严禁依赖 Flutter Material/Cupertino 库 (保持领域层无样式绑定)');
   expectEq(uiImportViolations, 0, 'packages/core 严禁反向依赖 UI 模块');
   expectEq(routerImportViolations, 0, 'packages/core 源码严禁依赖 go_router 路由包');
 
@@ -229,14 +229,14 @@ void main() {
   final hasIllegalPubspecDeps = corePubspecContent.contains('go_router') ||
       corePubspecContent.contains('flutter_riverpod') ||
       corePubspecContent.contains('riverpod_annotation');
-  expect(!hasIllegalPubspecDeps, 'packages/core 规范排除 go_router 与 riverpod 等上层框架依赖');
+  expect(!hasIllegalPubspecDeps,
+      'packages/core 规范排除 go_router 与 riverpod 等上层框架依赖');
 
   final duiPubspecFile = File('packages/dui/pubspec.yaml');
   expect(duiPubspecFile.existsSync(), 'packages/dui/pubspec.yaml 存在');
   final duiPubspecContent = duiPubspecFile.readAsStringSync();
   final duiHasLuaDep = duiPubspecContent.contains('plugin_toolbox_lua');
   expect(!duiHasLuaDep, 'packages/dui 严禁依赖 packages/lua 模块 (保持兄弟模块单向解耦)');
-
 
   // 4. 动态插件规范与样例完整性校验
   print('\n--- 4. .ptx 动态插件与 Manifest 规范校验 ---');
@@ -250,35 +250,47 @@ void main() {
 
     Map<String, dynamic>? manifestJson;
     try {
-      manifestJson = jsonDecode(manifestF.readAsStringSync()) as Map<String, dynamic>;
-    } catch (_) {}
+      manifestJson =
+          jsonDecode(manifestF.readAsStringSync()) as Map<String, dynamic>;
+    } catch (_) {
+      // 容错: 脏数据保持 null, 交由下方断言给出 FAIL
+    }
     expect(manifestJson != null, '$pluginId: plugin.json 为有效 JSON');
     expectEq(manifestJson?['id'], pluginId, '$pluginId: plugin.id 匹配目录名');
-    expect(manifestJson?['name'] != null && (manifestJson!['name'] as String).isNotEmpty,
+    expect(
+        manifestJson?['name'] != null &&
+            (manifestJson!['name'] as String).isNotEmpty,
         '$pluginId: 包含非空插件名称');
     expect(manifestJson?['version'] != null, '$pluginId: 包含版本号字段');
     expectEq(manifestJson?['type'], 'lua', '$pluginId: 插件类型为 lua');
 
     final entryRelPath = manifestJson?['entry'] as String? ?? 'main.lua';
     final entryFile = File('sample_plugins/$pluginId/$entryRelPath');
-    expect(entryFile.existsSync() && entryFile.lengthSync() > 0, '$pluginId: 入口脚本 $entryRelPath 存在且非空');
+    expect(entryFile.existsSync() && entryFile.lengthSync() > 0,
+        '$pluginId: 入口脚本 $entryRelPath 存在且非空');
 
     final uiRelPath = manifestJson?['ui'] as String? ?? 'ui/main.ui.json';
     final uiFile = File('sample_plugins/$pluginId/$uiRelPath');
-    expect(uiFile.existsSync() && uiFile.lengthSync() > 0, '$pluginId: UI 描述 $uiRelPath 存在且非空');
+    expect(uiFile.existsSync() && uiFile.lengthSync() > 0,
+        '$pluginId: UI 描述 $uiRelPath 存在且非空');
 
     Map<String, dynamic>? uiJson;
     try {
       uiJson = jsonDecode(uiFile.readAsStringSync()) as Map<String, dynamic>;
-    } catch (_) {}
+    } catch (_) {
+      // 容错: 脏数据保持 null, 交由下方断言给出 FAIL
+    }
     expect(uiJson != null, '$pluginId: UI 描述为合法 JSON AST 结构');
     final rootType = uiJson?['type'] as String?;
     expect(
-        rootType == 'SingleChildScrollView' || rootType == 'Column' || rootType == 'ListView',
+        rootType == 'SingleChildScrollView' ||
+            rootType == 'Column' ||
+            rootType == 'ListView',
         '$pluginId: 声明式 UI 根节点为合法的顶级布局容器 ($rootType)');
 
     final ptxFile = File('sample_plugins/$pluginId.ptx');
-    expect(ptxFile.existsSync() && ptxFile.lengthSync() > 500, '$pluginId: 打包产物 $pluginId.ptx 存在且有效');
+    expect(ptxFile.existsSync() && ptxFile.lengthSync() > 500,
+        '$pluginId: 打包产物 $pluginId.ptx 存在且有效');
   }
 
   final packScript = File('sample_plugins/pack.py');
@@ -287,54 +299,163 @@ void main() {
   // 5. 沙箱路径隔离与 Path Traversal 防御算法 (直接断言 packages/core 生产实现)
   print('\n--- 5. 沙箱存储与防路径穿越安全算法断言 (生产实现) ---');
   const baseBox = 'app_data/plugins/base64_tool';
-  expectEq(SandboxPath.isSafeSubpath(baseBox, 'data/storage.json'), true, '沙箱内合法子路径放行');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, 'sub/nested/file.txt'), true, '沙箱多级合法子路径放行');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, '../../etc/passwd'), false, '恶意父级穿越路径被成功拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, r'..\..\Windows\System32\cmd.exe'), false, 'Windows 风格反斜杠穿越路径拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, '....//....//escape'), false, '异形双点混淆路径拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:\evil.bat'), false, 'Windows 盘符绝对路径拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:evil.bat'), false, 'Windows 盘符相对形式拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, r'\\server\share\evil'), false, 'UNC 网络共享路径拦截');
-  expectEq(SandboxPath.isSafeSubpath(baseBox, '/etc/passwd'), false, 'POSIX 绝对路径不作为相对子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, 'data/storage.json'), true,
+      '沙箱内合法子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, 'sub/nested/file.txt'), true,
+      '沙箱多级合法子路径放行');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '../../etc/passwd'), false,
+      '恶意父级穿越路径被成功拦截');
+  expectEq(
+      SandboxPath.isSafeSubpath(baseBox, r'..\..\Windows\System32\cmd.exe'),
+      false,
+      'Windows 风格反斜杠穿越路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '....//....//escape'), false,
+      '异形双点混淆路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:\evil.bat'), false,
+      'Windows 盘符绝对路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'C:evil.bat'), false,
+      'Windows 盘符相对形式拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, r'\\server\share\evil'), false,
+      'UNC 网络共享路径拦截');
+  expectEq(SandboxPath.isSafeSubpath(baseBox, '/etc/passwd'), false,
+      'POSIX 绝对路径不作为相对子路径放行');
   expectEq(SandboxPath.isSafeSubpath(baseBox, ''), false, '空路径不放行');
 
   // ZIP 解压条目 (Zip Slip) 校验
-  expectEq(SandboxPath.isSafeRelativeEntry('ui/main.ui.json'), true, '压缩包合法条目路径放行');
+  expectEq(
+      SandboxPath.isSafeRelativeEntry('ui/main.ui.json'), true, '压缩包合法条目路径放行');
   expectEq(SandboxPath.isSafeRelativeEntry('icon.png'), true, '压缩包根级文件条目放行');
-  expectEq(SandboxPath.isSafeRelativeEntry('../evil.txt'), false, '压缩包父级穿越条目拦截');
-  expectEq(SandboxPath.isSafeRelativeEntry(r'C:\evil.bat'), false, '压缩包 Windows 盘符条目拦截');
-  expectEq(SandboxPath.isSafeRelativeEntry(r'\\server\share\evil'), false, '压缩包 UNC 条目拦截');
-  expectEq(SandboxPath.isSafeRelativeEntry('/abs/evil.txt'), false, '压缩包 POSIX 绝对路径条目拦截');
-  expectEq(SandboxPath.isSafeRelativeEntry('a/../../evil'), false, '压缩包嵌套穿越条目拦截');
+  expectEq(
+      SandboxPath.isSafeRelativeEntry('../evil.txt'), false, '压缩包父级穿越条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry(r'C:\evil.bat'), false,
+      '压缩包 Windows 盘符条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry(r'\\server\share\evil'), false,
+      '压缩包 UNC 条目拦截');
+  expectEq(SandboxPath.isSafeRelativeEntry('/abs/evil.txt'), false,
+      '压缩包 POSIX 绝对路径条目拦截');
+  expectEq(
+      SandboxPath.isSafeRelativeEntry('a/../../evil'), false, '压缩包嵌套穿越条目拦截');
   expectEq(SandboxPath.isSafeRelativeEntry(''), false, '压缩包空条目路径拦截');
 
-  // 6. 双向排序数学一致性算法验证
-  print('\n--- 6. 双向排序同步算法逻辑断言 ---');
-  final originalList = ['plugin_a', 'plugin_b', 'plugin_c', 'plugin_d'];
-  // 模拟将首项移动至索引 2: a, b, c, d -> b, c, a, d
-  final reordered1 = simulateReorder(originalList, 0, 3);
-  expectEq(reordered1, ['plugin_b', 'plugin_c', 'plugin_a', 'plugin_d'], '前向拖拽重排序');
+  // 6. 双向排序数学一致性算法验证 (直接断言 packages/core 生产实现)
+  print('\n--- 6. 双向排序同步算法逻辑断言 (生产实现) ---');
+  // 锚定调用链: 注册中心必须把两处排序入口委托给同一个 PluginListController,
+  // 保证下方驱动的就是真正运行在用户设备上的排序算法
+  final listControllerFile =
+      File('packages/core/lib/src/plugin/plugin_list_controller.dart');
+  expect(listControllerFile.existsSync(),
+      '生产排序控制器 plugin_list_controller.dart 存在');
 
-  // 模拟将末项移动至索引 0: a, b, c, d -> d, a, b, c
-  final reordered2 = simulateReorder(originalList, 3, 0);
-  expectEq(reordered2, ['plugin_d', 'plugin_a', 'plugin_b', 'plugin_c'], '后向拖拽至首位重排序');
+  final registryFile =
+      File('packages/core/lib/src/plugin/plugin_registry.dart');
+  expect(registryFile.existsSync(), 'plugin_registry.dart 存在');
+  final registryCode = registryFile.readAsStringSync();
+  expect(
+    registryCode.contains('_orderController.reorder(oldIndex, newIndex)') &&
+        registryCode.contains('_orderController.reorderEnabled('),
+    'PluginRegistry 将全量/启用子集排序统一委托给 PluginListController',
+  );
 
-  // 边界移动：原位拖放不变
-  final reordered3 = simulateReorder(originalList, 1, 1);
-  expectEq(reordered3, originalList, '原位拖放保持序不变');
+  // 锚定宿主两处入口: 插件管理中心全量重排, 主界面网格仅重排启用子集
+  final managerPageCode =
+      File('app/lib/src/plugin_manager/plugin_manager_page.dart')
+          .readAsStringSync();
+  expect(
+    managerPageCode.contains('.reorder(oldIndex, newIndex)'),
+    '插件管理中心拖拽走全量列表重排 reorder',
+  );
+  final homePageCode =
+      File('app/lib/src/home/home_page.dart').readAsStringSync();
+  expect(
+    homePageCode.contains('.reorderEnabled(oldIndex, newIndex)'),
+    '主界面网格拖拽走启用子集重排 reorderEnabled',
+  );
+
+  // 两处排序经同一 Riverpod Notifier 入口落盘, 保证双向变动实时同步持久化
+  final providersCode =
+      File('app/lib/src/providers/app_providers.dart').readAsStringSync();
+  expect(
+    providersCode.contains('state.reorder(oldIndex, newIndex)') &&
+        providersCode.contains('state.reorderEnabled(oldIndex, newIndex)') &&
+        providersCode.contains('saveOrder()'),
+    '两处排序经同一 Notifier 入口并实时 saveOrder 持久化',
+  );
+
+  PluginListController newController(List<String> ids) {
+    final controller = PluginListController();
+    controller.loadOrder(ids.toSet(), const []);
+    return controller;
+  }
+
+  const baseOrder = ['plugin_a', 'plugin_b', 'plugin_c', 'plugin_d'];
+
+  // 全量重排 (插件管理中心): 项目索引语义, 移除后直接插入目标位
+  final forward = newController(baseOrder);
+  forward.reorder(0, 3);
+  expectEq(forward.order, ['plugin_b', 'plugin_c', 'plugin_d', 'plugin_a'],
+      '全量重排: 首项前向拖拽至末位');
+
+  final backward = newController(baseOrder);
+  backward.reorder(3, 0);
+  expectEq(backward.order, ['plugin_d', 'plugin_a', 'plugin_b', 'plugin_c'],
+      '全量重排: 末项后向拖拽至首位');
+
+  final inPlace = newController(baseOrder);
+  inPlace.reorder(1, 1);
+  expectEq(inPlace.order, baseOrder, '全量重排: 原位拖放保持序不变');
+
+  final outOfBounds = newController(baseOrder);
+  outOfBounds.reorder(-1, 2);
+  outOfBounds.reorder(1, 4);
+  expectEq(outOfBounds.order, baseOrder, '全量重排: 越界索引被安全忽略');
+
+  // 启用子集重排 (主界面网格): 禁用插件 (plugin_x/plugin_y) 相对位置保持不变
+  const mixedOrder = [
+    'plugin_a',
+    'plugin_x',
+    'plugin_b',
+    'plugin_y',
+    'plugin_c'
+  ];
+  const enabledSubset = ['plugin_a', 'plugin_b', 'plugin_c'];
+
+  final gridForward = newController(mixedOrder);
+  gridForward.reorderEnabled(enabledSubset, 0, 2);
+  expectEq(
+    gridForward.order,
+    ['plugin_x', 'plugin_b', 'plugin_y', 'plugin_c', 'plugin_a'],
+    '启用子集重排: 前向拖拽且禁用插件相对位置不变',
+  );
+
+  final gridBackward = newController(mixedOrder);
+  gridBackward.reorderEnabled(enabledSubset, 2, 0);
+  expectEq(
+    gridBackward.order,
+    ['plugin_c', 'plugin_a', 'plugin_x', 'plugin_b', 'plugin_y'],
+    '启用子集重排: 后向拖拽且禁用插件相对位置不变',
+  );
 
   // 7. 矢量与位图图标资源完整性
   print('\n--- 7. 矢量图与各分辨率应用图标完整性 ---');
   final iconPng = File('app/assets/icons/plugin-toolbox-icon.png');
-  expect(iconPng.existsSync() && iconPng.lengthSync() > 10000, '主图标 PNG 存在且分辨率完备 (>10KB)');
+  expect(iconPng.existsSync() && iconPng.lengthSync() > 10000,
+      '主图标 PNG 存在且分辨率完备 (>10KB)');
 
   final iconSvg = File('app/assets/icons/plugin-toolbox-icon.svg');
   expect(iconSvg.existsSync() && iconSvg.lengthSync() > 1000, '矢量图标 SVG 存在且完整');
 
-  final mipmaps = ['mipmap-mdpi', 'mipmap-hdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi'];
+  final mipmaps = [
+    'mipmap-mdpi',
+    'mipmap-hdpi',
+    'mipmap-xhdpi',
+    'mipmap-xxhdpi',
+    'mipmap-xxxhdpi'
+  ];
   for (final mipmap in mipmaps) {
-    final mipmapFile = File('app/android/app/src/main/res/$mipmap/ic_launcher.png');
-    expect(mipmapFile.existsSync() && mipmapFile.lengthSync() > 0, 'Android $mipmap 启动图标就绪');
+    final mipmapFile =
+        File('app/android/app/src/main/res/$mipmap/ic_launcher.png');
+    expect(mipmapFile.existsSync() && mipmapFile.lengthSync() > 0,
+        'Android $mipmap 启动图标就绪');
   }
 
   // 8. 规范与开源证书
@@ -342,8 +463,10 @@ void main() {
   final gitignore = File('.gitignore');
   expect(gitignore.existsSync(), '.gitignore 存在');
   final gitignoreContent = gitignore.readAsStringSync();
-  expect(gitignoreContent.contains('AGENTS.md'), '.gitignore 中排除了本地 AI 规范文件 AGENTS.md');
-  expect(gitignoreContent.contains('PTX-plugins/'), '.gitignore 中排除了插件开发目录 PTX-plugins/');
+  expect(gitignoreContent.contains('AGENTS.md'),
+      '.gitignore 中排除了本地 AI 规范文件 AGENTS.md');
+  expect(gitignoreContent.contains('PTX-plugins/'),
+      '.gitignore 中排除了插件开发目录 PTX-plugins/');
 
   final license = File('LICENSE');
   expect(license.existsSync(), 'LICENSE 存在');
@@ -363,7 +486,8 @@ void main() {
 
   // 9. 插件商店: 远端目录契约、版本语义与安装编排约束
   print('\n--- 9. 插件商店目录契约与版本语义断言 ---');
-  final storeEntryFile = File('packages/core/lib/src/store/plugin_store_entry.dart');
+  final storeEntryFile =
+      File('packages/core/lib/src/store/plugin_store_entry.dart');
   expect(storeEntryFile.existsSync(), '插件商店条目模型 plugin_store_entry.dart 存在');
   final storeEntryCode = storeEntryFile.readAsStringSync();
   expect(
@@ -371,8 +495,10 @@ void main() {
     '商店条目携带 .ptx 体积信息 (安装前向用户展示)',
   );
 
-  final storeClientFile = File('packages/core/lib/src/store/jsdelivr_plugin_store_source.dart');
-  expect(storeClientFile.existsSync(), '插件商店目录客户端 jsdelivr_plugin_store_source.dart 存在');
+  final storeClientFile =
+      File('packages/core/lib/src/store/jsdelivr_plugin_store_source.dart');
+  expect(storeClientFile.existsSync(),
+      '插件商店目录客户端 jsdelivr_plugin_store_source.dart 存在');
   final storeClientCode = storeClientFile.readAsStringSync();
   expect(
     storeClientCode.contains('https://data.jsdelivr.com/v1'),
@@ -477,11 +603,13 @@ void main() {
     '商店安装复用统一的生产安装器 (校验与沙箱解压同一链路)',
   );
 
-  final storeProvidersFile = File('app/lib/src/plugin_store/store_providers.dart');
+  final storeProvidersFile =
+      File('app/lib/src/plugin_store/store_providers.dart');
   expect(storeProvidersFile.existsSync(), '商店依赖装配 store_providers.dart 存在');
   final storeProvidersCode = storeProvidersFile.readAsStringSync();
   expect(
-    storeProvidersCode.contains("'Aclguh'") && storeProvidersCode.contains("'PTX-plugins'"),
+    storeProvidersCode.contains("'Aclguh'") &&
+        storeProvidersCode.contains("'PTX-plugins'"),
     '商店默认指向 Aclguh/PTX-plugins 插件仓库',
   );
 
@@ -508,6 +636,66 @@ void main() {
     File('packages/core/test/plugin_store_test.dart').existsSync(),
     '商店客户端具备核心层单元测试',
   );
+
+  // 10. README 测试用例数声明与真实测试规模同步校验
+  print('\n--- 10. README 测试用例数声明与真实统计同步 ---');
+  // 统计口径: 各模块 test/ 目录 *_test.dart 中 test( / testWidgets( 出现次数
+  // (词边界匹配, testWidgets( 不会被 test( 重复计数)
+  final casePattern = RegExp(r'\b(?:test|testWidgets)\(');
+  const moduleTestDirs = <String, String>{
+    'packages/core': 'packages/core/test',
+    'packages/lua': 'packages/lua/test',
+    'packages/dui': 'packages/dui/test',
+    'packages/ui': 'packages/ui/test',
+    'app': 'app/test',
+  };
+  final perModuleCases = <String, int>{};
+  var totalCases = 0;
+  moduleTestDirs.forEach((module, dirPath) {
+    final dir = Directory(dirPath);
+    var count = 0;
+    if (dir.existsSync()) {
+      for (final entity in dir.listSync(recursive: true)) {
+        if (entity is File && entity.path.endsWith('_test.dart')) {
+          count += casePattern.allMatches(entity.readAsStringSync()).length;
+        }
+      }
+    }
+    perModuleCases[module] = count;
+    totalCases += count;
+  });
+  final modules = moduleTestDirs.keys.toList();
+  final breakdown = modules.map((m) => '$m ${perModuleCases[m]}').join(' / ');
+  print('    实际统计: $breakdown, 共 $totalCases 用例');
+
+  final readmeFile = File('README.md');
+  expect(readmeFile.existsSync(), 'README.md 存在');
+  final readmeContent = readmeFile.readAsStringSync();
+
+  final declaredTotal = RegExp(r'共\s*(\d+)\s*用例').firstMatch(readmeContent);
+  expect(declaredTotal != null, 'README.md 声明了测试用例总数 (共 N 用例)');
+  if (declaredTotal != null) {
+    expect(
+      int.parse(declaredTotal.group(1)!) == totalCases,
+      'README 声明用例总数与 test/testWidgets 真实统计一致',
+      'README 声明 ${declaredTotal.group(1)}, 实际统计 $totalCases ($breakdown)',
+    );
+  }
+
+  final declaredBreakdown = RegExp(
+    r'packages/core\s+(\d+)\s*/\s*packages/lua\s+(\d+)\s*/\s*packages/dui\s+(\d+)\s*/\s*packages/ui\s+(\d+)\s*/\s*app\s+(\d+)',
+  ).firstMatch(readmeContent);
+  expect(declaredBreakdown != null, 'README.md 声明了分模块用例数明细');
+  if (declaredBreakdown != null) {
+    for (var i = 0; i < modules.length; i++) {
+      expect(
+        int.parse(declaredBreakdown.group(i + 1)!) ==
+            perModuleCases[modules[i]],
+        'README 分模块用例数与真实统计一致 (${modules[i]})',
+        'README 声明 ${declaredBreakdown.group(i + 1)}, 实际统计 ${perModuleCases[modules[i]]}',
+      );
+    }
+  }
 
   // 总结输出
   print('\n================================================================');

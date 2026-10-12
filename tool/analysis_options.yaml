@@ -1,0 +1,10 @@
+# tool/ 独立命令行脚本的质量门禁: 继承仓库根 lint 规则集, 仅按脚本特性豁免两条。
+# - avoid_print: 验证结果依赖 print 终端输出, 属脚本本职行为;
+# - avoid_relative_lib_imports: verify.dart 以相对路径直接锚定 packages/core
+#   的生产实现文件 (纯 Dart), 与第 5/6/9 节"直接断言生产代码"的既有先例一致。
+include: ../analysis_options.yaml
+
+linter:
+  rules:
+    avoid_print: false
+    avoid_relative_lib_imports: false
