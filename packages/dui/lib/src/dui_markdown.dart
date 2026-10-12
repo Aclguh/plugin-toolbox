@@ -46,7 +46,8 @@ class DuiMarkdownView extends StatelessWidget {
           codeBlockLines.clear();
         } else {
           inCodeBlock = false;
-          widgets.add(_buildCodeBlock(context, codeBlockLines.join('\n'), codeLang));
+          widgets.add(
+              _buildCodeBlock(context, codeBlockLines.join('\n'), codeLang));
           codeBlockLines.clear();
           codeLang = null;
         }
@@ -105,7 +106,8 @@ class DuiMarkdownView extends StatelessWidget {
       if (numListMatch != null) {
         final numPrefix = '${numListMatch.group(1)}.';
         final content = numListMatch.group(2) ?? '';
-        widgets.add(_buildListItem(context, numPrefix, content, defaultBodyStyle));
+        widgets
+            .add(_buildListItem(context, numPrefix, content, defaultBodyStyle));
         continue;
       }
 
@@ -115,7 +117,8 @@ class DuiMarkdownView extends StatelessWidget {
 
     // 若代码块未闭合，补充渲染
     if (inCodeBlock && codeBlockLines.isNotEmpty) {
-      widgets.add(_buildCodeBlock(context, codeBlockLines.join('\n'), codeLang));
+      widgets
+          .add(_buildCodeBlock(context, codeBlockLines.join('\n'), codeLang));
     }
 
     final contentWidget = Column(
@@ -294,17 +297,23 @@ class DuiMarkdownView extends StatelessWidget {
       }
 
       final matched = match.group(0)!;
-      if (matched.startsWith('**') && matched.endsWith('**') && matched.length >= 4) {
+      if (matched.startsWith('**') &&
+          matched.endsWith('**') &&
+          matched.length >= 4) {
         spans.add(TextSpan(
           text: matched.substring(2, matched.length - 2),
           style: baseStyle.copyWith(fontWeight: FontWeight.bold),
         ));
-      } else if (matched.startsWith('*') && matched.endsWith('*') && matched.length >= 2) {
+      } else if (matched.startsWith('*') &&
+          matched.endsWith('*') &&
+          matched.length >= 2) {
         spans.add(TextSpan(
           text: matched.substring(1, matched.length - 1),
           style: baseStyle.copyWith(fontStyle: FontStyle.italic),
         ));
-      } else if (matched.startsWith('`') && matched.endsWith('`') && matched.length >= 2) {
+      } else if (matched.startsWith('`') &&
+          matched.endsWith('`') &&
+          matched.length >= 2) {
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Container(

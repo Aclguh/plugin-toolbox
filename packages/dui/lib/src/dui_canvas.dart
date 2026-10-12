@@ -38,7 +38,10 @@ class DuiCanvas extends StatelessWidget {
   static List<Map<String, dynamic>> _parseCommands(dynamic raw) {
     if (raw == null) return const [];
     if (raw is List) {
-      return raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      return raw
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
     }
     if (raw is String) {
       final cached = _commandsCache[raw];
@@ -93,7 +96,8 @@ class DuiCanvasPainter extends CustomPainter {
           _drawText(canvas, cmd);
           break;
         case 'clear':
-          final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? Colors.transparent;
+          final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+              Colors.transparent;
           canvas.drawColor(color, BlendMode.src);
           break;
       }
@@ -105,7 +109,8 @@ class DuiCanvasPainter extends CustomPainter {
     final y1 = DuiUtils.tryDouble(cmd['y1']) ?? 0.0;
     final x2 = DuiUtils.tryDouble(cmd['x2']) ?? 0.0;
     final y2 = DuiUtils.tryDouble(cmd['y2']) ?? 0.0;
-    final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
+    final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+        const Color(0xFFB4C9FF);
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
     final paint = _paint
@@ -120,7 +125,8 @@ class DuiCanvasPainter extends CustomPainter {
     final y = DuiUtils.tryDouble(cmd['y']) ?? 0.0;
     final w = DuiUtils.tryDouble(cmd['width']) ?? 0.0;
     final h = DuiUtils.tryDouble(cmd['height']) ?? 0.0;
-    final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
+    final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+        const Color(0xFFB4C9FF);
     final styleStr = cmd['style']?.toString().toLowerCase();
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
     final radius = DuiUtils.tryDouble(cmd['borderRadius']);
@@ -128,11 +134,13 @@ class DuiCanvasPainter extends CustomPainter {
     final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
-      ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
+      ..style =
+          styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(x, y, w, h);
     if (radius != null && radius > 0) {
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)), paint);
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, Radius.circular(radius)), paint);
     } else {
       canvas.drawRect(rect, paint);
     }
@@ -142,14 +150,16 @@ class DuiCanvasPainter extends CustomPainter {
     final cx = DuiUtils.tryDouble(cmd['cx']) ?? 0.0;
     final cy = DuiUtils.tryDouble(cmd['cy']) ?? 0.0;
     final radius = DuiUtils.tryDouble(cmd['radius']) ?? 0.0;
-    final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
+    final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+        const Color(0xFFB4C9FF);
     final styleStr = cmd['style']?.toString().toLowerCase();
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
     final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
-      ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
+      ..style =
+          styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
 
     canvas.drawCircle(Offset(cx, cy), radius, paint);
   }
@@ -162,16 +172,19 @@ class DuiCanvasPainter extends CustomPainter {
     final startAngle = DuiUtils.tryDouble(cmd['startAngle']) ?? 0.0;
     final sweepAngle = DuiUtils.tryDouble(cmd['sweepAngle']) ?? 0.0;
     final useCenter = DuiUtils.tryBool(cmd['useCenter']);
-    final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
+    final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+        const Color(0xFFB4C9FF);
     final styleStr = cmd['style']?.toString().toLowerCase();
     final strokeWidth = DuiUtils.tryDouble(cmd['strokeWidth']) ?? 1.0;
 
     final paint = _paint
       ..color = color
       ..strokeWidth = strokeWidth
-      ..style = styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
+      ..style =
+          styleStr == 'stroke' ? PaintingStyle.stroke : PaintingStyle.fill;
 
-    canvas.drawArc(Rect.fromLTWH(x, y, w, h), startAngle, sweepAngle, useCenter, paint);
+    canvas.drawArc(
+        Rect.fromLTWH(x, y, w, h), startAngle, sweepAngle, useCenter, paint);
   }
 
   void _drawText(Canvas canvas, Map<String, dynamic> cmd) {
@@ -179,7 +192,8 @@ class DuiCanvasPainter extends CustomPainter {
     final x = DuiUtils.tryDouble(cmd['x']) ?? 0.0;
     final y = DuiUtils.tryDouble(cmd['y']) ?? 0.0;
     final fontSize = DuiUtils.tryDouble(cmd['fontSize']) ?? 14.0;
-    final color = DuiUtils.parseColor(cmd['color']?.toString()) ?? const Color(0xFFB4C9FF);
+    final color = DuiUtils.parseColor(cmd['color']?.toString()) ??
+        const Color(0xFFB4C9FF);
 
     final textSpan = TextSpan(
       text: text,

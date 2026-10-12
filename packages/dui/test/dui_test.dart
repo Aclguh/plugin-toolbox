@@ -87,7 +87,8 @@ void main() {
   });
 
   group('DuiRenderer Tests', () {
-    testWidgets('renders Text, Button and handles click events', (tester) async {
+    testWidgets('renders Text, Button and handles click events',
+        (tester) async {
       final state = DuiState();
       final executor = MockActionExecutor();
       final handler = DuiEventHandler(state: state, executor: executor);
@@ -141,7 +142,8 @@ void main() {
 
     testWidgets('状态变更经 ListenableBuilder 自动刷新 UI', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -164,7 +166,8 @@ void main() {
 
     testWidgets('registerFactory 支持扩展自定义组件类型', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
       renderer.registerFactory(
         'Badge',
@@ -183,7 +186,8 @@ void main() {
 
     testWidgets('未知组件类型安全降级为空白而非崩溃', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       await tester.pumpWidget(buildHost(renderer, {
@@ -196,7 +200,8 @@ void main() {
 
     testWidgets('数值属性为字符串时安全解析不崩溃 (类型容错)', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -215,7 +220,8 @@ void main() {
 
     testWidgets('Image src 路径穿越被拦截, 不发起任何文件加载', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(
         state: state,
         eventHandler: handler,
@@ -234,7 +240,8 @@ void main() {
 
     testWidgets('Image src 指向沙箱内合法相对路径时正常构建', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(
         state: state,
         eventHandler: handler,
@@ -252,7 +259,8 @@ void main() {
 
     testWidgets('Image src 支持响应式状态插值, 状态变更触发更新与沙箱拦截', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(
         state: state,
         eventHandler: handler,
@@ -279,10 +287,10 @@ void main() {
       expect(find.byType(Image), findsNothing);
     });
 
-
     testWidgets('Container color 属性渲染背景色, 非法值降级为无色不崩溃', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -320,12 +328,14 @@ void main() {
 
     testWidgets('PixelGrid 按状态位图渲染像素方块尺寸, 数据异常安全降级', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       Widget buildHost(Map<String, dynamic> node) => MaterialApp(
             home: Scaffold(
-              body: Builder(builder: (context) => renderer.build(context, node)),
+              body:
+                  Builder(builder: (context) => renderer.build(context, node)),
             ),
           );
 
@@ -341,9 +351,12 @@ void main() {
       ));
       expect(matches, isNotEmpty);
       expect(matches.first.height, 30.0);
-      final pixelPaint = tester.widgetList<CustomPaint>(find.byType(CustomPaint)).where(
-        (p) => p.painter.runtimeType.toString().endsWith('_PixelGridPainter'),
-      );
+      final pixelPaint = tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .where(
+            (p) =>
+                p.painter.runtimeType.toString().endsWith('_PixelGridPainter'),
+          );
       expect(pixelPaint, isNotEmpty);
 
       // 位图长度与列数不匹配 -> 空白降级
@@ -353,10 +366,8 @@ void main() {
         'props': {'data': '{{state.px}}', 'cols': '3', 'cellSize': '10'},
       }));
       expect(
-        tester
-            .widgetList<CustomPaint>(find.byType(CustomPaint))
-            .where((p) =>
-                p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
+        tester.widgetList<CustomPaint>(find.byType(CustomPaint)).where((p) =>
+            p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
         isEmpty,
       );
 
@@ -366,22 +377,22 @@ void main() {
         'props': {'data': '{{state.empty}}', 'cols': '3', 'cellSize': '10'},
       }));
       expect(
-        tester
-            .widgetList<CustomPaint>(find.byType(CustomPaint))
-            .where((p) =>
-                p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
+        tester.widgetList<CustomPaint>(find.byType(CustomPaint)).where((p) =>
+            p.painter.runtimeType.toString().endsWith('_PixelGridPainter')),
         isEmpty,
       );
     });
 
     testWidgets('Container color 支持状态插值, 非法值降级为无色', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       Widget buildHost(Map<String, dynamic> node) => MaterialApp(
             home: Scaffold(
-              body: Builder(builder: (context) => renderer.build(context, node)),
+              body:
+                  Builder(builder: (context) => renderer.build(context, node)),
             ),
           );
 
@@ -411,7 +422,8 @@ void main() {
 
     testWidgets('TextField 双向绑定: 输入回写状态, 状态变更同步 UI', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -435,7 +447,8 @@ void main() {
 
     testWidgets('TextField didUpdateWidget 保留合理光标位置 (P3-5)', (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -451,9 +464,11 @@ void main() {
       // 模拟光标设置在位置 3
       final textFieldFinder = find.byType(TextField);
       final editableText = tester.widget<EditableText>(
-        find.descendant(of: textFieldFinder, matching: find.byType(EditableText)),
+        find.descendant(
+            of: textFieldFinder, matching: find.byType(EditableText)),
       );
-      editableText.controller.selection = const TextSelection.collapsed(offset: 3);
+      editableText.controller.selection =
+          const TextSelection.collapsed(offset: 3);
 
       // 外部更新文本为较长字符串，光标应维持在 3
       state.set('text_ref', '12345678');
@@ -466,9 +481,12 @@ void main() {
       expect(editableText.controller.selection.baseOffset, 2);
     });
 
-    testWidgets('TextField didUpdateWidget 在输入法组合态 (isComposingRangeValid) 下不覆盖输入', (tester) async {
+    testWidgets(
+        'TextField didUpdateWidget 在输入法组合态 (isComposingRangeValid) 下不覆盖输入',
+        (tester) async {
       final state = DuiState();
-      final handler = DuiEventHandler(state: state, executor: MockActionExecutor());
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
       final node = {
@@ -480,7 +498,8 @@ void main() {
       await tester.pumpWidget(buildHost(renderer, node));
       final textFieldFinder = find.byType(TextField);
       final editableText = tester.widget<EditableText>(
-        find.descendant(of: textFieldFinder, matching: find.byType(EditableText)),
+        find.descendant(
+            of: textFieldFinder, matching: find.byType(EditableText)),
       );
 
       // 模拟输入法正在拼音打字中 (设置 composing range 为 [0, 4])
@@ -498,7 +517,8 @@ void main() {
 
     test('DuiState extractKeys 与 key-level 局部通知 (P2-1)', () {
       final state = DuiState();
-      expect(DuiState.extractKeys('Hello {{state.user}}, count: {{state.count}}'),
+      expect(
+          DuiState.extractKeys('Hello {{state.user}}, count: {{state.count}}'),
           equals({'user', 'count'}));
       expect(DuiState.extractKeys('plain text'), isEmpty);
       expect(DuiState.extractKeys(null), isEmpty);
@@ -521,7 +541,9 @@ void main() {
       expect(countNotified, 1);
     });
 
-    testWidgets('DuiRenderer 渲染 Switch、Slider、Dropdown、ProgressBar、Divider 与 Wrap 组件及双向绑定', (tester) async {
+    testWidgets(
+        'DuiRenderer 渲染 Switch、Slider、Dropdown、ProgressBar、Divider 与 Wrap 组件及双向绑定',
+        (tester) async {
       final state = DuiState();
       final executor = MockActionExecutor();
       final handler = DuiEventHandler(state: state, executor: executor);
@@ -660,7 +682,8 @@ void main() {
       final handler = DuiEventHandler(state: state, executor: executor);
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
-      state.set('md_text', '# 标题一\n> 引用说明\n- 列表项\n```dart\nvoid main() {}\n```');
+      state.set(
+          'md_text', '# 标题一\n> 引用说明\n- 列表项\n```dart\nvoid main() {}\n```');
 
       final node = {
         'type': 'MarkdownView',
@@ -691,7 +714,8 @@ void main() {
       final handler = DuiEventHandler(state: state, executor: executor);
       final renderer = DuiRenderer(state: state, eventHandler: handler);
 
-      state.set('canvas_cmds', '[{"type":"line","x1":0,"y1":0,"x2":50,"y2":50,"color":"#788CFF"}]');
+      state.set('canvas_cmds',
+          '[{"type":"line","x1":0,"y1":0,"x2":50,"y2":50,"color":"#788CFF"}]');
 
       final node = {
         'type': 'Canvas',
@@ -717,7 +741,8 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
 
       // 更新画板指令
-      state.set('canvas_cmds', '[{"type":"circle","cx":20,"cy":20,"radius":10,"color":"#FF0000"}]');
+      state.set('canvas_cmds',
+          '[{"type":"circle","cx":20,"cy":20,"radius":10,"color":"#FF0000"}]');
       await tester.pump();
       expect(find.byType(DuiCanvas), findsOneWidget);
     });
@@ -755,7 +780,8 @@ void main() {
       expect(state.get('my_sign_has_drawing'), false);
 
       // 模拟手势绘制一条线
-      final gesture = await tester.startGesture(tester.getCenter(find.byType(DuiDrawingPad)));
+      final gesture = await tester
+          .startGesture(tester.getCenter(find.byType(DuiDrawingPad)));
       await gesture.moveBy(const Offset(50, 50));
       await gesture.up();
       await tester.pump();
@@ -851,7 +877,8 @@ void main() {
       final node = {
         'type': 'Html',
         'props': {
-          'html': '<b>你好</b> {{state.user_name}}，<a href="https://example.com">点击这里</a> 查看详情。',
+          'html':
+              '<b>你好</b> {{state.user_name}}，<a href="https://example.com">点击这里</a> 查看详情。',
         },
         'events': {
           'onLinkTap': {'action': 'toast', 'message': 'link clicked'},
@@ -872,8 +899,10 @@ void main() {
       expect(find.byType(SelectableText), findsOneWidget);
 
       // 验证富文本内容被正确插值与解析
-      final selectableWidget = tester.widget<SelectableText>(find.byType(SelectableText));
-      expect(selectableWidget.data, isNull); // rich 模式 data 为 null，textSpan 不为 null
+      final selectableWidget =
+          tester.widget<SelectableText>(find.byType(SelectableText));
+      expect(selectableWidget.data,
+          isNull); // rich 模式 data 为 null，textSpan 不为 null
       expect(selectableWidget.textSpan, isNotNull);
       final textSpan = selectableWidget.textSpan!;
       final fullText = textSpan.toPlainText();
@@ -900,7 +929,8 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: Builder(
-              builder: (context) => renderer.buildWidget(context, malformedHtmlNode),
+              builder: (context) =>
+                  renderer.buildWidget(context, malformedHtmlNode),
             ),
           ),
         ),
@@ -920,7 +950,8 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: Builder(
-              builder: (context) => renderer.buildWidget(context, corruptedChartNode),
+              builder: (context) =>
+                  renderer.buildWidget(context, corruptedChartNode),
             ),
           ),
         ),
@@ -940,7 +971,8 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: Builder(
-              builder: (context) => renderer.buildWidget(context, corruptedCanvasNode),
+              builder: (context) =>
+                  renderer.buildWidget(context, corruptedCanvasNode),
             ),
           ),
         ),

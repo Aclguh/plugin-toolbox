@@ -47,6 +47,32 @@ class DuiNodeContext {
 
 typedef DuiWidgetFactory = Widget Function(DuiNodeContext node);
 
+/// AST 节点的装载期预编译描述。
+///
+/// 一份 AST (ui.json 解析产物) 在页面生命周期内是不可变的静态结构，
+/// 但每次 build 都会为每个节点重跑 visible 键正则提取与防御式 Map 转换，
+/// 且任一祖先重建都会沿 childAt 递归放大该开销；因此在首次访问时
+/// 将 type / visible 绑定键 / props / children / events 一次提取并缓存。
+class _CompiledNode {
+  final String type;
+  final dynamic visibleExpr;
+  final Set<String> visibleKeys;
+  final Map<String, dynamic> props;
+  final List<Map<String, dynamic>> children;
+  final Map<String, dynamic> events;
+  final String? ref;
+
+  const _CompiledNode({
+    required this.type,
+    required this.visibleExpr,
+    required this.visibleKeys,
+    required this.props,
+    required this.children,
+    required this.events,
+    required this.ref,
+  });
+}
+
 /// 声明式 UI (DUI) 核心渲染引擎。
 ///
 /// 负责维护组件工厂字典、下沉局部精准刷新与递归解析 JSON AST 节点树。
@@ -56,6 +82,9 @@ class DuiRenderer {
   final Directory? pluginRootDir;
 
   final Map<String, DuiWidgetFactory> _factories = {};
+
+  /// 以节点 Map 实例身份为键的预编译缓存 (Expando 弱引用, AST 释放后自动回收)
+  final Expando<_CompiledNode> _compiledNodes = Expando('_CompiledNodeCache');
 
   DuiRenderer({
     required this.state,
@@ -80,56 +109,67 @@ class DuiRenderer {
 
   /// 将 JSON 节点递归转换为 Flutter Widget
   Widget buildWidget(BuildContext context, Map<String, dynamic> node) {
-    // 1. 检查条件可见性（包含局部响应式绑定）
-    final visibleExpr = node['visible'];
-    final visibleKeys = visibleExpr != null
-        ? DuiState.extractKeys(visibleExpr.toString())
-        : const <String>{};
+    final compiled = _compile(node);
 
-    if (visibleKeys.isNotEmpty) {
+    // 条件可见性含响应式绑定：仅在本节点边界订阅对应键，
+    // 键变化只触发该节点子树的取舍，不波及兄弟与祖先
+    if (compiled.visibleKeys.isNotEmpty) {
       return ListenableBuilder(
-        listenable: state.listenableForKeys(visibleKeys),
+        listenable: state.listenableForKeys(compiled.visibleKeys),
         builder: (ctx, _) {
-          if (!state.evaluateVisible(visibleExpr)) {
+          if (!state.evaluateVisible(compiled.visibleExpr)) {
             return const SizedBox.shrink();
           }
-          return _buildNodeContent(ctx, node);
+          return _buildNodeContent(ctx, compiled);
         },
       );
     }
 
-    if (!state.evaluateVisible(visibleExpr)) {
+    if (!state.evaluateVisible(compiled.visibleExpr)) {
       return const SizedBox.shrink();
     }
 
-    return _buildNodeContent(context, node);
+    return _buildNodeContent(context, compiled);
   }
 
-  Widget _buildNodeContent(BuildContext context, Map<String, dynamic> node) {
-    final type = node['type']?.toString() ?? 'Container';
-    final props = _asMap(node['props']);
-    final childrenRaw = node['children'] as List<dynamic>? ?? const [];
-    final events = _asMap(node['events']);
-    final ref = node['ref']?.toString();
+  /// 装载期预编译：同一节点实例只提取一次 type 与绑定键
+  _CompiledNode _compile(Map<String, dynamic> node) {
+    final cached = _compiledNodes[node];
+    if (cached != null) return cached;
 
-    final factory = _factories[type];
+    final visibleExpr = node['visible'];
+    final compiled = _CompiledNode(
+      type: node['type']?.toString() ?? 'Container',
+      visibleExpr: visibleExpr,
+      visibleKeys: visibleExpr != null
+          ? DuiState.extractKeys(visibleExpr.toString())
+          : const <String>{},
+      props: _asMap(node['props']),
+      children: [
+        for (final c in node['children'] as List<dynamic>? ?? const [])
+          if (c is Map) _asMap(c),
+      ],
+      events: _asMap(node['events']),
+      ref: node['ref']?.toString(),
+    );
+    _compiledNodes[node] = compiled;
+    return compiled;
+  }
+
+  Widget _buildNodeContent(BuildContext context, _CompiledNode compiled) {
+    final factory = _factories[compiled.type];
     if (factory == null) {
       return const SizedBox.shrink();
-    }
-
-    final parsedChildren = <Map<String, dynamic>>[];
-    for (final c in childrenRaw) {
-      if (c is Map) parsedChildren.add(_asMap(c));
     }
 
     return factory(
       DuiNodeContext(
         context: context,
         renderer: this,
-        props: props,
-        children: parsedChildren,
-        events: events,
-        ref: ref,
+        props: compiled.props,
+        children: compiled.children,
+        events: compiled.events,
+        ref: compiled.ref,
       ),
     );
   }

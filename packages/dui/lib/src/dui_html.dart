@@ -28,12 +28,39 @@ class DuiHtml extends StatefulWidget {
 
 class _DuiHtmlState extends State<DuiHtml> {
   final List<TapGestureRecognizer> _recognizers = [];
+  TextSpan? _spanCache;
 
   void _disposeRecognizers() {
     for (final recognizer in _recognizers) {
       recognizer.dispose();
     }
     _recognizers.clear();
+  }
+
+  /// 使解析产物失效并回收旧链接识别器。
+  ///
+  /// 识别器的销毁必须放在生命周期方法里：build 应无副作用，
+  /// 且缓存 span 后无关的父级重建无需重建识别器。
+  void _invalidateParse() {
+    _disposeRecognizers();
+    _spanCache = null;
+  }
+
+  @override
+  void didChangeDependencies() {
+    // 解析依赖 Theme.of 的文字与配色，依赖变化时 span 需整体重建
+    _invalidateParse();
+    super.didChangeDependencies();
+  }
+
+  @override
+  void didUpdateWidget(covariant DuiHtml oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.html != widget.html ||
+        oldWidget.baseStyle != widget.baseStyle ||
+        oldWidget.onLinkTap != widget.onLinkTap) {
+      _invalidateParse();
+    }
   }
 
   @override
@@ -44,24 +71,26 @@ class _DuiHtmlState extends State<DuiHtml> {
 
   @override
   Widget build(BuildContext context) {
-    _disposeRecognizers();
-
-    final theme = Theme.of(context);
-    final defaultStyle = widget.baseStyle ??
-        theme.textTheme.bodyMedium ??
-        const TextStyle(fontSize: 14.0);
-
-    final span = _HtmlParser(
-      theme: theme,
-      baseStyle: defaultStyle,
-      onLinkTap: widget.onLinkTap,
-      recognizers: _recognizers,
-    ).parse(widget.html);
+    final span = _spanCache ??= _parseSpan(context);
 
     if (widget.selectable) {
       return SelectableText.rich(span);
     }
     return Text.rich(span);
+  }
+
+  TextSpan _parseSpan(BuildContext context) {
+    final theme = Theme.of(context);
+    final defaultStyle = widget.baseStyle ??
+        theme.textTheme.bodyMedium ??
+        const TextStyle(fontSize: 14.0);
+
+    return _HtmlParser(
+      theme: theme,
+      baseStyle: defaultStyle,
+      onLinkTap: widget.onLinkTap,
+      recognizers: _recognizers,
+    ).parse(widget.html);
   }
 }
 
@@ -106,7 +135,8 @@ class _HtmlParser {
 
     for (final match in tagRegex.allMatches(rawHtml)) {
       if (match.start > currentIndex) {
-        final text = _decodeEntities(rawHtml.substring(currentIndex, match.start));
+        final text =
+            _decodeEntities(rawHtml.substring(currentIndex, match.start));
         if (text.isNotEmpty) {
           spans.add(_buildSpan(
             text,
@@ -151,32 +181,39 @@ class _HtmlParser {
             newStyle = currentTopStyle.copyWith(fontStyle: FontStyle.italic);
             break;
           case 'u':
-            newStyle = currentTopStyle.copyWith(decoration: TextDecoration.underline);
+            newStyle =
+                currentTopStyle.copyWith(decoration: TextDecoration.underline);
             break;
           case 's':
           case 'del':
           case 'strike':
-            newStyle = currentTopStyle.copyWith(decoration: TextDecoration.lineThrough);
+            newStyle = currentTopStyle.copyWith(
+                decoration: TextDecoration.lineThrough);
             break;
           case 'code':
             newStyle = currentTopStyle.copyWith(
               fontFamily: 'monospace',
-              backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.5),
             );
             break;
           case 'h1':
-            newStyle = currentTopStyle.copyWith(fontSize: 22.0, fontWeight: FontWeight.bold);
+            newStyle = currentTopStyle.copyWith(
+                fontSize: 22.0, fontWeight: FontWeight.bold);
             break;
           case 'h2':
-            newStyle = currentTopStyle.copyWith(fontSize: 18.0, fontWeight: FontWeight.bold);
+            newStyle = currentTopStyle.copyWith(
+                fontSize: 18.0, fontWeight: FontWeight.bold);
             break;
           case 'h3':
-            newStyle = currentTopStyle.copyWith(fontSize: 16.0, fontWeight: FontWeight.bold);
+            newStyle = currentTopStyle.copyWith(
+                fontSize: 16.0, fontWeight: FontWeight.bold);
             break;
           case 'h4':
           case 'h5':
           case 'h6':
-            newStyle = currentTopStyle.copyWith(fontSize: 14.0, fontWeight: FontWeight.bold);
+            newStyle = currentTopStyle.copyWith(
+                fontSize: 14.0, fontWeight: FontWeight.bold);
             break;
           case 'a':
             newHref = tag.attributes['href'];
@@ -188,7 +225,8 @@ class _HtmlParser {
           case 'font':
           case 'color':
           case 'span':
-            final colorAttr = tag.attributes['color'] ?? tag.attributes['value'];
+            final colorAttr =
+                tag.attributes['color'] ?? tag.attributes['value'];
             if (colorAttr != null) {
               final parsedColor = DuiUtils.parseColor(colorAttr);
               if (parsedColor != null) {
@@ -235,7 +273,13 @@ class _HtmlParser {
   }
 
   TextStyle _combineStyles(List<TextStyle> styles) {
-    return styles.last;
+    // 嵌套标签自外向内逐层 merge：外层样式 (<b> 粗体) 必须保留到
+    // 内层 (<i> 斜体) 文本上，只取 styles.last 会在样式来源变化时丢外层属性
+    var combined = styles.first;
+    for (var i = 1; i < styles.length; i++) {
+      combined = combined.merge(styles[i]);
+    }
+    return combined;
   }
 
   _HtmlTag _parseTag(String rawName, String rawAttrs) {
@@ -249,7 +293,8 @@ class _HtmlParser {
     final bool isSelfClosing = rawAttrs.trim().endsWith('/');
     final attrs = <String, String>{};
 
-    final attrRegex = RegExp(r'([a-zA-Z0-9_\-]+)\s*=\s*["' "'" r']?([^"' "'" r'\s>]+)["' "'" r']?');
+    final attrRegex = RegExp(
+        r'([a-zA-Z0-9_\-]+)\s*=\s*["' "'" r']?([^"' "'" r'\s>]+)["' "'" r']?');
     for (final m in attrRegex.allMatches(rawAttrs)) {
       final key = m.group(1)?.toLowerCase();
       final val = m.group(2);

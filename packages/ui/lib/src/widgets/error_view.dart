@@ -8,13 +8,16 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 错误色取自 colorScheme.error 以随亮暗主题保持语义与对比度合规，
+    // 硬编码 redAccent 在深色品牌主题下既不协调也无法保证对比度
+    final errorColor = Theme.of(context).colorScheme.error;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+            Icon(Icons.error_outline, size: 48, color: errorColor),
             const SizedBox(height: 16),
             Text(message, textAlign: TextAlign.center),
             if (onRetry != null) ...[

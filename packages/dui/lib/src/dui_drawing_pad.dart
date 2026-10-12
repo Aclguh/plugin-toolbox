@@ -96,12 +96,14 @@ class _DuiDrawingPadState extends State<DuiDrawingPad> {
   Future<void> _export() async {
     final b64 = await exportBase64();
     if (b64 != null) {
-      _syncState(hasDrawing: _strokes.isNotEmpty, count: _strokes.length, base64: b64);
+      _syncState(
+          hasDrawing: _strokes.isNotEmpty, count: _strokes.length, base64: b64);
       widget.onExport?.call(b64);
     }
   }
 
-  void _syncState({required bool hasDrawing, required int count, String? base64}) {
+  void _syncState(
+      {required bool hasDrawing, required int count, String? base64}) {
     final s = widget.state;
     if (s == null) return;
     if (widget.refKey != null) {
@@ -204,7 +206,8 @@ class _DuiDrawingPadState extends State<DuiDrawingPad> {
               // 异步刷新 base64 输出
               exportBase64().then((b64) {
                 if (b64 != null && mounted) {
-                  _syncState(hasDrawing: true, count: _strokes.length, base64: b64);
+                  _syncState(
+                      hasDrawing: true, count: _strokes.length, base64: b64);
                 }
               });
             }

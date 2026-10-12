@@ -45,8 +45,7 @@ void registerInputFactories(DuiRenderer renderer) {
     final rawText = node.props['text']?.toString() ?? '';
     final keys = DuiState.extractKeys(rawText);
     final iconStr = node.props['icon']?.toString();
-    void onPressed() =>
-        eventHandler.handleEvent(node.events['onPressed']);
+    void onPressed() => eventHandler.handleEvent(node.events['onPressed']);
 
     Widget buildButton() {
       final label = state.interpolate(rawText);
@@ -72,8 +71,7 @@ void registerInputFactories(DuiRenderer renderer) {
     final rawText = node.props['text']?.toString() ?? '';
     final keys = DuiState.extractKeys(rawText);
     final iconStr = node.props['icon']?.toString();
-    void onPressed() =>
-        eventHandler.handleEvent(node.events['onPressed']);
+    void onPressed() => eventHandler.handleEvent(node.events['onPressed']);
 
     Widget buildButton() {
       final label = state.interpolate(rawText);
@@ -95,12 +93,13 @@ void registerInputFactories(DuiRenderer renderer) {
     return buildButton();
   });
 
-  renderer.registerFactory('IconButton', (node) => IconButton(
-        icon: Icon(DuiUtils.parseIcon(node.props['icon']?.toString())),
-        tooltip: node.props['tooltip']?.toString(),
-        onPressed: () =>
-            eventHandler.handleEvent(node.events['onPressed']),
-      ));
+  renderer.registerFactory(
+      'IconButton',
+      (node) => IconButton(
+            icon: Icon(DuiUtils.parseIcon(node.props['icon']?.toString())),
+            tooltip: node.props['tooltip']?.toString(),
+            onPressed: () => eventHandler.handleEvent(node.events['onPressed']),
+          ));
 
   // ---- 进度条 (ProgressBar) ----
   renderer.registerFactory('ProgressBar', (node) {
@@ -113,8 +112,8 @@ void registerInputFactories(DuiRenderer renderer) {
         value: val,
         color: DuiUtils.parseColor(
             state.interpolate(node.props['color']?.toString() ?? '')),
-        backgroundColor: DuiUtils.parseColor(state
-            .interpolate(node.props['backgroundColor']?.toString() ?? '')),
+        backgroundColor: DuiUtils.parseColor(
+            state.interpolate(node.props['backgroundColor']?.toString() ?? '')),
       );
     }
 
@@ -289,6 +288,7 @@ void registerInputFactories(DuiRenderer renderer) {
       children: children,
     );
   }
+
   renderer.registerFactory('Tabs', buildTabs);
   renderer.registerFactory('TabBar', buildTabs);
 }

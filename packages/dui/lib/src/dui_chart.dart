@@ -223,7 +223,9 @@ class _DuiChartPainter extends CustomPainter {
         effectiveMin = dataMin < 0 ? dataMin * 1.1 : 0.0;
       }
       if (maxY == null) {
-        effectiveMax = dataMax == 0.0 ? 10.0 : (dataMax > 0 ? dataMax * 1.15 : dataMax * 0.85);
+        effectiveMax = dataMax == 0.0
+            ? 10.0
+            : (dataMax > 0 ? dataMax * 1.15 : dataMax * 0.85);
       }
     }
     if (effectiveMax <= effectiveMin) {
@@ -251,7 +253,8 @@ class _DuiChartPainter extends CustomPainter {
 
       if (showLabels) {
         final val = effectiveMin + yRange * ratio;
-        final labelText = val.abs() >= 100 ? val.toStringAsFixed(0) : val.toStringAsFixed(1);
+        final labelText =
+            val.abs() >= 100 ? val.toStringAsFixed(0) : val.toStringAsFixed(1);
         final tp = TextPainter(
           text: TextSpan(
             text: labelText,
@@ -363,7 +366,8 @@ class _DuiChartPainter extends CustomPainter {
             secondaryColor.withValues(alpha: 0.35),
             secondaryColor.withValues(alpha: 0.02),
           ],
-        ).createShader(Rect.fromLTWH(leftMargin, topMargin, chartWidth, chartHeight))
+        ).createShader(
+            Rect.fromLTWH(leftMargin, topMargin, chartWidth, chartHeight))
         ..style = PaintingStyle.fill;
 
       canvas.drawPath(fillPath, fillPaint);

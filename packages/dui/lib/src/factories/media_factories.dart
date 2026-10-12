@@ -34,12 +34,22 @@ void registerMediaFactories(DuiRenderer renderer) {
           !SandboxPath.isSafeSubpath(rootDir.path, src)) {
         return const SizedBox.shrink();
       }
+      // 解码缓存宽度按组件声明 width x 设备像素比推导：
+      // 固定 256 会使声明更大宽度的图被降采样发虚；未声明宽度时以 512 兼顾清晰度与内存
+      final declaredWidth = node.width;
+      final dpr = MediaQuery.maybeDevicePixelRatioOf(node.context) ?? 2.0;
+      final int cacheWidth;
+      if (declaredWidth != null && declaredWidth > 0) {
+        cacheWidth = (declaredWidth * dpr).round();
+      } else {
+        cacheWidth = 512;
+      }
       return Image.file(
         File('${rootDir.path}/$src'),
         width: node.width,
         height: node.height,
         fit: BoxFit.contain,
-        cacheWidth: 256,
+        cacheWidth: cacheWidth,
         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       );
     }
@@ -52,24 +62,44 @@ void registerMediaFactories(DuiRenderer renderer) {
     }
     return renderImage();
   }
+
   renderer.registerFactory('Image', buildImage);
 
   // ---- 像素网格 (状态 0/1 位图逐格填充, 如二维码矩阵) ----
   renderer.registerFactory('PixelGrid', (node) {
-    // data/cols/cellSize 均为渲染期取值, 支持从状态插值
-    final data = state.interpolate(node.props['data']?.toString() ?? '');
-    final cols =
-        DuiUtils.tryInt(state.interpolate(node.props['cols']?.toString() ?? ''));
-    final cellSize = DuiUtils.tryDouble(
-        state.interpolate(node.props['cellSize']?.toString() ?? ''));
-    return DuiPixelGrid(
-      data: data,
-      cols: cols ?? 0,
-      cellSize: cellSize ?? 4.0,
-      darkColor:
-          DuiUtils.parseColor(node.props['darkColor']) ?? const Color(0xFF000000),
-      lightColor: DuiUtils.parseColor(node.props['lightColor']) ??
-          const Color(0xFFFFFFFF),
+    final rawData = node.props['data']?.toString() ?? '';
+    final rawCols = node.props['cols']?.toString() ?? '';
+    final rawCellSize = node.props['cellSize']?.toString() ?? '';
+    final darkColor =
+        DuiUtils.parseColor(node.props['darkColor']) ?? const Color(0xFF000000);
+    final lightColor = DuiUtils.parseColor(node.props['lightColor']) ??
+        const Color(0xFFFFFFFF);
+
+    // data/cols/cellSize 支持状态插值，且必须订阅所引用的状态键：
+    // 二维码类插件先渲染占位、后写位图，不订阅则状态更新后网格永不重绘
+    final keys = <String>{
+      ...DuiState.extractKeys(rawData),
+      ...DuiState.extractKeys(rawCols),
+      ...DuiState.extractKeys(rawCellSize),
+    };
+
+    Widget renderGrid() {
+      final data = state.interpolate(rawData);
+      final cols = DuiUtils.tryInt(state.interpolate(rawCols));
+      final cellSize = DuiUtils.tryDouble(state.interpolate(rawCellSize));
+      return DuiPixelGrid(
+        data: data,
+        cols: cols ?? 0,
+        cellSize: cellSize ?? 4.0,
+        darkColor: darkColor,
+        lightColor: lightColor,
+      );
+    }
+
+    if (keys.isEmpty) return renderGrid();
+    return ListenableBuilder(
+      listenable: state.listenableForKeys(keys),
+      builder: (_, __) => renderGrid(),
     );
   });
 
@@ -122,8 +152,7 @@ void registerMediaFactories(DuiRenderer renderer) {
           state.interpolate(node.props['strokeWidth']?.toString() ?? ''),
         ) ??
         3.0;
-    final borderRadius =
-        DuiUtils.tryDouble(node.props['borderRadius']) ?? 12.0;
+    final borderRadius = DuiUtils.tryDouble(node.props['borderRadius']) ?? 12.0;
 
     final clearTrigger = node.props['clearTrigger'] != null
         ? state.interpolate(node.props['clearTrigger'].toString())
@@ -168,9 +197,8 @@ void registerMediaFactories(DuiRenderer renderer) {
 
   // ---- Markdown 渲染组件 (MarkdownView / Markdown) ----
   Widget buildMarkdown(DuiNodeContext node) {
-    final rawText = node.props['text']?.toString() ??
-        node.props['data']?.toString() ??
-        '';
+    final rawText =
+        node.props['text']?.toString() ?? node.props['data']?.toString() ?? '';
     final selectable =
         DuiUtils.tryBool(node.props['selectable'], fallback: true);
     final keys = DuiState.extractKeys(rawText);
@@ -186,6 +214,7 @@ void registerMediaFactories(DuiRenderer renderer) {
       builder: (_, __) => renderMd(),
     );
   }
+
   renderer.registerFactory('MarkdownView', buildMarkdown);
   renderer.registerFactory('Markdown', buildMarkdown);
 
@@ -209,7 +238,8 @@ void registerMediaFactories(DuiRenderer renderer) {
     final minY = DuiUtils.tryDouble(node.props['minY']);
     final maxY = DuiUtils.tryDouble(node.props['maxY']);
     final showGrid = DuiUtils.tryBool(node.props['showGrid'], fallback: true);
-    final showLabels = DuiUtils.tryBool(node.props['showLabels'], fallback: true);
+    final showLabels =
+        DuiUtils.tryBool(node.props['showLabels'], fallback: true);
     final showDots = DuiUtils.tryBool(node.props['showDots'], fallback: true);
     final filled = DuiUtils.tryBool(node.props['filled'], fallback: true);
     final strokeWidth = DuiUtils.tryDouble(node.props['strokeWidth']) ?? 2.5;
@@ -259,6 +289,7 @@ void registerMediaFactories(DuiRenderer renderer) {
       builder: (_, __) => renderChart(),
     );
   }
+
   renderer.registerFactory('Chart', buildChart);
   renderer.registerFactory('LineChart', (n) {
     n.props['type'] = 'line';
@@ -297,6 +328,7 @@ void registerMediaFactories(DuiRenderer renderer) {
       builder: (_, __) => renderHtml(),
     );
   }
+
   renderer.registerFactory('Html', buildHtml);
   renderer.registerFactory('HtmlView', buildHtml);
 }

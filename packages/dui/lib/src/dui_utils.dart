@@ -207,7 +207,9 @@ class DuiUtils {
     }
 
     if (hasToken(['timer', 'alarm', 'stopwatch'])) return Icons.timer;
-    if (hasToken(['time', 'clock', 'date', 'calendar', 'sched'])) return Icons.access_time;
+    if (hasToken(['time', 'clock', 'date', 'calendar', 'sched'])) {
+      return Icons.access_time;
+    }
     if (hasToken(['lock', 'key', 'auth', 'pass', 'shield'])) return Icons.lock;
     if (hasToken(['calc', 'math'])) return Icons.calculate;
     if (hasToken(['color', 'paint', 'palette'])) return Icons.palette;

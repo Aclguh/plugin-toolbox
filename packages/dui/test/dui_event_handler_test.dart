@@ -94,8 +94,8 @@ void main() {
         }
         return null;
       });
-      addTearDown(() => TestDefaultBinaryMessengerBinding.instance
-          .defaultBinaryMessenger
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null));
 
       state.set('code', 'ABC-123');
@@ -121,8 +121,8 @@ void main() {
         }
         return null;
       });
-      addTearDown(() => TestDefaultBinaryMessengerBinding.instance
-          .defaultBinaryMessenger
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null));
 
       final restrictedHandler = DuiEventHandler(
@@ -139,13 +139,15 @@ void main() {
       restrictedHandler.handleEvent(event);
 
       expect(copiedText, isNull);
-      expect(executor.toasts, contains(predicate<String>((s) => s.contains('权限不足'))));
+      expect(executor.toasts,
+          contains(predicate<String>((s) => s.contains('权限不足'))));
     });
 
     test('容错降级：null 或非法事件定义安全无害忽略', () {
       expect(() => handler.handleEvent(null), returnsNormally);
       expect(() => handler.handleEvent({}), returnsNormally);
-      expect(() => handler.handleEvent({'action': 'unknownAction'}), returnsNormally);
+      expect(() => handler.handleEvent({'action': 'unknownAction'}),
+          returnsNormally);
       expect(() => handler.handleEvent({'unknown_key': 123}), returnsNormally);
       // dynamic map 容错
       final dynamicMap = <dynamic, dynamic>{

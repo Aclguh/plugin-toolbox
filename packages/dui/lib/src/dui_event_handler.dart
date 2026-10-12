@@ -44,8 +44,9 @@ class DuiEventHandler {
       case 'callLua':
         final func = eventDef['function']?.toString();
         if (func == null) return;
-        final args =
-            eventDef['args'] is List ? eventDef['args'] as List<dynamic> : const <dynamic>[];
+        final args = eventDef['args'] is List
+            ? eventDef['args'] as List<dynamic>
+            : const <dynamic>[];
         executor.callLua(func, args);
         break;
 
