@@ -2,8 +2,10 @@ name: lua_dardo
 description: >-
   Lua 5.3 virtual machine written in Dart (fork of lua_dardo 0.0.5,
   Apache-2.0, upstream: https://github.com/arcticfox1919/LuaDardo).
-  本地维护分支: 在 VM 执行循环中加入指令数预算 (instruction budget),
-  用于宿主侧限制插件脚本的最长执行指令数, 超限自动抛出异常, 防止死循环冻结应用。
+  本地维护分支: (1) 在 VM 执行循环中加入指令数预算 (instruction budget),
+  用于宿主侧限制插件脚本的最长执行指令数, 超限自动抛出异常, 防止死循环冻结应用;
+  (2) 从 os 标准库中剔除 os.execute / os.exit / os.getenv 的注册与实现,
+  在解释器层面根除任意命令执行、进程退出与环境变量读取的残留攻击面 (纵深防御)。
 version: 0.0.5+toolbox.1
 
 environment:

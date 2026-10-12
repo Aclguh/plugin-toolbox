@@ -3,6 +3,12 @@ import 'dart:io';
 import '../../lua.dart';
 
 class OSLib {
+  // PluginToolbox 本地维护分支: 剔除上游的 os.execute / os.exit / os.getenv。
+  // 这三个函数分别等价于任意命令执行、杀死宿主进程与读取宿主环境变量,
+  // 属于插件沙箱必须根除的攻击面。宿主运行时虽已将 os 库整体置 nil,
+  // 但运行后置 nil 只是单层防线——一旦注册表被意外还原或宿主营造新的
+  // LuaState 而漏掉置 nil, 危险函数仍可触达。在 fork 源码内直接移除其
+  // 注册与实现, 构成纵深防御: 函数在 VM 层面根本不存在。
   static const Map<String, DartFunction> _sysFuncs = {
     "clock": _osClock,
     "difftime": _osDiffTime,
@@ -11,9 +17,6 @@ class OSLib {
     "remove": _osRemove,
     "rename": _osRename,
     "tmpname": _osTmpName,
-    "getenv": _osGetEnv,
-    "execute": _osExecute,
-    "exit": _osExit,
     "setlocale": _osSetLocale,
   };
 
@@ -178,51 +181,6 @@ class OSLib {
 // http://www.lua.org/manual/5.3/manual.html#pdf-os.tmpname
   static int _osTmpName(LuaState ls) {
     throw ("todo: osTmpName!");
-  }
-
-// os.getenv (varname)
-// http://www.lua.org/manual/5.3/manual.html#pdf-os.getenv
-// lua-5.3.4/src/loslib.c#os_getenv()
-  static int _osGetEnv(LuaState ls) {
-    var key = ls.checkString(1);
-    var env = Platform.environment[key!]!;
-
-    if (env.isNotEmpty) {
-      ls.pushString(env);
-    } else {
-      ls.pushNil();
-    }
-    return 1;
-  }
-
-// os.execute ([command])
-// http://www.lua.org/manual/5.3/manual.html#pdf-os.execute
-  static int _osExecute(LuaState ls) {
-    var cmd = ls.checkString(1)!;
-    var args = cmd.split(" ");
-    if(args.length > 1){
-      var comm = args.removeAt(0);
-      Process.runSync(comm,args);
-    }else{
-      Process.runSync(cmd,[]);
-    }
-    return 0;
-  }
-
-// os.exit ([code [, close]])
-// http://www.lua.org/manual/5.3/manual.html#pdf-os.exit
-// lua-5.3.4/src/loslib.c#os_exit()
-  static int _osExit(LuaState ls) {
-    if (ls.isBoolean(1)) {
-      if (ls.toBoolean(1)) {
-        exit(0);
-      } else {
-        exit(1); // todo
-      }
-    } else {
-      var code = ls.optInteger(1, 1)!;
-      exit(code);
-    }
   }
 
 // os.setlocale (locale [, category])

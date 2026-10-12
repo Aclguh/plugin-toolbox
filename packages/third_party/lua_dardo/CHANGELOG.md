@@ -3,6 +3,10 @@
 - 在 `LuaStateImpl._runLuaClosure` 虚拟机执行循环中加入指令数预算检查:
   通过 `LuaState.setInstructionBudget(int?)` 设置每次闭包执行的最大指令条数,
   超限抛出异常 (pCall 捕获为 luaErrRun), 用于宿主侧防止插件脚本死循环冻结应用。
+- 从 `os` 标准库 (`lib/src/stdlib/os_lib.dart`) 中剔除 `os.execute` / `os.exit` /
+  `os.getenv` 的注册与实现: 三者分别等价于任意命令执行、杀死宿主进程与读取
+  宿主环境变量, 宿主运行时虽已将 os 库整体置 nil, 但运行后置 nil 只是单层防线,
+  在 fork 源码内移除可构成纵深防御 (函数在 VM 层面根本不存在)。
 - 同步调整 SDK 约束至 `^3.0.0` 以匹配宿主 Monorepo。
 - 上游: https://github.com/arcticfox1919/LuaDardo (Apache-2.0), 版本 0.0.5。
 
