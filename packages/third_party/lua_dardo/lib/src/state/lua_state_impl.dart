@@ -42,6 +42,35 @@ class LuaStateImpl implements LuaState, LuaVM {
   /// 已执行指令计数, 在设置预算时一并归零。
   int _executedInstructions = 0;
 
+  /// 堆内存预算上限 (字节数), null 表示不限制。
+  int? _memoryBudget;
+
+  /// 累计已分配的估算字节数。
+  int _allocatedBytes = 0;
+
+  @override
+  int get allocatedBytes => _allocatedBytes;
+
+  @override
+  void setMemoryBudget(int? maxBytes) {
+    _memoryBudget = maxBytes;
+    _allocatedBytes = 0;
+  }
+
+  @override
+  void recordAllocatedBytes(int bytes) {
+    if (bytes <= 0) return;
+    _checkMemoryBudget(bytes);
+  }
+
+  void _checkMemoryBudget(int additionalBytes) {
+    _allocatedBytes += additionalBytes;
+    if (_memoryBudget != null && _allocatedBytes > _memoryBudget!) {
+      throw LuaMemoryLimitException(
+          'Lua memory budget exceeded (>$_memoryBudget bytes, currently $_allocatedBytes bytes)');
+    }
+  }
+
   LuaStateImpl() {
     registry!.put(luaRidxGlobals, LuaTable(0, 0));
     LuaStack stack = LuaStack();
@@ -211,6 +240,9 @@ class LuaStateImpl implements LuaState, LuaVM {
 
   @override
   void pushString(String? s) {
+    if (s != null) {
+      _checkMemoryBudget(s.length * 2);
+    }
     _stack!.push(s);
   }
 
@@ -432,6 +464,7 @@ class LuaStateImpl implements LuaState, LuaVM {
 
   @override
   void createTable(int nArr, int nRec) {
+    _checkMemoryBudget(64 + nArr * 8 + nRec * 32);
     _stack!.push(LuaTable(nArr, nRec));
   }
 
@@ -520,6 +553,12 @@ class LuaStateImpl implements LuaState, LuaVM {
     if (t is LuaTable) {
       LuaTable tbl = t;
       if (raw || tbl.get(k) != null || !tbl.hasMetafield("__newindex")) {
+        if (tbl.get(k) == null) {
+          int extra = 32;
+          if (k is String) extra += k.length * 2;
+          if (v is String) extra += v.length * 2;
+          _checkMemoryBudget(extra);
+        }
         tbl.put(k, v);
         return;
       }
@@ -646,6 +685,10 @@ class LuaStateImpl implements LuaState, LuaVM {
               'Lua instruction budget exceeded (>$_instructionBudget instructions)');
         }
       }
+      if (_memoryBudget != null && _allocatedBytes > _memoryBudget!) {
+        throw LuaMemoryLimitException(
+            'Lua memory budget exceeded (>$_memoryBudget bytes, currently $_allocatedBytes bytes)');
+      }
       int i = fetch();
       OpCode opCode = Instruction.getOpCode(i);
       opCode.action!.call(i, this);
@@ -657,6 +700,7 @@ class LuaStateImpl implements LuaState, LuaVM {
 
   @override
   ThreadStatus load(Uint8List chunk, String chunkName, String? mode) {
+    _checkMemoryBudget(chunk.length);
     Prototype proto = BinaryChunk.isBinaryChunk(chunk)
         ? BinaryChunk.unDump(chunk)
         : Compiler.compile(utf8.decode(chunk), chunkName);

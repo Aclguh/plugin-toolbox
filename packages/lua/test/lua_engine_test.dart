@@ -2901,7 +2901,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      for (var i = 0; i < 20; i++) {
+        if (delegate.getState('special_flush_ok') == true) break;
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
       expect(delegate.getState('ins_special_ok'), isTrue);
       expect(delegate.getState('query_special_ok'), isTrue);
       expect(delegate.getState('query_special_title'), 'A AND B');
@@ -2920,7 +2923,10 @@ void main() {
           state.set("flush2_ok", res.ok)
         end)
       ''');
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      for (var i = 0; i < 20; i++) {
+        if (delegate.getState('flush2_ok') == true) break;
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
       expect(delegate.getState('flush2_ok'), isTrue);
       dbEngine2.close();
       expect(bakFile.existsSync(), isTrue);
@@ -2936,7 +2942,10 @@ void main() {
           end
         end)
       ''');
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      for (var i = 0; i < 20; i++) {
+        if (delegate.getState('recovered_count') != null) break;
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
       expect(delegate.getState('recovered_count'), isNotNull);
       dbEngine3.close();
 

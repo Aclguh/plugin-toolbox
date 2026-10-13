@@ -56,7 +56,12 @@ class LuaEngine {
   /// 类死循环永久冻结宿主主线程；超限抛出异常并由 pCall 降级为执行错误。
   static const int defaultInstructionBudget = 5000000;
 
+  /// 单个 Lua 虚拟机实例允许的最大堆内存预算（字节），防止巨型 Table 或长字符串
+  /// 耗尽宿主内存造成 OOM 强杀。默认 32MB。
+  static const int defaultMemoryBudget = 32 * 1024 * 1024;
+
   final int instructionBudget;
+  final int memoryBudget;
 
   late final LuaState _ls;
   LuaCallbackInvoker? _callbacks;
@@ -70,15 +75,20 @@ class LuaEngine {
   /// 引擎是否已被关闭
   bool get isClosed => _closed;
 
+  /// 当前引擎已累计估算分配的堆内存字节数
+  int get allocatedBytes => _ls.allocatedBytes;
+
   LuaEngine({
     required this.context,
     required this.delegate,
     this.instructionBudget = defaultInstructionBudget,
+    this.memoryBudget = defaultMemoryBudget,
   }) {
     _ls = LuaState.newState();
     _ls.openLibs();
     _registerSecuritySandbox();
     _registerHostApis();
+    _ls.setMemoryBudget(memoryBudget);
   }
 
   /// 封禁具有潜在安全风险的 Lua 标准库。

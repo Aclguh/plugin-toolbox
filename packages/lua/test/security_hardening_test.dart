@@ -693,4 +693,52 @@ void main() {
       expect(delegate.getState('ssrf_err').toString(), contains('SSRF 防护'));
     });
   });
+
+  group('Lua 虚拟机堆内存上限保护', () {
+    test('小内存操作正常执行且 allocatedBytes 递增', () {
+      final delegate = MockLuaHostDelegate();
+      final engine = LuaEngine(
+        context: buildContext(null, {}),
+        delegate: delegate,
+        memoryBudget: 1024 * 1024, // 1MB
+      );
+      addTearDown(engine.close);
+
+      engine.loadAndExecute('''
+        local t = {}
+        for i = 1, 50 do
+          t["key_" .. i] = "val_" .. i
+        end
+        return #t
+      ''');
+      expect(engine.allocatedBytes, greaterThan(0));
+      expect(engine.allocatedBytes, lessThan(1024 * 1024));
+    });
+
+    test('单实例内存分配超出上限抛出异常并由 pCall 安全捕获', () {
+      final delegate = MockLuaHostDelegate();
+      // 设置极小堆内存预算：10KB
+      final engine = LuaEngine(
+        context: buildContext(null, {}),
+        delegate: delegate,
+        memoryBudget: 10 * 1024,
+      );
+      addTearDown(engine.close);
+
+      // 构造大字符串或巨型 Table 超出 10KB 限制
+      expect(
+        () => engine.loadAndExecute('''
+          local s = "abcdefghijklmnopqrstuvwxyz"
+          for i = 1, 20 do
+            s = s .. s
+          end
+        '''),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'error',
+          contains('LuaMemoryLimitException'),
+        )),
+      );
+    });
+  });
 }
