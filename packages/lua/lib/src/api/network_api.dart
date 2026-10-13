@@ -23,6 +23,93 @@ class NetworkApi {
   /// 响应体大小上限（10MB），恶意服务端无限输出不得耗尽宿主内存
   static const int maxResponseBytes = 10 * 1024 * 1024;
 
+  /// 判断指定主机名或 IP 是否属于回环或私有局域网地址
+  static bool isPrivateOrLocalHost(String host) {
+    var normalized = host.trim().toLowerCase();
+    if (normalized.startsWith('[') && normalized.contains(']')) {
+      normalized = normalized.substring(1, normalized.indexOf(']'));
+    } else if (normalized.contains(':') &&
+        !normalized.contains('::') &&
+        normalized.split(':').length == 2) {
+      // 仅针对非 IPv6 的 host:port 剥离端口号
+      normalized = normalized.split(':').first;
+    }
+    if (normalized.isEmpty) return false;
+
+    if (normalized == 'localhost' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.lan')) {
+      return true;
+    }
+
+    final addr = InternetAddress.tryParse(normalized);
+    if (addr != null) {
+      if (addr.isLoopback || addr.isLinkLocal) return true;
+      final raw = addr.rawAddress;
+      if (addr.type == InternetAddressType.IPv4) {
+        final b0 = raw[0];
+        final b1 = raw[1];
+        if (b0 == 0) return true; // 0.0.0.0/8
+        if (b0 == 10) return true; // 10.0.0.0/8
+        if (b0 == 127) return true; // 127.0.0.0/8
+        if (b0 == 169 && b1 == 254) return true; // 169.254.0.0/16
+        if (b0 == 172 && (b1 >= 16 && b1 <= 31)) return true; // 172.16.0.0/12
+        if (b0 == 192 && b1 == 168) return true; // 192.168.0.0/16
+        if (b0 == 255 && b1 == 255 && raw[2] == 255 && raw[3] == 255) return true;
+      } else if (addr.type == InternetAddressType.IPv6) {
+        // Unique Local Address (ULA): fc00::/7 (0xfc or 0xfd)
+        if (raw[0] == 0xfc || raw[0] == 0xfd) return true;
+        // IPv4-mapped IPv6: ::ffff:w.x.y.z
+        if (raw.length == 16) {
+          var isMapped = true;
+          for (var i = 0; i < 10; i++) {
+            if (raw[i] != 0) {
+              isMapped = false;
+              break;
+            }
+          }
+          if (isMapped && raw[10] == 0xff && raw[11] == 0xff) {
+            final b0 = raw[12];
+            final b1 = raw[13];
+            if (b0 == 0 || b0 == 10 || b0 == 127) return true;
+            if (b0 == 169 && b1 == 254) return true;
+            if (b0 == 172 && (b1 >= 16 && b1 <= 31)) return true;
+            if (b0 == 192 && b1 == 168) return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /// 综合白名单与 SSRF 防护校验
+  ///
+  /// 对于私有/回环地址，仅在 allowedDomains 显式声明该精确主机（而非通配符 '*'）时放行；
+  /// 未配置白名单或仅配置 '*' 时一律拦截。
+  static bool isHostAllowedWithSsrfCheck(PluginContext context, String host) {
+    if (!context.isHostAllowed(host)) {
+      return false;
+    }
+    if (isPrivateOrLocalHost(host)) {
+      final allowed = context.allowedDomains;
+      if (allowed == null || allowed.isEmpty) return false;
+      var normalized = host.trim().toLowerCase();
+      if (normalized.startsWith('[') && normalized.contains(']')) {
+        normalized = normalized.substring(1, normalized.indexOf(']'));
+      } else if (normalized.contains(':')) {
+        normalized = normalized.split(':').first;
+      }
+      return allowed.any((pattern) {
+        final p = pattern.trim().toLowerCase();
+        return p == normalized && p != '*';
+      });
+    }
+    return true;
+  }
+
   static void bind(
     LuaState ls,
     PluginContext context,
@@ -160,6 +247,9 @@ class NetworkApi {
             if (!context.isHostAllowed(nextUri.host)) {
               throw Exception('重定向目标域名不在白名单内: ${nextUri.host}');
             }
+            if (!isHostAllowedWithSsrfCheck(context, nextUri.host)) {
+              throw Exception('重定向目标为私有地址被拦截 (SSRF 防护): ${nextUri.host}');
+            }
             // 303（及浏览器惯例的 301/302 非 GET）改写为 GET 并丢弃请求体
             if (status == 303 ||
                 ((status == 301 || status == 302) &&
@@ -213,6 +303,11 @@ class NetworkApi {
 
       if (!context.isHostAllowed(uri.host)) {
         handleError('域名不在白名单内: ${uri.host}', cbRef);
+        return;
+      }
+
+      if (!isHostAllowedWithSsrfCheck(context, uri.host)) {
+        handleError('禁止访问局域网或本地私有地址 (SSRF 防护): ${uri.host}', cbRef);
         return;
       }
 

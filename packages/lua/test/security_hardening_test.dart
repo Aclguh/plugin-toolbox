@@ -643,4 +643,54 @@ void main() {
       expect(res['self'], isNull);
     });
   });
+
+  group('NetworkApi SSRF 私有 IP 防护', () {
+    test('isPrivateOrLocalHost 正确识别各私有网段与本地主机', () {
+      expect(NetworkApi.isPrivateOrLocalHost('localhost'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('sub.localhost'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('service.local'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('127.0.0.1'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('127.255.255.255'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('10.0.0.1'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('172.16.0.1'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('172.31.255.255'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('192.168.1.1'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('169.254.169.254'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('0.0.0.0'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('::1'), isTrue);
+      expect(NetworkApi.isPrivateOrLocalHost('fc00::1'), isTrue);
+
+      // 公网地址放行
+      expect(NetworkApi.isPrivateOrLocalHost('8.8.8.8'), isFalse);
+      expect(NetworkApi.isPrivateOrLocalHost('1.1.1.1'), isFalse);
+      expect(NetworkApi.isPrivateOrLocalHost('172.32.0.1'), isFalse);
+      expect(NetworkApi.isPrivateOrLocalHost('example.com'), isFalse);
+    });
+
+    test('未显式配置私有白名单的插件发起私有 IP 请求被拦截', () async {
+      final delegate = MockLuaHostDelegate();
+      final engine = LuaEngine(
+        context: PluginContext(
+          pluginId: 'ssrf_test',
+          storage: InMemoryPluginStorage(),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {PluginPermission.network},
+        ),
+        delegate: delegate,
+      );
+      addTearDown(engine.close);
+
+      engine.loadAndExecute('''
+        network.get("http://127.0.0.1:8080/admin", function(res)
+          state.set("ssrf_ok", res.ok)
+          state.set("ssrf_err", res.error)
+        end)
+      ''');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(delegate.getState('ssrf_ok'), isFalse);
+      expect(delegate.getState('ssrf_err').toString(), contains('SSRF 防护'));
+    });
+  });
 }
