@@ -632,6 +632,17 @@ class InMemoryPluginStorage implements PluginStorage {
   }
 }
 
+Future<void> _waitFor(
+  bool Function() condition, {
+  int maxTries = 40,
+  int stepMs = 25,
+}) async {
+  for (var i = 0; i < maxTries; i++) {
+    if (condition()) return;
+    await Future<void>.delayed(Duration(milliseconds: stepMs));
+  }
+}
+
 void main() {
   group('LuaEngine & Host APIs', () {
     late MockLuaHostDelegate delegate;
@@ -1461,16 +1472,12 @@ void main() {
         end)
       ''');
 
-      for (var i = 0; i < 40; i++) {
-        if (delegate.getState('write_1_ok') != null &&
-            delegate.getState('read_1_content') != null &&
-            delegate.getState('write_2_ok') != null &&
-            delegate.getState('read_2_content') != null &&
-            delegate.getState('read_err_content') != null) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 25));
-      }
+      await _waitFor(() =>
+          delegate.getState('write_1_ok') != null &&
+          delegate.getState('read_1_content') != null &&
+          delegate.getState('write_2_ok') != null &&
+          delegate.getState('read_2_content') != null &&
+          delegate.getState('read_err_content') != null);
       expect(delegate.getState('write_1_ok'), true);
       expect(delegate.getState('read_1_content'), 'async hello 1');
       expect(delegate.getState('write_2_ok'), true);
@@ -2194,7 +2201,10 @@ void main() {
           state.set("net_async", net)
         end)
       ''');
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await _waitFor(() =>
+          delegate.getState('batt_async') != null &&
+          delegate.getState('charge_async') != null &&
+          delegate.getState('net_async') != null);
       expect(delegate.getState('batt_async'), 85);
       expect(delegate.getState('charge_async'), isTrue);
       expect(delegate.getState('net_async'), 'wifi');
@@ -2333,7 +2343,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await _waitFor(() =>
+          delegate.getState('dns_ok') != null &&
+          delegate.getState('ping_done') != null &&
+          delegate.getState('scan_done') != null);
       expect(delegate.getState('dns_ok'), isTrue);
       expect(delegate.getState('dns_ips'), '127.0.0.1');
       expect(delegate.getState('ping_done'), isTrue);
@@ -2380,7 +2393,10 @@ void main() {
         })
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() =>
+          delegate.getState('get_blocked_ok') != null &&
+          delegate.getState('dns_blocked_ok') != null &&
+          delegate.getState('tcp_blocked_err') != null);
       expect(delegate.getState('get_blocked_ok'), isFalse);
       expect(
           delegate.getState('get_blocked_err'), contains('域名不在白名单内: evil.com'));
@@ -2419,7 +2435,9 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() =>
+          delegate.getState('bio_avail') != null &&
+          delegate.getState('bio_success') != null);
       expect(delegate.getState('bio_avail'), isTrue);
       expect(delegate.getState('bio_success'), isTrue);
 
@@ -2473,7 +2491,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() =>
+          delegate.getState('rec_started') != null &&
+          delegate.getState('rec_db') != null &&
+          delegate.getState('rec_stopped') != null);
       expect(delegate.getState('rec_started'), isTrue);
       expect(delegate.getState('rec_db'), 65.5);
       expect(delegate.getState('rec_stopped'), isTrue);
@@ -2493,7 +2514,9 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() =>
+          delegate.getState('speak_ok') != null &&
+          delegate.getState('stop_speak_ok') != null);
       expect(delegate.getState('speak_ok'), isTrue);
       expect(delegate.spokenText, 'Hello Toolbox');
       expect(delegate.spokenLanguage, 'zh-CN');
@@ -2528,7 +2551,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await _waitFor(() =>
+          delegate.getState('task_sum_ok') != null &&
+          delegate.getState('task_upper_ok') != null &&
+          delegate.getState('task_err_ok') != null);
       expect(delegate.getState('task_sum_ok'), isTrue);
       expect(delegate.getState('task_sum_val'), 42);
       expect(delegate.getState('task_upper_ok'), isTrue);
@@ -2553,7 +2579,7 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await _waitFor(() => delegate.getState('parallel_ok') != null);
       expect(delegate.getState('parallel_ok'), isTrue);
       expect(delegate.getState('parallel_res1'), 20);
       expect(delegate.getState('parallel_res2'), 'hello world');
@@ -2610,7 +2636,9 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await _waitFor(() =>
+          delegate.getState('screen_on_ok') != null &&
+          delegate.getState('brightness_set_ok') != null);
       expect(delegate.keepScreenOn, isTrue);
       expect(delegate.screenBrightness, 0.75);
       expect(delegate.getState('screen_on_ok'), isTrue);
@@ -2654,7 +2682,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await _waitFor(() =>
+          delegate.getState('loc_avail') != null &&
+          delegate.getState('loc_ok') != null &&
+          delegate.getState('loc_alt') != null);
       expect(delegate.getState('loc_avail'), isTrue);
       expect(delegate.getState('loc_ok'), isTrue);
       expect(delegate.getState('loc_lat'), 31.2304);
@@ -2692,7 +2723,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await _waitFor(() =>
+          delegate.getState('nfc_avail') != null &&
+          delegate.getState('nfc_read_ok') != null &&
+          delegate.getState('nfc_write_ok') != null);
       expect(delegate.getState('nfc_avail'), isTrue);
       expect(delegate.getState('nfc_read_ok'), isTrue);
       expect(delegate.getState('nfc_read_payload'), 'Hello NFC');
@@ -2732,7 +2766,11 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await _waitFor(() =>
+          delegate.getState('ble_scan_dev') != null &&
+          delegate.getState('ble_conn_ok') != null &&
+          delegate.getState('ble_read_val') != null &&
+          delegate.getState('ble_write_ok') != null);
       expect(delegate.getState('ble_scan_dev'), 'Test Beacon');
       expect(delegate.getState('ble_conn_ok'), isTrue);
       expect(delegate.getState('ble_read_val'), '01020304');
@@ -2793,7 +2831,7 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await _waitFor(() => delegate.getState('db_batch_ok') != null);
       expect(delegate.getState('db_create_ok'), isTrue);
       expect(delegate.getState('db_ins1_ok'), isTrue);
       expect(delegate.getState('db_ins2_ok'), isTrue);
@@ -2816,7 +2854,7 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() => delegate.getState('db_count_val') != null);
       expect(delegate.getState('db_count_val'), 1);
 
       // 7. 测试显式 flush 刷盘
@@ -2825,7 +2863,7 @@ void main() {
           state.set("db_flush_ok", res.ok)
         end)
       ''');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitFor(() => delegate.getState('db_flush_ok') != null);
       expect(delegate.getState('db_flush_ok'), isTrue);
 
       final dbFile = File('${tempDir.path}/plugin_data.db');
@@ -2870,7 +2908,7 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await _waitFor(() => delegate.getState('batch_query_count') != null);
       expect(delegate.getState('batch_create_ok'), isTrue);
       expect(delegate.getState('batch_res_ok'), isTrue);
       expect(delegate.getState('batch_res_affected'), 20);
@@ -3039,7 +3077,10 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _waitFor(() =>
+          delegate.getState('ai_avail') != null &&
+          delegate.getState('ai_chat_ok') != null &&
+          delegate.getState('ai_stream_text') != null);
       expect(delegate.getState('ai_avail'), isTrue);
       expect(delegate.getState('ai_chat_ok'), isTrue);
       expect(delegate.getState('ai_chat_text'), 'AI generated response');
@@ -3091,7 +3132,9 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _waitFor(() =>
+          delegate.getState('ipc_call_ok') != null &&
+          delegate.getState('ipc_open_ok') != null);
       expect(delegate.getState('ipc_call_ok'), isTrue);
       expect(delegate.getState('ipc_call_val'), 42);
       expect(delegate.getState('ipc_open_ok'), isTrue);
@@ -3140,7 +3183,9 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _waitFor(() =>
+          delegate.getState('ocr_ok') != null &&
+          delegate.getState('initial_share_text') != null);
       expect(delegate.getState('ocr_ok'), isTrue);
       expect(delegate.getState('ocr_text'), 'Recognized Sample Text');
       expect(delegate.getState('initial_share_text'), 'shared content');
