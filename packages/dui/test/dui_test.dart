@@ -1002,7 +1002,8 @@ void main() {
       expect(find.byType(DuiCanvas), findsOneWidget);
     });
 
-    testWidgets('DuiNodeErrorBoundary 组件工厂抛出异常时局部降级显示错误占位而不会崩溃整页', (tester) async {
+    testWidgets('DuiNodeErrorBoundary 组件工厂抛出异常时局部降级显示错误占位而不会崩溃整页',
+        (tester) async {
       final state = DuiState();
       final executor = MockActionExecutor();
       final eventHandler = DuiEventHandler(state: state, executor: executor);

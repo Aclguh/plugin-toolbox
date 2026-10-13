@@ -25,7 +25,8 @@ void main() {
     });
 
     final uiFile = File('${tempDir.path}/ui.json');
-    uiFile.writeAsStringSync('{"type": "Center", "child": {"type": "Text", "text": "插件运行中"}}');
+    uiFile.writeAsStringSync(
+        '{"type": "Center", "child": {"type": "Text", "text": "插件运行中"}}');
 
     final entryFile = File('${tempDir.path}/main.lua');
     entryFile.writeAsStringSync('-- mock entry script');

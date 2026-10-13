@@ -480,8 +480,7 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
       await mediaDelegate?.playAudio(filePath) ?? false;
 
   @override
-  Future<bool> stopAudio() async =>
-      await mediaDelegate?.stopAudio() ?? false;
+  Future<bool> stopAudio() async => await mediaDelegate?.stopAudio() ?? false;
 
   @override
   Future<bool> playTone(double frequencyHz, int durationMs) async =>
@@ -554,7 +553,9 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
 
   @override
   Future<int> showNotification(
-          {required String title, required String body, String? payload}) async =>
+          {required String title,
+          required String body,
+          String? payload}) async =>
       await deviceDelegate?.showNotification(
           title: title, body: body, payload: payload) ??
       -1;
@@ -606,8 +607,7 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
       await deviceDelegate?.isBiometricsAvailable() ?? false;
 
   @override
-  Future<Map<String, dynamic>> authenticateBiometrics(
-          {String? reason}) async =>
+  Future<Map<String, dynamic>> authenticateBiometrics({String? reason}) async =>
       await deviceDelegate?.authenticateBiometrics(reason: reason) ??
       {'success': false, 'error': 'not_supported'};
 

@@ -326,7 +326,6 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     return await DesktopSimulationAdapter.simulateDecodeBarcode(context);
   }
 
-
   @override
   Widget build(BuildContext context) {
     return PluginPageScaffold(

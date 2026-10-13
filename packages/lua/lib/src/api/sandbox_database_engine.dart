@@ -775,4 +775,3 @@ class SandboxDatabaseEngine implements PluginDatabase {
 
 /// 纯 Dart JSON 结构化存储引擎别名，供适配层显式表达降级语义
 typedef JsonFallbackDatabase = SandboxDatabaseEngine;
-

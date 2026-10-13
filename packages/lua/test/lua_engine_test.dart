@@ -2984,7 +2984,8 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 25));
       }
       expect(delegate.getState('custom_ins_ok'), isTrue);
-      expect(customDb.executedSqls, contains('INSERT INTO test (id) VALUES (1)'));
+      expect(
+          customDb.executedSqls, contains('INSERT INTO test (id) VALUES (1)'));
     });
 
     test('AiApi: 统一大模型网关 chat 与 streamChat 调用', () async {
@@ -3178,12 +3179,14 @@ class _MockCustomDatabase implements PluginDatabase {
   }
 
   @override
-  Future<Map<String, dynamic>> query(String rawSql, List<dynamic> params) async {
+  Future<Map<String, dynamic>> query(
+      String rawSql, List<dynamic> params) async {
     return {'ok': true, 'rows': []};
   }
 
   @override
-  Future<Map<String, dynamic>> batch(List<Map<String, dynamic>> statements) async {
+  Future<Map<String, dynamic>> batch(
+      List<Map<String, dynamic>> statements) async {
     return {'ok': true, 'batchCount': statements.length};
   }
 
@@ -3195,4 +3198,3 @@ class _MockCustomDatabase implements PluginDatabase {
   @override
   void dispose() {}
 }
-
