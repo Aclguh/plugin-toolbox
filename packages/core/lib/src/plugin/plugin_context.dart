@@ -123,25 +123,8 @@ class PluginContext {
       _cachedUsedBytes = 0;
       return 0;
     }
-    int bytes = 0;
-    try {
-      if (await dir.exists()) {
-        await for (final entity
-            in dir.list(recursive: true, followLinks: false)) {
-          if (entity is File) {
-            try {
-              bytes += await entity.length();
-            } on FileSystemException {
-              // 扫描期间文件被并发删除时跳过该条目，不中断整体统计
-            }
-          }
-        }
-      }
-    } on FileSystemException {
-      // 目录被并发移除时按 0 处理，与同步兜底路径的容灾语义一致
-    }
-    _cachedUsedBytes = bytes;
-    return bytes;
+    _cachedUsedBytes = _calculateDiskUsedBytes();
+    return _cachedUsedBytes!;
   }
 
   /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
