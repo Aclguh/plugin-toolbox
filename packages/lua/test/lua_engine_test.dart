@@ -1461,7 +1461,16 @@ void main() {
         end)
       ''');
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      for (var i = 0; i < 40; i++) {
+        if (delegate.getState('write_1_ok') != null &&
+            delegate.getState('read_1_content') != null &&
+            delegate.getState('write_2_ok') != null &&
+            delegate.getState('read_2_content') != null &&
+            delegate.getState('read_err_content') != null) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
       expect(delegate.getState('write_1_ok'), true);
       expect(delegate.getState('read_1_content'), 'async hello 1');
       expect(delegate.getState('write_2_ok'), true);
