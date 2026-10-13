@@ -1,0 +1,307 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations_en.dart';
+import 'app_localizations_zh.dart';
+
+// ignore_for_file: type=lint
+
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'l10n/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item then, for each
+/// locale your application supports, add a new item and select the locale
+/// you wish to add from the pop-up menu in the Value field. This list should
+/// be consistent with the languages listed in the AppLocalizations.supportedLocales
+/// property.
+abstract class AppLocalizations {
+  AppLocalizations(String locale)
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+
+  final String localeName;
+
+  static AppLocalizations? of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations);
+  }
+
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
+
+  /// A list of this localizations delegate's supported locales.
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('zh')
+  ];
+
+  /// No description provided for @appTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'PluginToolbox'**
+  String get appTitle;
+
+  /// No description provided for @myTools.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的工具'**
+  String get myTools;
+
+  /// No description provided for @pluginStore.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件商店'**
+  String get pluginStore;
+
+  /// No description provided for @pluginManager.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件管理'**
+  String get pluginManager;
+
+  /// No description provided for @settings.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置'**
+  String get settings;
+
+  /// No description provided for @appearanceAndDisplay.
+  ///
+  /// In zh, this message translates to:
+  /// **'外观与显示'**
+  String get appearanceAndDisplay;
+
+  /// No description provided for @themeMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'主题模式'**
+  String get themeMode;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In zh, this message translates to:
+  /// **'品牌深色（默认）'**
+  String get themeDark;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In zh, this message translates to:
+  /// **'清新浅色'**
+  String get themeLight;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随系统'**
+  String get themeSystem;
+
+  /// No description provided for @dynamicColor.
+  ///
+  /// In zh, this message translates to:
+  /// **'动态取色 (Material You)'**
+  String get dynamicColor;
+
+  /// No description provided for @dynamicColorDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随系统壁纸主色（开启后将覆盖品牌主题色）'**
+  String get dynamicColorDesc;
+
+  /// No description provided for @autoRotateScreen.
+  ///
+  /// In zh, this message translates to:
+  /// **'重力旋转屏幕'**
+  String get autoRotateScreen;
+
+  /// No description provided for @autoRotateScreenDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭时锁定竖屏，开启后跟随手机重力感应方向'**
+  String get autoRotateScreenDesc;
+
+  /// No description provided for @about.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于'**
+  String get about;
+
+  /// No description provided for @aboutApp.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于 PluginToolbox'**
+  String get aboutApp;
+
+  /// No description provided for @aboutDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'万物皆插件 · Android 原生与动态扩展工具箱'**
+  String get aboutDesc;
+
+  /// No description provided for @author.
+  ///
+  /// In zh, this message translates to:
+  /// **'开发者'**
+  String get author;
+
+  /// No description provided for @openSourceLicense.
+  ///
+  /// In zh, this message translates to:
+  /// **'开源协议'**
+  String get openSourceLicense;
+
+  /// No description provided for @openSourceLicenseDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'MIT License'**
+  String get openSourceLicenseDesc;
+
+  /// No description provided for @install.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装'**
+  String get install;
+
+  /// No description provided for @update.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新'**
+  String get update;
+
+  /// No description provided for @uninstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'卸载'**
+  String get uninstall;
+
+  /// No description provided for @cancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消'**
+  String get cancel;
+
+  /// No description provided for @confirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认'**
+  String get confirm;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索工具...'**
+  String get searchHint;
+
+  /// No description provided for @emptyToolsPrompt.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无已启用工具'**
+  String get emptyToolsPrompt;
+
+  /// No description provided for @goToStoreToInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'去插件商店安装'**
+  String get goToStoreToInstall;
+
+  /// No description provided for @importLocalPtx.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入本地 .ptx'**
+  String get importLocalPtx;
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  Future<AppLocalizations> load(Locale locale) {
+    return SynchronousFuture<AppLocalizations>(lookupAppLocalizations(locale));
+  }
+
+  @override
+  bool isSupported(Locale locale) =>
+      <String>['en', 'zh'].contains(locale.languageCode);
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when only language code is specified.
+  switch (locale.languageCode) {
+    case 'en':
+      return AppLocalizationsEn();
+    case 'zh':
+      return AppLocalizationsZh();
+  }
+
+  throw FlutterError(
+      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
+}

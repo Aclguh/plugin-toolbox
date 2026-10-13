@@ -2,6 +2,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
+import '../l10n/app_localizations.dart';
 import 'providers/app_providers.dart';
 import 'router/app_router.dart';
 
@@ -26,6 +27,8 @@ class PluginToolboxApp extends ConsumerWidget {
           darkTheme: AppTheme.dark(dynamicColorScheme: darkScheme),
           themeMode: themeMode,
           routerConfig: router,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
         );
       },
     );
