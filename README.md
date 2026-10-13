@@ -39,9 +39,9 @@
 ## 核心特性
 
 - **内置插件商店（在线安装与更新）**：
-  - 从插件仓库的 Contents API 拉取 `plugin-source/<id>/plugin.json` 获取**版本号、简介、作者、分类与权限**，从 `dist/<id>.ptx` 下载安装包。
+  - 基于 jsDelivr 全球 CDN 与清单接口拉取 `plugin-source/<id>/plugin.json` 获取**版本号、简介、作者、分类与权限**，从 `dist/<id>.ptx` 下载安装包。
   - 逐条展示"未安装 / 可更新 / 已是最新"，安装前确认体积与权限，同 ID 覆盖即插件更新，安装完成立即出现在首页。
-  - 安装包下载后先落盘再交给安装器校验解压，临时文件无条件清理，绝不留下残留产物。
+  - 安装包下载后校验 SHA-256 防篡改，先落盘再交给安装器校验解压，临时文件无条件清理，绝不留下残留产物。
 - **动态热插拔插件生态**：
   - 基于标准 Zip 归档格式的 `.ptx` (Plugin Toolbox Extension) 插件包，支持一键安装、即刻启用与安全卸载。
   - 每个动态插件拥有独立沙箱存储空间，防止插件间数据污染与越权访问。
@@ -67,7 +67,7 @@ plugin-toolbox/
 │   └── test/             # 宿主 Widget 测试与组件交互测试
 ├── packages/
 │   ├── core/             # 领域核心：插件模型、注册中心、安装器与沙箱安全（纯 Dart）
-│   │   └── src/store/    # 插件商店目录客户端与版本语义（GitHub Contents API）
+│   │   └── src/store/    # 插件商店目录客户端与版本语义（jsDelivr CDN）
 │   ├── lua/              # 脚本执行层：Lua 脚本引擎与沙箱 API 绑定（含指令数预算防护）
 │   ├── dui/              # 声明式 UI 引擎：JSON AST -> Flutter Widget 动态渲染
 │   ├── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
@@ -119,18 +119,20 @@ sequenceDiagram
     participant Store as 插件商店页 (app)
     participant Svc as 商店服务 (app)
     participant Core as 核心层 (packages/core)
-    participant GH as GitHub Contents API
+    participant CDN as jsDelivr 全球 CDN
 
     User->>Store: 打开插件商店
-    Store->>Core: GithubPluginStoreClient.fetchCatalog()
-    Core->>GH: 列出 plugin-source 与 dist 目录
-    GH-->>Core: plugin.json (base64) + .ptx 元数据
-    Core-->>Store: 条目(版本/简介/权限) + 快照 revision
+    Store->>Core: JsDelivrPluginStoreSource.fetchCatalog()
+    Core->>CDN: 拉取仓库文件清单 flat 列表
+    CDN-->>Core: 包含 plugin-source 与 dist 的整仓清单
+    Core->>CDN: 按需拉取 plugin.json (按内容哈希缓存)
+    CDN-->>Core: 插件清单 JSON
+    Core-->>Store: 条目(版本/简介/权限/体积/哈希) + revision
     Store->>Svc: buildItems(本地已安装插件)
     Svc-->>User: 展示 未安装 / 可更新 / 已是最新
     User->>Store: 点击安装并确认体积与权限
     Store->>Svc: install(entry)
-    Svc->>GH: 下载 .ptx (按 revision 锚定)
+    Svc->>CDN: 下载 .ptx 并校验 SHA-256 哈希
     Svc->>Svc: 写入临时文件并调用 PluginInstaller
     Svc->>Svc: 无条件删除临时安装包
     Svc-->>Store: 安装结果与版本一致性提示
@@ -174,14 +176,11 @@ python sample_plugins/pack.py base64_tool
 
 设计要点：
 
-- **只依赖 GitHub Contents API**：`raw.githubusercontent.com` 在部分网络环境下不可达，
-  而 Contents API 返回的 base64 正文既能解析清单也能直接落盘为安装包。
-- **快照一致**：目录列表返回的 `sha` 作为 revision 锚定后续的清单与安装包请求，
-  避免"列表来自旧快照、下载却拿到新产物"。
-- **脏数据隔离**：单个插件的 `plugin.json` 损坏或缺字段只跳过该条目并在页头提示，
-  不会阻断整个目录；限流、超时、断网均给出可读中文提示。
-- **安装态判定**：`PluginStoreSemantics` 提供纯函数的版本比较（缺失段补零、允许
-  `v` 前缀与 `+build` 后缀、非数字段归零），据此区分未安装/可更新/已是最新。
+- **基于 jsDelivr 全球 CDN**：清单接口一次请求即可拿到整仓全部插件的路径、体积与内容哈希，彻底规避 GitHub Contents API 未认证 60 次/小时配额极易耗尽的痛点。
+- **快照一致与动态发现**：支持动态探测仓库最新 HEAD 提交哈希，结合语义化版本标签彻底绕开 CDN 对分支的长效强缓存，并以内置基准快照平滑兜底。
+- **SHA-256 防篡改校验**：安装包下载后强制计算 SHA-256 并与清单比对，未通过校验或缺少哈希的安装包执行 fail-closed 拦截，杜绝供应链篡改。
+- **脏数据隔离与内容缓存**：按清单内容哈希持久化缓存 `plugin.json`，源码未变动的插件刷新时零重复下载；单插件清单损坏自动跳过并不阻断目录加载。
+- **安装态判定**：`PluginStoreSemantics` 提供纯函数的版本比较（缺失段补零、允许 `v` 前缀与 `+build` 后缀、非数字段归零），据此区分未安装/可更新/已是最新。
 
 ---
 
