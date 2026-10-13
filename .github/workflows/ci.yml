@@ -43,8 +43,11 @@ jobs:
       - name: Spec & logic verification suite
         run: dart run tool/verify.dart
 
-      - name: Unit & widget tests (all packages)
-        run: melos run test
+      - name: Unit & widget tests with coverage (all packages)
+        run: melos run test:coverage
+
+      - name: Coverage threshold gate check
+        run: dart run tool/check_coverage.dart --min-coverage 75
 
       - name: Debug APK build smoke (app)
         working-directory: app

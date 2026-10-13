@@ -28,6 +28,10 @@ scripts:
     packageFilters:
       dirExists: test
 
+  check:coverage:
+    run: dart run tool/check_coverage.dart
+    description: 汇总各包覆盖率并验证门禁是否达标
+
   format:
     exec: dart format .
     description: 格式化
