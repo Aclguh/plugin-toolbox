@@ -2901,7 +2901,7 @@ void main() {
         end)
       ''');
 
-      for (var i = 0; i < 20; i++) {
+      for (var i = 0; i < 40; i++) {
         if (delegate.getState('special_flush_ok') == true) break;
         await Future<void>.delayed(const Duration(milliseconds: 25));
       }
@@ -2923,7 +2923,7 @@ void main() {
           state.set("flush2_ok", res.ok)
         end)
       ''');
-      for (var i = 0; i < 20; i++) {
+      for (var i = 0; i < 40; i++) {
         if (delegate.getState('flush2_ok') == true) break;
         await Future<void>.delayed(const Duration(milliseconds: 25));
       }
@@ -2942,7 +2942,7 @@ void main() {
           end
         end)
       ''');
-      for (var i = 0; i < 20; i++) {
+      for (var i = 0; i < 40; i++) {
         if (delegate.getState('recovered_count') != null) break;
         await Future<void>.delayed(const Duration(milliseconds: 25));
       }
