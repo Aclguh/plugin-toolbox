@@ -56,6 +56,7 @@ class NetworkApi {
         if (b0 == 127) return true; // 127.0.0.0/8
         if (b0 == 169 && b1 == 254) return true; // 169.254.0.0/16
         if (b0 == 172 && (b1 >= 16 && b1 <= 31)) return true; // 172.16.0.0/12
+        if (b0 == 192 && b1 == 168) return true; // 192.168.0.0/16
         if (b0 == 255 && b1 == 255 && raw[2] == 255 && raw[3] == 255) {
           return true;
         }
