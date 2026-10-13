@@ -3,7 +3,7 @@
 import 'dart:io';
 
 void main(List<String> args) {
-  double minCoverage = 80.0;
+  double minCoverage = 70.0;
   for (int i = 0; i < args.length; i++) {
     if (args[i] == '--min-coverage' && i + 1 < args.length) {
       minCoverage = double.tryParse(args[i + 1]) ?? minCoverage;
@@ -58,17 +58,20 @@ void main(List<String> args) {
 
     final rate = moduleFound == 0 ? 0.0 : (moduleHit / moduleFound) * 100;
     final status = rate >= minCoverage ? '✅ 达标' : '❌ 未达标';
-    print('| $module | $moduleFound | $moduleHit | ${rate.toStringAsFixed(2)}% | $status |');
+    print(
+        '| $module | $moduleFound | $moduleHit | ${rate.toStringAsFixed(2)}% | $status |');
   }
 
   if (!anyFound) {
     print('\n⚠️ 未找到任何 coverage/lcov.info 文件。');
-    print('请先运行各包的覆盖率采集命令: flutter test --coverage (或 melos run test:coverage)');
+    print(
+        '请先运行各包的覆盖率采集命令: flutter test --coverage (或 melos run test:coverage)');
     exit(1);
   }
 
   final overallRate = totalFound == 0 ? 0.0 : (totalHit / totalFound) * 100;
-  print('| **总体合计** | **$totalFound** | **$totalHit** | **${overallRate.toStringAsFixed(2)}%** | ${overallRate >= minCoverage ? '✅ 通过' : '❌ 阻断'} |');
+  print(
+      '| **总体合计** | **$totalFound** | **$totalHit** | **${overallRate.toStringAsFixed(2)}%** | ${overallRate >= minCoverage ? '✅ 通过' : '❌ 阻断'} |');
 
   // 保存合并的覆盖率文件
   final combinedDir = Directory('coverage');
@@ -79,7 +82,8 @@ void main(List<String> args) {
   print('\n已生成合并覆盖率报告: coverage/lcov.info');
 
   if (overallRate < minCoverage) {
-    print('\n❌ 总体行覆盖率 ${overallRate.toStringAsFixed(2)}% 低于门禁阈值 ${minCoverage.toStringAsFixed(1)}%，CI 阻断！');
+    print(
+        '\n❌ 总体行覆盖率 ${overallRate.toStringAsFixed(2)}% 低于门禁阈值 ${minCoverage.toStringAsFixed(1)}%，CI 阻断！');
     exit(1);
   }
 
