@@ -40,6 +40,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   final Map<String, String> _busyPlugins = {};
 
   Future<void> _refresh() async {
+    ref.invalidate(pluginStoreResolvedRefProvider);
     ref.invalidate(pluginStoreCatalogProvider);
     await ref.read(pluginStoreCatalogProvider.future);
   }

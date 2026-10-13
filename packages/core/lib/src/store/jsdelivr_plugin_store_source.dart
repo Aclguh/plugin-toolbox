@@ -106,6 +106,68 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
     if (_ownsHttpClient) _http.close();
   }
 
+  /// 动态解析远端仓库最新发布版本标签或引用。
+  ///
+  /// 优先探测 jsDelivr 包元数据接口获取最新 release tag 或版本；
+  /// 失败、未发布 tags 或离线时，安全平滑降级至本地持久化历史缓存或 [fallbackRef]。
+  static Future<String> resolveLatestRef({
+    required String owner,
+    required String repository,
+    required String fallbackRef,
+    http.Client? client,
+    SharedPreferences? preferences,
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final httpClient = client ?? http.Client();
+    final ownsClient = client == null;
+    try {
+      final uri = Uri.parse('$_dataApiBase/packages/gh/$owner/$repository');
+      final response = await httpClient.get(uri).timeout(timeout);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded is Map) {
+          final tags = decoded['tags'];
+          if (tags is Map && tags['latest'] is String) {
+            final latestTag = (tags['latest'] as String).trim();
+            if (latestTag.isNotEmpty) {
+              if (preferences != null) {
+                await preferences.setString(
+                    'plugin_store_cached_ref_${owner}_$repository', latestTag);
+              }
+              return latestTag;
+            }
+          }
+          final versions = decoded['versions'];
+          if (versions is List && versions.isNotEmpty) {
+            final first = versions.first;
+            if (first is Map && first['version'] is String) {
+              final v = (first['version'] as String).trim();
+              if (v.isNotEmpty) {
+                if (preferences != null) {
+                  await preferences.setString(
+                      'plugin_store_cached_ref_${owner}_$repository', v);
+                }
+                return v;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // 离线、超时或未配置 tag 时静默降级
+    } finally {
+      if (ownsClient) httpClient.close();
+    }
+
+    // 优先尝试读取上次成功解析并持久化的缓存引用
+    final cached =
+        preferences?.getString('plugin_store_cached_ref_${owner}_$repository');
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+    return fallbackRef;
+  }
+
   @override
   Future<PluginStoreCatalog> fetchCatalog() async {
     await _loadCache();

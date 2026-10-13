@@ -11,20 +11,32 @@ import 'store_service.dart';
 const String kPluginStoreOwner = 'Aclguh';
 const String kPluginStoreRepository = 'PTX-plugins';
 
-/// 目录锚定的分支、标签或提交哈希；发布插件时改用语义化版本标签或具体 commit SHA 可让目录与产物稳定同源。
-///
-/// 注意：jsDelivr Data API (`data.jsdelivr.com`) 对分支名称（如 `master`）具有长达 1 年的强缓存
-/// (max-age=31536000)，且其 Purge 机制仅针对静态文件 CDN (`cdn.jsdelivr.net`)，无法清理 API 清单缓存。
-/// 若锚定为 `master`，将持续返回首次建立缓存时的 47 个插件历史快照；
-/// 锚定为最新发布的提交哈希 (commit SHA) 或 release tag 可彻底绕开陈旧缓存，实时获取仓库全部 130 款生态插件。
-const String kPluginStoreRef = 'd8e4e63b71a0a4fd4b4c7b001b735c3864e68734';
+/// 经过验证的内置基准提交快照（离线或限流时的可靠兜底快照）。
+const String kPluginStoreFallbackRef =
+    'd8e4e63b71a0a4fd4b4c7b001b735c3864e68734';
+
+/// 保持向后兼容的引用常量（默认指向当前基准）。
+const String kPluginStoreRef = kPluginStoreFallbackRef;
+
+/// 动态解析或本地缓存的最新仓库 ref。
+final pluginStoreResolvedRefProvider = FutureProvider<String>((ref) async {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return JsDelivrPluginStoreSource.resolveLatestRef(
+    owner: kPluginStoreOwner,
+    repository: kPluginStoreRepository,
+    fallbackRef: kPluginStoreFallbackRef,
+    preferences: prefs,
+  );
+});
 
 /// 商店页依赖的服务。测试通过 override 注入内存替身，避免真实网络请求。
 final pluginStoreServiceProvider = Provider<PluginStoreService>((ref) {
+  final resolvedRef = ref.watch(pluginStoreResolvedRefProvider).valueOrNull ??
+      kPluginStoreFallbackRef;
   final client = JsDelivrPluginStoreSource(
     owner: kPluginStoreOwner,
     repository: kPluginStoreRepository,
-    ref: kPluginStoreRef,
+    ref: resolvedRef,
     // 借用已注入的 SharedPreferences 缓存清单：源码未变化的插件刷新时
     // 不再重复下载 plugin.json，把一次刷新的请求数压到接近 1 次
     preferences: ref.watch(sharedPreferencesProvider),
