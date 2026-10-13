@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +11,8 @@ import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
 import '../providers/app_providers.dart';
 import 'plugin_native_bridge.dart';
+import 'plugin_dialog_service.dart';
+import 'desktop_simulation_adapter.dart';
 import 'plugin_host_ai_delegate.dart';
 import 'plugin_host_media_delegate.dart';
 import 'plugin_host_system_delegate.dart';
@@ -181,58 +182,21 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
   @override
   Map<String, dynamic> getAllStates() => _duiState.getAll();
 
-  // --- LuaHostDelegate: UI 弹窗与用户交互 ---
+  // --- LuaHostDelegate: UI 弹窗与用户交互 (委托至 PluginDialogService) ---
   @override
   void showToast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (mounted) PluginDialogService.showToast(context, message);
   }
 
   @override
   Future<void> showAlert(String title, String message) async {
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
+    if (mounted) await PluginDialogService.showAlert(context, title, message);
   }
 
   @override
   Future<bool> showConfirm(String title, String message) async {
     if (!mounted) return false;
-    final res = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    return res ?? false;
+    return await PluginDialogService.showConfirm(context, title, message);
   }
 
   @override
@@ -242,34 +206,12 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     String? defaultValue,
   }) async {
     if (!mounted) return null;
-    final controller = TextEditingController(text: defaultValue);
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(title),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: hint),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(controller.text),
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      // 对话框关闭（含异常路径）后必须释放控制器，防止每次调用泄漏一个
-      // TextEditingController 及其挂载的 FocusNode 监听器
-      controller.dispose();
-    }
+    return await PluginDialogService.showPrompt(
+      context,
+      title: title,
+      hint: hint,
+      defaultValue: defaultValue,
+    );
   }
 
   @override
@@ -279,23 +221,11 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     int initialIndex = 0,
   }) async {
     if (!mounted) return null;
-    return await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(title),
-        children: items.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final item = entry.value;
-          return SimpleDialogOption(
-            onPressed: () =>
-                Navigator.of(ctx).pop({'index': idx, 'text': item}),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(item),
-            ),
-          );
-        }).toList(),
-      ),
+    return await PluginDialogService.showPickItem(
+      context,
+      title: title,
+      items: items,
+      initialIndex: initialIndex,
     );
   }
 
@@ -305,34 +235,10 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     required List<String> items,
   }) async {
     if (!mounted) return null;
-    return await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                title,
-                style: Theme.of(ctx).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const Divider(height: 1),
-            ...items.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final item = entry.value;
-              return ListTile(
-                title: Text(item, textAlign: TextAlign.center),
-                onTap: () =>
-                    Navigator.of(ctx).pop({'index': idx, 'text': item}),
-              );
-            }),
-          ],
-        ),
-      ),
+    return await PluginDialogService.showBottomSheet(
+      context,
+      title: title,
+      items: items,
     );
   }
 
@@ -372,58 +278,21 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     String? lastDate,
   }) async {
     if (!mounted) return null;
-    DateTime parseDate(String? s, DateTime fallback) {
-      if (s == null || s.isEmpty) return fallback;
-      try {
-        return DateTime.parse(s);
-      } catch (_) {
-        return fallback;
-      }
-    }
-
-    final now = DateTime.now();
-    final first = parseDate(firstDate, DateTime(1900, 1, 1));
-    final last = parseDate(lastDate, DateTime(2100, 12, 31));
-    var init = parseDate(initialDate, now);
-    if (init.isBefore(first)) init = first;
-    if (init.isAfter(last)) init = last;
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: init,
-      firstDate: first,
-      lastDate: last,
+    return await PluginDialogService.pickDate(
+      context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
-    if (picked == null) return null;
-    final y = picked.year.toString().padLeft(4, '0');
-    final m = picked.month.toString().padLeft(2, '0');
-    final d = picked.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
   }
 
   @override
   Future<String?> pickTime({String? initialTime}) async {
     if (!mounted) return null;
-    TimeOfDay parseTime(String? s) {
-      if (s != null && s.contains(':')) {
-        final parts = s.split(':');
-        final h = int.tryParse(parts[0]);
-        final m = int.tryParse(parts[1]);
-        if (h != null && m != null) {
-          return TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
-        }
-      }
-      return TimeOfDay.now();
-    }
-
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: parseTime(initialTime),
+    return await PluginDialogService.pickTime(
+      context,
+      initialTime: initialTime,
     );
-    if (picked == null) return null;
-    final h = picked.hour.toString().padLeft(2, '0');
-    final m = picked.minute.toString().padLeft(2, '0');
-    return '$h:$m';
   }
 
   @override
@@ -440,20 +309,13 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     }
   }
 
-  // 扫码与图片解码在桌面端无原生识别器时需借 showPrompt 降级模拟，
-  // 依赖页面上下文，故保留在页面层而不下沉到能力域 mixin
   @override
   Future<String?> scanBarcode({String? prompt}) async {
     final res = await nativeBridge.scanBarcode(prompt: prompt);
     if (res != null) return res;
     if (!mounted) return null;
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return await showPrompt(
-        title: prompt ?? '扫码识别 (桌面模拟)',
-        hint: '请输入或粘贴条形码/二维码扫描内容',
-      );
-    }
-    return null;
+    return await DesktopSimulationAdapter.simulateScanBarcode(context,
+        prompt: prompt);
   }
 
   @override
@@ -461,14 +323,9 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     final res = await nativeBridge.decodeBarcodeFromImage(filePath);
     if (res != null) return res;
     if (!mounted) return null;
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return await showPrompt(
-        title: '图片二维码识别 (桌面模拟)',
-        hint: '未检测到原生条码识别器，可手动输入模拟识别结果',
-      );
-    }
-    return null;
+    return await DesktopSimulationAdapter.simulateDecodeBarcode(context);
   }
+
 
   @override
   Widget build(BuildContext context) {

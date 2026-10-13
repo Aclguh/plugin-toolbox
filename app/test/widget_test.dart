@@ -30,6 +30,8 @@ Future<ProviderContainer> createContainer({
   return container;
 }
 
+final _mockRootDir = Directory.systemTemp.createTempSync('mock_plugin_test_');
+
 ToolPlugin createMockPlugin(String id, String name) {
   return DynamicPlugin(
     manifest: PluginManifest(
@@ -44,7 +46,7 @@ ToolPlugin createMockPlugin(String id, String name) {
       entry: 'entry.lua',
       ui: 'ui.json',
     ),
-    rootDir: Directory('.'),
+    rootDir: _mockRootDir,
   );
 }
 
@@ -229,7 +231,7 @@ void main() {
           entry: 'main.lua',
           ui: 'ui/main.ui.json',
         ),
-        rootDir: Directory('.'),
+        rootDir: _mockRootDir,
       );
     }
 
