@@ -38,6 +38,7 @@ import 'api/location_api.dart';
 import 'api/nfc_api.dart';
 import 'api/bluetooth_api.dart';
 import 'api/database_api.dart';
+import 'api/plugin_database.dart';
 import 'api/ai_api.dart';
 import 'api/ipc_api.dart';
 import 'delegates/domain_delegates.dart';
@@ -45,6 +46,7 @@ import 'lua_callback_invoker.dart';
 import 'lua_value_codec.dart';
 
 export 'delegates/domain_delegates.dart';
+export 'api/plugin_database.dart';
 
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
@@ -62,6 +64,7 @@ class LuaEngine {
 
   final int instructionBudget;
   final int memoryBudget;
+  final PluginDatabaseFactory? databaseFactory;
 
   late final LuaState _ls;
   LuaCallbackInvoker? _callbacks;
@@ -83,6 +86,7 @@ class LuaEngine {
     required this.delegate,
     this.instructionBudget = defaultInstructionBudget,
     this.memoryBudget = defaultMemoryBudget,
+    this.databaseFactory,
   }) {
     _ls = LuaState.newState();
     _ls.openLibs();
@@ -172,7 +176,7 @@ class LuaEngine {
     LocationApi.bind(_ls, context, delegate, _callbacks!);
     NfcApi.bind(_ls, context, delegate, _callbacks!);
     BluetoothApi.bind(_ls, context, delegate, _callbacks!);
-    _databaseApi = DatabaseApi();
+    _databaseApi = DatabaseApi(databaseFactory: databaseFactory);
     _databaseApi!.bindInstance(_ls, context, _callbacks!);
     AiApi.bind(_ls, context, delegate, _callbacks!);
     IpcApi.bind(_ls, context, delegate, _callbacks!);

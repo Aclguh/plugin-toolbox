@@ -5,21 +5,27 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
 import '../lua_value_codec.dart';
+import 'plugin_database.dart';
 import 'sandbox_database_engine.dart';
 
 /// `db` — 插件独立沙箱内的轻量结构化数据库 API。
 ///
 /// 严格限定于插件沙箱独立文件 (`<sandbox>/plugin_data.db`)，
-/// 提供纯 Dart 实现的无依赖结构化 SQL 查询与增删改查引擎。
+/// 默认提供纯 Dart 实现的无依赖结构化 SQL 查询与增删改查引擎，
+/// 亦支持注入 [PluginDatabaseFactory] 接入原生驱动。
 class DatabaseApi {
-  SandboxDatabaseEngine? _engine;
+  final PluginDatabaseFactory? databaseFactory;
+  PluginDatabase? _engine;
+
+  DatabaseApi({this.databaseFactory});
 
   static void bind(
     LuaState ls,
     PluginContext context,
-    LuaCallbackInvoker callbacks,
-  ) {
-    final api = DatabaseApi();
+    LuaCallbackInvoker callbacks, {
+    PluginDatabaseFactory? databaseFactory,
+  }) {
+    final api = DatabaseApi(databaseFactory: databaseFactory);
     api.bindInstance(ls, context, callbacks);
   }
 
@@ -54,9 +60,10 @@ class DatabaseApi {
       return;
     }
 
-    final dbEngine = SandboxDatabaseEngine(
-      dbFile: File('${rootDir.path}/plugin_data.db'),
-    );
+    final dbFile = File('${rootDir.path}/plugin_data.db');
+    final dbEngine = databaseFactory != null
+        ? databaseFactory!(dbFile)
+        : SandboxDatabaseEngine(dbFile: dbFile);
     _engine = dbEngine;
 
     // db.execute(sql [, paramsList | callback, callback])

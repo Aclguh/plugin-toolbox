@@ -2952,6 +2952,41 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
+    test('DatabaseApi: 支持注入自定义 PluginDatabaseFactory 驱动并透明调用', () async {
+      final customDb = _MockCustomDatabase();
+      final tempDir = Directory.systemTemp.createTempSync('ptx_custom_db_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      final dbCtx = PluginContext(
+        pluginId: 'custom_db_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.database},
+        rootDir: tempDir,
+      );
+      final dbEngine = LuaEngine(
+        context: dbCtx,
+        delegate: delegate,
+        databaseFactory: (file) => customDb,
+      );
+      addTearDown(dbEngine.close);
+
+      dbEngine.loadAndExecute('''
+        db.execute("INSERT INTO test (id) VALUES (1)", function(res)
+          state.set("custom_ins_ok", res.ok)
+        end)
+      ''');
+
+      for (var i = 0; i < 20; i++) {
+        if (delegate.getState('custom_ins_ok') == true) break;
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+      expect(delegate.getState('custom_ins_ok'), isTrue);
+      expect(customDb.executedSqls, contains('INSERT INTO test (id) VALUES (1)'));
+    });
+
     test('AiApi: 统一大模型网关 chat 与 streamChat 调用', () async {
       // 1. 无权限拦截
       expect(
@@ -3131,3 +3166,33 @@ class _SimpleStateDelegate implements LuaStateDelegate {
   @override
   void onStateChanged(String key, dynamic value) => state[key] = value;
 }
+
+class _MockCustomDatabase implements PluginDatabase {
+  final List<String> executedSqls = [];
+
+  @override
+  Future<Map<String, dynamic>> execute(String rawSql, List<dynamic> params,
+      {bool inTransaction = false}) async {
+    executedSqls.add(rawSql);
+    return {'ok': true, 'affected': 1};
+  }
+
+  @override
+  Future<Map<String, dynamic>> query(String rawSql, List<dynamic> params) async {
+    return {'ok': true, 'rows': []};
+  }
+
+  @override
+  Future<Map<String, dynamic>> batch(List<Map<String, dynamic>> statements) async {
+    return {'ok': true, 'batchCount': statements.length};
+  }
+
+  @override
+  Future<Map<String, dynamic>> flush() async {
+    return {'ok': true};
+  }
+
+  @override
+  void dispose() {}
+}
+

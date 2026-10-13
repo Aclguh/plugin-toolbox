@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-/// 纯 Dart 轻量沙箱结构化存储引擎。
+import 'plugin_database.dart';
+
+/// 纯 Dart 轻量沙箱结构化存储引擎（JSON 回退实现）。
 ///
 /// 以单 JSON 文件承载全部表数据，写操作经串行操作队列排队执行，
-/// 脏数据防抖合并落盘；仅服务于插件独立沙箱内的小型结构化存储场景。
-class SandboxDatabaseEngine {
+/// 脏数据防抖合并落盘；作为 [PluginDatabase] 默认的开箱即用轻量实现。
+class SandboxDatabaseEngine implements PluginDatabase {
   final File dbFile;
   Map<String, List<Map<String, dynamic>>> _tables = {};
   Future<void>? _loadFuture;
@@ -146,8 +148,9 @@ class SandboxDatabaseEngine {
     }
   }
 
+  @override
   Future<Map<String, dynamic>> execute(String rawSql, List<dynamic> params,
-      {bool autoPersist = true}) {
+      {bool autoPersist = true, bool inTransaction = false}) {
     final completer = Completer<Map<String, dynamic>>();
     _opQueue = _opQueue.whenComplete(() async {
       try {
@@ -765,3 +768,7 @@ class SandboxDatabaseEngine {
     return s;
   }
 }
+
+/// 纯 Dart JSON 结构化存储引擎别名，供适配层显式表达降级语义
+typedef JsonFallbackDatabase = SandboxDatabaseEngine;
+
