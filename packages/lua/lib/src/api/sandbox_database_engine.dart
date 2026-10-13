@@ -97,6 +97,7 @@ class SandboxDatabaseEngine implements PluginDatabase {
     } catch (_) {}
   }
 
+  @override
   Future<Map<String, dynamic>> flush() {
     final completer = Completer<Map<String, dynamic>>();
     _opQueue = _opQueue.whenComplete(() async {
@@ -117,6 +118,7 @@ class SandboxDatabaseEngine implements PluginDatabase {
     return completer.future;
   }
 
+  @override
   void dispose() {
     _debounceTimer?.cancel();
     _debounceTimer = null;
@@ -330,6 +332,7 @@ class SandboxDatabaseEngine implements PluginDatabase {
     return {'ok': false, 'error': '不支持的 SQL 语句: $rawSql'};
   }
 
+  @override
   Future<Map<String, dynamic>> query(String rawSql, List<dynamic> params) {
     final completer = Completer<Map<String, dynamic>>();
     _opQueue = _opQueue.whenComplete(() async {
@@ -491,6 +494,7 @@ class SandboxDatabaseEngine implements PluginDatabase {
     return {'ok': true, 'rows': resultRows};
   }
 
+  @override
   Future<Map<String, dynamic>> batch(List<Map<String, dynamic>> statements) {
     final completer = Completer<Map<String, dynamic>>();
     _opQueue = _opQueue.whenComplete(() async {
