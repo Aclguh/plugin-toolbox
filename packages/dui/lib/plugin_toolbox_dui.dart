@@ -10,3 +10,4 @@ export 'src/dui_canvas.dart';
 export 'src/dui_drawing_pad.dart';
 export 'src/dui_chart.dart';
 export 'src/dui_html.dart';
+export 'src/dui_error_boundary.dart';

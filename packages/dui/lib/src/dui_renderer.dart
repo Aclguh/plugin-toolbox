@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'dui_error_boundary.dart';
 import 'dui_event_handler.dart';
 import 'dui_state.dart';
 import 'dui_utils.dart';
@@ -162,14 +163,22 @@ class DuiRenderer {
       return const SizedBox.shrink();
     }
 
-    return factory(
-      DuiNodeContext(
-        context: context,
-        renderer: this,
-        props: compiled.props,
-        children: compiled.children,
-        events: compiled.events,
-        ref: compiled.ref,
+    return DuiNodeErrorBoundary(
+      nodeType: compiled.type,
+      builder: () => factory(
+        DuiNodeContext(
+          context: context,
+          renderer: this,
+          props: compiled.props,
+          children: compiled.children,
+          events: compiled.events,
+          ref: compiled.ref,
+        ),
+      ),
+      fallback: (error, stackTrace) => DuiErrorPlaceholder(
+        type: compiled.type,
+        error: error,
+        stackTrace: stackTrace,
       ),
     );
   }

@@ -980,5 +980,53 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(DuiCanvas), findsOneWidget);
     });
+
+    testWidgets('DuiNodeErrorBoundary 组件工厂抛出异常时局部降级显示错误占位而不会崩溃整页', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final eventHandler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: eventHandler);
+
+      // 注册一个故意抛出异常的工厂组件
+      renderer.registerFactory('BrokenWidget', (ctx) {
+        throw const FormatException('Malformed config data');
+      });
+
+      final rootNode = {
+        'type': 'Column',
+        'children': [
+          {
+            'type': 'Text',
+            'props': {'text': '正常的组件'},
+          },
+          {
+            'type': 'BrokenWidget',
+          },
+          {
+            'type': 'FilledButton',
+            'props': {'text': '可交互按钮'},
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.build(context, rootNode),
+            ),
+          ),
+        ),
+      );
+
+      // 页面正常渲染，未抛出阻断异常
+      expect(tester.takeException(), isNull);
+      // 正常组件与按钮均存在
+      expect(find.text('正常的组件'), findsOneWidget);
+      expect(find.text('可交互按钮'), findsOneWidget);
+      // 故障组件局部降级为 DuiErrorPlaceholder
+      expect(find.byType(DuiErrorPlaceholder), findsOneWidget);
+      expect(find.textContaining('BrokenWidget'), findsOneWidget);
+    });
   });
 }
