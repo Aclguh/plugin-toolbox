@@ -541,6 +541,27 @@ void main() {
       expect(countNotified, 1);
     });
 
+    test('DuiState 细粒度精准通知与避免全局级联触发', () {
+      final state = DuiState();
+      int globalNotified = 0;
+      int keyNotified = 0;
+      state.addListener(() => globalNotified++);
+      state.listenableForKey('name').addListener(() => keyNotified++);
+
+      state.set('name', 'Bob');
+      expect(keyNotified, 1);
+      expect(globalNotified, 0); // 局部 set 默认不击穿全局监听
+
+      state.set('name', 'Charlie', notifyGlobal: true);
+      expect(keyNotified, 2);
+      expect(globalNotified, 1);
+
+      state.reset({'name': 'Dave'});
+      expect(keyNotified, 3);
+      expect(globalNotified, 2);
+      expect(state.get('name'), 'Dave');
+    });
+
     testWidgets(
         'DuiRenderer 渲染 Switch、Slider、Dropdown、ProgressBar、Divider 与 Wrap 组件及双向绑定',
         (tester) async {

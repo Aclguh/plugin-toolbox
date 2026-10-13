@@ -11,14 +11,49 @@ class DuiState extends ChangeNotifier {
   static final RegExp _visibleExprPattern =
       RegExp(r'^\{\{state\.([a-zA-Z0-9_]+)\}\}$');
 
+  static final Listenable _emptyListenable = ChangeNotifier();
+
   dynamic get(String key) => _values[key];
 
-  void set(String key, dynamic value) {
+  /// 设置指定键的状态值
+  ///
+  /// 仅通知监听该键的局部订阅者（精确局部刷新，杜绝无差别全量穿透）；
+  /// 若需要显式触发全局监听器（如重置或整体置换），可将 [notifyGlobal] 设为 true。
+  void set(String key, dynamic value, {bool notifyGlobal = false}) {
     if (_values[key] != value) {
       _values[key] = value;
       _keyNotifiers[key]?.notify();
+      if (notifyGlobal) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// 批量设置状态键值
+  void setAll(Map<String, dynamic> entries, {bool notifyGlobal = false}) {
+    var hasChanged = false;
+    for (final entry in entries.entries) {
+      if (_values[entry.key] != entry.value) {
+        _values[entry.key] = entry.value;
+        _keyNotifiers[entry.key]?.notify();
+        hasChanged = true;
+      }
+    }
+    if (hasChanged && notifyGlobal) {
       notifyListeners();
     }
+  }
+
+  /// 重置状态存储并通知全部订阅者
+  void reset([Map<String, dynamic>? initialValues]) {
+    _values.clear();
+    if (initialValues != null) {
+      _values.addAll(initialValues);
+    }
+    for (final notifier in _keyNotifiers.values) {
+      notifier.notify();
+    }
+    notifyListeners();
   }
 
   Map<String, dynamic> getAll() => Map.unmodifiable(_values);
@@ -31,7 +66,7 @@ class DuiState extends ChangeNotifier {
   /// 获取一组键的合并局部监听对象
   Listenable listenableForKeys(Iterable<String> keys) {
     final list = keys.map(listenableForKey).toList();
-    if (list.isEmpty) return this;
+    if (list.isEmpty) return _emptyListenable;
     if (list.length == 1) return list.first;
     return Listenable.merge(list);
   }
