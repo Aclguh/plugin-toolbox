@@ -8,6 +8,7 @@ import '../plugin/dynamic_plugin.dart';
 import '../event/event_bus.dart';
 import '../event/app_event.dart';
 import '../sandbox/sandbox_path.dart';
+import '../storage/plugin_storage.dart';
 
 class PluginInstaller {
   static const int maxPackageSizeBytes = 10 * 1024 * 1024; // 10MB
@@ -182,10 +183,11 @@ class PluginInstaller {
     }
   }
 
-  /// 卸载插件
+  /// 卸载插件并同步清理其命名空间下的持久化存储
   static Future<void> uninstall(
     String pluginId, {
     Directory? baseDirectory,
+    PluginStorageFactory storageFactory = const PluginStorageFactory(),
   }) async {
     final Directory pluginsBaseDir;
     if (baseDirectory != null) {
@@ -198,9 +200,14 @@ class PluginInstaller {
     if (await targetDir.exists()) {
       await targetDir.delete(recursive: true);
     }
+    try {
+      await storageFactory.create(pluginId).clear();
+    } catch (_) {
+      // 容灾: 存储异常不阻断卸载主流程
+    }
   }
 
-  /// 监听卸载请求事件并执行沙箱目录清理。
+  /// 监听卸载请求事件并执行沙箱目录与持久化数据清理。
   ///
   /// 注册中心只通过事件总线发出卸载请求（保持自身无文件系统职责），
   /// 由宿主在组装层调用本方法建立"请求 -> 清理"的桥接。
@@ -208,10 +215,15 @@ class PluginInstaller {
       listenUninstallRequests(
     EventBus eventBus, {
     Directory? baseDirectory,
+    PluginStorageFactory storageFactory = const PluginStorageFactory(),
   }) {
     return eventBus.on<PluginUninstallRequestedEvent>().listen((event) async {
       try {
-        await uninstall(event.pluginId, baseDirectory: baseDirectory);
+        await uninstall(
+          event.pluginId,
+          baseDirectory: baseDirectory,
+          storageFactory: storageFactory,
+        );
       } on FileSystemException {
         // 沙箱目录可能已被外部移除，卸载流程不因此中断
       }

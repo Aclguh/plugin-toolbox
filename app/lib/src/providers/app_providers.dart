@@ -127,8 +127,11 @@ final pluginRegistryProvider =
     eventBus: bus,
     storageFactory: storageFactory,
   );
-  // 注册中心只发出卸载请求事件，沙箱目录清理由安装器监听执行
-  final uninstallSub = PluginInstaller.listenUninstallRequests(bus);
+  // 注册中心只发出卸载请求事件，沙箱目录与持久化数据清理由安装器监听执行
+  final uninstallSub = PluginInstaller.listenUninstallRequests(
+    bus,
+    storageFactory: storageFactory,
+  );
   ref.onDispose(() => uninstallSub.cancel());
   return PluginRegistryNotifier(registry, prefs, eventBus: bus);
 });

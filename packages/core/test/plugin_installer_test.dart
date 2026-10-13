@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -327,13 +328,20 @@ void main() {
       await file.parent.delete(recursive: true);
     });
 
-    test('uninstall 清理沙箱目录', () async {
+    test('uninstall 清理沙箱目录与持久化存储数据', () async {
+      SharedPreferences.setMockInitialValues({});
       final file = await writeTempPtx(buildPtx(validEntries()));
       final plugin = await PluginInstaller.installFromPtx(file);
       expect(plugin.rootDir.existsSync(), isTrue);
 
+      const storageFactory = PluginStorageFactory();
+      final storage = storageFactory.create(plugin.id);
+      await storage.setString('test_pref', 'saved_data');
+      expect(await storage.getString('test_pref'), 'saved_data');
+
       await PluginInstaller.uninstall(plugin.id);
       expect(plugin.rootDir.existsSync(), isFalse);
+      expect(await storage.getString('test_pref'), isNull);
 
       await file.parent.delete(recursive: true);
     });
