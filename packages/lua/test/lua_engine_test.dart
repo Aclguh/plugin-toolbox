@@ -3094,5 +3094,31 @@ void main() {
       ocrEngine.close();
       await tempDir.delete(recursive: true);
     });
+
+    test('CompositeLuaHostDelegate 领域子委托组合与状态穿透', () {
+      final stateStorage = <String, dynamic>{};
+      final stateDelegate = _SimpleStateDelegate(stateStorage);
+      final composite = CompositeLuaHostDelegate(stateDelegate: stateDelegate);
+
+      composite.onStateChanged('key1', 'val1');
+      expect(composite.getState('key1'), 'val1');
+      expect(composite.getAllStates()['key1'], 'val1');
+      expect(composite.batteryLevel, 100);
+      expect(composite.isTorchOn, isFalse);
+    });
   });
+}
+
+class _SimpleStateDelegate implements LuaStateDelegate {
+  final Map<String, dynamic> state;
+  _SimpleStateDelegate(this.state);
+
+  @override
+  dynamic getState(String key) => state[key];
+
+  @override
+  Map<String, dynamic> getAllStates() => Map.unmodifiable(state);
+
+  @override
+  void onStateChanged(String key, dynamic value) => state[key] = value;
 }
