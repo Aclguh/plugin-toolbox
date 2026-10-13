@@ -181,6 +181,9 @@ class PluginRegistry {
         allowedDomains:
             plugin is DynamicPlugin ? plugin.manifest.allowedDomains : null,
       );
+      if (plugin is DynamicPlugin) {
+        await context.scanUsedBytes();
+      }
       await plugin.initialize(context);
       _initializedPlugins.add(plugin.id);
     } catch (e, st) {

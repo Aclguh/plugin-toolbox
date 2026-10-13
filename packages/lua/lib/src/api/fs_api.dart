@@ -266,7 +266,7 @@ class FsApi {
       final dir = Directory(fullPath);
       if (dir.existsSync()) {
         dir.deleteSync(recursive: true);
-        context.invalidateStorageQuotaCache();
+        unawaited(context.scanUsedBytes());
         ls.pushBoolean(true);
         return 1;
       }
