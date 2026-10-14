@@ -126,8 +126,7 @@ void main() {
     expect(await hostDelegates.resetBrightness(), isFalse);
   });
 
-  testWidgets('DynamicPluginHostPage 加载异常时渲染错误界面',
-      (WidgetTester tester) async {
+  testWidgets('DynamicPluginHostPage 加载异常时渲染错误界面', (WidgetTester tester) async {
     final brokenPlugin = DynamicPlugin(
       manifest: const PluginManifest(
         id: 'broken_plugin',
@@ -169,8 +168,7 @@ void main() {
     expect(find.textContaining('插件运行错误'), findsOneWidget);
   });
 
-  testWidgets('DynamicPluginHostPage 容器生命周期事件调度',
-      (WidgetTester tester) async {
+  testWidgets('DynamicPluginHostPage 容器生命周期事件调度', (WidgetTester tester) async {
     final mockPlugin = DynamicPlugin(
       manifest: const PluginManifest(
         id: 'lifecycle_test',

@@ -38,8 +38,8 @@ void main() {
   testWidgets('showAlert 弹出警告弹窗并点击确定关闭', (WidgetTester tester) async {
     await tester.pumpWidget(
       buildTestHost((context) => ElevatedButton(
-            onPressed: () => PluginDialogService.showAlert(
-                context, '警告标题', '警告详细信息内容'),
+            onPressed: () =>
+                PluginDialogService.showAlert(context, '警告标题', '警告详细信息内容'),
             child: const Text('打开警告'),
           )),
     );
@@ -256,7 +256,8 @@ void main() {
     expect(selectedTime, '14:30');
   });
 
-  testWidgets('DesktopSimulationAdapter 桌面环境扫码降级模拟输入', (WidgetTester tester) async {
+  testWidgets('DesktopSimulationAdapter 桌面环境扫码降级模拟输入',
+      (WidgetTester tester) async {
     String? simulatedCode;
 
     await tester.pumpWidget(
@@ -284,7 +285,8 @@ void main() {
     }
   });
 
-  testWidgets('DesktopSimulationAdapter 桌面环境图片二维码识别模拟输入', (WidgetTester tester) async {
+  testWidgets('DesktopSimulationAdapter 桌面环境图片二维码识别模拟输入',
+      (WidgetTester tester) async {
     String? simulatedCode;
 
     await tester.pumpWidget(

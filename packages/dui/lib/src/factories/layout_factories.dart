@@ -211,15 +211,15 @@ void registerLayoutFactories(DuiRenderer renderer) {
             .replaceAll(RegExp(r'\{\{\s*\$index\s*\}\}'), index.toString())
             .replaceAllMapped(
                 RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}'), (m) {
-              final field = m.group(1);
-              if (field == null) {
-                return item?.toString() ?? '';
-              }
-              if (item is Map) {
-                return item[field]?.toString() ?? '';
-              }
-              return '';
-            });
+          final field = m.group(1);
+          if (field == null) {
+            return item?.toString() ?? '';
+          }
+          if (item is Map) {
+            return item[field]?.toString() ?? '';
+          }
+          return '';
+        });
       } else if (val is Map) {
         return val.map(
             (k, v) => MapEntry(k.toString(), resolveScoped(v, item, index)));

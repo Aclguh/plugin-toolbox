@@ -22,8 +22,8 @@ class SettingsPage extends ConsumerWidget {
           SwitchListTile(
             secondary: const Icon(Icons.screen_rotation_outlined),
             title: Text(l10n?.autoRotateScreen ?? '重力旋转屏幕'),
-            subtitle: Text(l10n?.autoRotateScreenDesc ??
-                '开启后允许横竖屏自由旋转，关闭时锁定竖屏'),
+            subtitle:
+                Text(l10n?.autoRotateScreenDesc ?? '开启后允许横竖屏自由旋转，关闭时锁定竖屏'),
             value: autoRotate,
             onChanged: (val) {
               ref.read(autoRotateProvider.notifier).toggle(val);
@@ -64,8 +64,8 @@ class SettingsPage extends ConsumerWidget {
           SwitchListTile(
             secondary: const Icon(Icons.color_lens_outlined),
             title: Text(l10n?.dynamicColor ?? '动态取色 (Material You)'),
-            subtitle: Text(l10n?.dynamicColorDesc ??
-                '开启后提取壁纸色彩，关闭时使用工具箱专属品牌配色'),
+            subtitle:
+                Text(l10n?.dynamicColorDesc ?? '开启后提取壁纸色彩，关闭时使用工具箱专属品牌配色'),
             value: useDynamicColor,
             onChanged: (val) {
               ref.read(dynamicColorEnabledProvider.notifier).toggle(val);

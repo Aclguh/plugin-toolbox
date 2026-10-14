@@ -297,17 +297,19 @@ void main() {
   expect(packScript.existsSync(), '全局插件打包脚本 sample_plugins/pack.py 存在');
 
   final pluginSchemaFile = File('tool/schemas/plugin.schema.json');
-  expect(pluginSchemaFile.existsSync(), '插件清单 JSON Schema 规范文件 plugin.schema.json 存在');
+  expect(pluginSchemaFile.existsSync(),
+      '插件清单 JSON Schema 规范文件 plugin.schema.json 存在');
   Map<String, dynamic>? pluginSchemaJson;
   try {
-    pluginSchemaJson =
-        jsonDecode(pluginSchemaFile.readAsStringSync()) as Map<String, dynamic>?;
+    pluginSchemaJson = jsonDecode(pluginSchemaFile.readAsStringSync())
+        as Map<String, dynamic>?;
   } catch (_) {}
   expect(pluginSchemaJson != null && pluginSchemaJson['properties'] != null,
       'plugin.schema.json 结构完整且为合法 JSON Schema');
 
   final duiSchemaFile = File('tool/schemas/dui.schema.json');
-  expect(duiSchemaFile.existsSync(), 'DUI 声明式组件树 JSON Schema 规范文件 dui.schema.json 存在');
+  expect(duiSchemaFile.existsSync(),
+      'DUI 声明式组件树 JSON Schema 规范文件 dui.schema.json 存在');
   Map<String, dynamic>? duiSchemaJson;
   try {
     duiSchemaJson =
