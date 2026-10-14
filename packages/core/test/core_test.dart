@@ -402,6 +402,49 @@ void main() {
       expect(res['result'], 'echo:hello');
     });
 
+    test('PluginIpcBroker 细粒度权限控制与调用方白名单 (ACL)', () async {
+      final broker = PluginIpcBroker();
+      // 仅允许 'trusted_plugin' 调用的敏感接口
+      broker.registerService(
+        'secure_vault',
+        'getSecret',
+        (arg) async => 'top_secret',
+        allowedCallers: {'trusted_plugin'},
+      );
+
+      // 白名单内的合法插件调用成功
+      final okRes = await broker.call(
+        callerPluginId: 'trusted_plugin',
+        targetPluginId: 'secure_vault',
+        functionName: 'getSecret',
+      );
+      expect(okRes['ok'], isTrue);
+      expect(okRes['result'], 'top_secret');
+
+      // 未授权插件调用被拦截拒绝
+      final deniedRes = await broker.call(
+        callerPluginId: 'unauthorized_plugin',
+        targetPluginId: 'secure_vault',
+        functionName: 'getSecret',
+      );
+      expect(deniedRes['ok'], isFalse);
+      expect(deniedRes['error'], contains('跨插件访问拒绝'));
+
+      // 公开接口任何插件均可调用
+      broker.registerService(
+        'public_service',
+        'ping',
+        (arg) async => 'pong',
+      );
+      final pingRes = await broker.call(
+        callerPluginId: 'any_caller',
+        targetPluginId: 'public_service',
+        functionName: 'ping',
+      );
+      expect(pingRes['ok'], isTrue);
+      expect(pingRes['result'], 'pong');
+    });
+
     test('PluginRegistry 停用插件与自定义权限状态机及注销清理', () async {
       final reg = PluginRegistry(
         storageFactory: const PluginStorageFactory(),

@@ -62,12 +62,31 @@ class IpcApi {
     });
     ls.setField(-2, 'call');
 
-    // plugin.export(functionName, callback)
-    // 导出当前插件的处理函数供其他插件调用
+    // plugin.export(functionName, [allowedCallers,] callback)
+    // 导出当前插件的处理函数供其他插件调用（支持访问控制白名单）
     ls.pushDartFunction((ls) {
       checkPermission(ls);
       final functionName = ls.checkString(1) ?? '';
-      final cbRef = callbacks.ref(2);
+      Set<String>? allowedCallers;
+      int? cbRef;
+
+      if (ls.type(2) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(2);
+      } else if (ls.type(2) == LuaType.luaTable) {
+        ls.pushValue(2);
+        final raw = LuaValueCodec.pop(ls);
+        if (raw is List) {
+          allowedCallers = raw.map((e) => e.toString()).toSet();
+        } else if (raw is Map) {
+          final list = raw['allowedCallers'];
+          if (list is List) {
+            allowedCallers = list.map((e) => e.toString()).toSet();
+          }
+        }
+        if (ls.type(3) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(3);
+        }
+      }
 
       if (cbRef != null) {
         PluginIpcBroker.instance.registerService(
@@ -78,6 +97,7 @@ class IpcApi {
             final result = callbacks.invokeWithResult(cbRef, [args]);
             return result;
           },
+          allowedCallers: allowedCallers,
         );
       }
       return 0;
