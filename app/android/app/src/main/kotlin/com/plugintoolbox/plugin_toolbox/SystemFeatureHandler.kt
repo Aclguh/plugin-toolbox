@@ -1,9 +1,11 @@
 package com.plugintoolbox.plugin_toolbox
 
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.bluetooth.BluetoothManager
 import android.content.ContentValues
 import android.content.Context
@@ -36,7 +38,23 @@ class SystemFeatureHandler(
     private val clearInitialShareData: () -> Unit
 ) : FeatureHandler {
     companion object {
-        private const val NOTIFICATION_CHANNEL_ID = "plugin_toolbox_notifications"
+        const val NOTIFICATION_CHANNEL_ID = "plugin_toolbox_notifications"
+
+        fun ensureNotificationChannel(nm: NotificationManager) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val existing = nm.getNotificationChannel(NOTIFICATION_CHANNEL_ID)
+                if (existing == null) {
+                    val channel = NotificationChannel(
+                        NOTIFICATION_CHANNEL_ID,
+                        "PluginToolbox 插件通知",
+                        NotificationManager.IMPORTANCE_DEFAULT
+                    ).apply {
+                        description = "展示来自 PluginToolbox 动态插件的提醒与通知"
+                    }
+                    nm.createNotificationChannel(channel)
+                }
+            }
+        }
     }
 
     private var nextNotificationId = 1000
@@ -206,19 +224,41 @@ class SystemFeatureHandler(
                 val id = nextNotificationId++
                 val nm = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 ensureNotificationChannel(nm)
-                val runnable = Runnable {
-                    val notif = NotificationCompat.Builder(activity, NOTIFICATION_CHANNEL_ID)
-                        .setContentTitle(title)
-                        .setContentText(body)
-                        .setSmallIcon(R.mipmap.ic_launcher)
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                        .setAutoCancel(true)
-                        .build()
-                    nm.notify(id, notif)
-                    scheduledRunnables.remove(id)
+
+                val intent = Intent(activity, NotificationReceiver::class.java).apply {
+                    putExtra("id", id)
+                    putExtra("title", title)
+                    putExtra("body", body)
                 }
-                scheduledRunnables[id] = runnable
-                mainHandler.postDelayed(runnable, delaySeconds * 1000L)
+                val pendingIntent = PendingIntent.getBroadcast(
+                    activity,
+                    id,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val alarmManager = activity.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                val triggerAtMillis = System.currentTimeMillis() + delaySeconds * 1000L
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager?.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+                    } else {
+                        alarmManager?.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+                    }
+                } catch (_: Exception) {
+                    val runnable = Runnable {
+                        val notif = NotificationCompat.Builder(activity, NOTIFICATION_CHANNEL_ID)
+                            .setContentTitle(title)
+                            .setContentText(body)
+                            .setSmallIcon(R.mipmap.ic_launcher)
+                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .setAutoCancel(true)
+                            .build()
+                        nm.notify(id, notif)
+                        scheduledRunnables.remove(id)
+                    }
+                    scheduledRunnables[id] = runnable
+                    mainHandler.postDelayed(runnable, delaySeconds * 1000L)
+                }
                 result.success(id)
                 true
             }
@@ -226,6 +266,20 @@ class SystemFeatureHandler(
                 val id = call.argument<Int>("id") ?: -1
                 val nm = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancel(id)
+                try {
+                    val intent = Intent(activity, NotificationReceiver::class.java)
+                    val pendingIntent = PendingIntent.getBroadcast(
+                        activity,
+                        id,
+                        intent,
+                        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    if (pendingIntent != null) {
+                        val alarmManager = activity.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                        alarmManager?.cancel(pendingIntent)
+                        pendingIntent.cancel()
+                    }
+                } catch (_: Exception) {}
                 scheduledRunnables.remove(id)?.let { mainHandler.removeCallbacks(it) }
                 result.success(true)
                 true
@@ -233,6 +287,22 @@ class SystemFeatureHandler(
             "cancelAllNotifications" -> {
                 val nm = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancelAll()
+                for (id in scheduledRunnables.keys) {
+                    try {
+                        val intent = Intent(activity, NotificationReceiver::class.java)
+                        val pendingIntent = PendingIntent.getBroadcast(
+                            activity,
+                            id,
+                            intent,
+                            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        if (pendingIntent != null) {
+                            val alarmManager = activity.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                            alarmManager?.cancel(pendingIntent)
+                            pendingIntent.cancel()
+                        }
+                    } catch (_: Exception) {}
+                }
                 scheduledRunnables.values.forEach { mainHandler.removeCallbacks(it) }
                 scheduledRunnables.clear()
                 result.success(true)
@@ -490,22 +560,6 @@ class SystemFeatureHandler(
                 true
             }
             else -> false
-        }
-    }
-
-    private fun ensureNotificationChannel(nm: NotificationManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val existing = nm.getNotificationChannel(NOTIFICATION_CHANNEL_ID)
-            if (existing == null) {
-                val channel = NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "PluginToolbox 插件通知",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply {
-                    description = "展示来自 PluginToolbox 动态插件的提醒与通知"
-                }
-                nm.createNotificationChannel(channel)
-            }
         }
     }
 

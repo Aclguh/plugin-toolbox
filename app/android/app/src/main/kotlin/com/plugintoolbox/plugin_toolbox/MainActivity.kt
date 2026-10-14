@@ -109,6 +109,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        handlers.forEach { it.onResume() }
+    }
+
     override fun onPause() {
         super.onPause()
         handlers.forEach { it.onPause() }
