@@ -64,6 +64,7 @@ class LuaEngine {
   final int instructionBudget;
   final int memoryBudget;
   final PluginDatabaseFactory? databaseFactory;
+  final void Function(String error)? onCallbackError;
 
   late final LuaState _ls;
   LuaCallbackInvoker? _callbacks;
@@ -86,6 +87,7 @@ class LuaEngine {
     this.instructionBudget = defaultInstructionBudget,
     this.memoryBudget = defaultMemoryBudget,
     this.databaseFactory,
+    this.onCallbackError,
   }) {
     _ls = LuaState.newState();
     _ls.openLibs();
@@ -129,7 +131,14 @@ class LuaEngine {
 
   /// 注册所有受白名单权限控制的宿主 API
   void _registerHostApis() {
-    _callbacks = LuaCallbackInvoker(_ls, instructionBudget);
+    _callbacks = LuaCallbackInvoker(
+      _ls,
+      instructionBudget,
+      onError: (err) {
+        context.logger.e('Lua Callback Execution Error: $err');
+        onCallbackError?.call(err);
+      },
+    );
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);
 

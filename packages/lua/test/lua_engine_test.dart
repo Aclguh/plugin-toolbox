@@ -1316,6 +1316,27 @@ void main() {
       expect(delegate.getState('cancelled_called'), isNull);
     });
 
+    test('Lua 异步回调异常被安全捕获并通知 onCallbackError', () async {
+      String? callbackErr;
+      final testEngine = LuaEngine(
+        context: context,
+        delegate: delegate,
+        onCallbackError: (err) {
+          callbackErr = err;
+        },
+      );
+      addTearDown(testEngine.close);
+
+      testEngine.loadAndExecute('''
+        timer.setTimeout(10, function()
+          error("Async callback boom")
+        end)
+      ''');
+
+      await _waitFor(() => callbackErr != null);
+      expect(callbackErr, contains('Async callback boom'));
+    });
+
     test('TimerApi clearAll 与 close 自动回收所有定时器', () async {
       engine.loadAndExecute('''
         timer.setTimeout(200, function()

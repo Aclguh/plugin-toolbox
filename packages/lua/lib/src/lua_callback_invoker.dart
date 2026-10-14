@@ -10,9 +10,14 @@ import 'lua_value_codec.dart';
 class LuaCallbackInvoker {
   final LuaState _ls;
   final int _instructionBudget;
+  final void Function(String error)? _onError;
   final Set<int> _activeRefs = {};
 
-  LuaCallbackInvoker(this._ls, this._instructionBudget);
+  LuaCallbackInvoker(
+    this._ls,
+    this._instructionBudget, {
+    void Function(String error)? onError,
+  }) : _onError = onError;
 
   /// 登记栈上 [stackIdx] 位置的函数供稍后调用；非函数参数返回 null
   int? ref(int stackIdx) {
@@ -49,7 +54,9 @@ class LuaCallbackInvoker {
     _ls.setInstructionBudget(_instructionBudget);
     final status = _ls.pCall(args.length, 1, 0);
     if (status != ThreadStatus.luaOk) {
+      final err = _ls.toStr(-1) ?? 'Unknown Lua callback error';
       _ls.pop(1);
+      _onError?.call(err);
       return null;
     }
     return LuaValueCodec.pop(_ls);
@@ -90,8 +97,10 @@ class LuaCallbackInvoker {
     _ls.setInstructionBudget(_instructionBudget);
     final status = _ls.pCall(args.length, 0, 0);
     if (status != ThreadStatus.luaOk) {
+      final err = _ls.toStr(-1) ?? 'Unknown Lua callback error';
       // pCall 失败时会压入错误信息，出栈以保持栈平衡
       _ls.pop(1);
+      _onError?.call(err);
     }
   }
 }
