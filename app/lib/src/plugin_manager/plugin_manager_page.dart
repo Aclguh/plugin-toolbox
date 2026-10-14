@@ -58,6 +58,12 @@ class PluginManagerPage extends ConsumerWidget {
 
       // 注册并初始化全部获授权项 (同 ID 覆盖即插件更新)
       for (final plugin in pluginsToRegister) {
+        final existingPerms = registry.getCustomPermissions(plugin.id);
+        if (existingPerms != null) {
+          final merged = Set<PluginPermission>.from(existingPerms)
+            ..addAll(plugin.manifest.permissions);
+          registry.setCustomPermissions(plugin.id, merged);
+        }
         registry.register(plugin);
         await registry.initializePlugin(plugin.id);
       }

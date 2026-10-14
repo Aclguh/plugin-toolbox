@@ -169,6 +169,12 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
       // 同 ID 覆盖即插件更新：注册中心会弃用旧实例并重新初始化
       final registry = ref.read(pluginRegistryProvider);
+      final existingPerms = registry.getCustomPermissions(outcome.plugin.id);
+      if (existingPerms != null) {
+        final merged = Set<PluginPermission>.from(existingPerms)
+          ..addAll(outcome.plugin.manifest.permissions);
+        registry.setCustomPermissions(outcome.plugin.id, merged);
+      }
       registry.register(outcome.plugin);
       await registry.initializePlugin(outcome.plugin.id);
       ref.read(pluginRegistryProvider.notifier).refresh();

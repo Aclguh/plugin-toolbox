@@ -479,6 +479,28 @@ void main() {
       await reg.setEnabled('p_test', true);
       expect(reg.disabledPluginIds.contains('p_test'), isFalse);
 
+      // 验证升级场景下非敏感权限自动合并
+      const manifestV2 = PluginManifest(
+        id: 'p_test',
+        name: 'P Test',
+        version: '1.1.0',
+        description: 'd',
+        author: 'a',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [PluginPermission.storage, PluginPermission.clipboard],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      );
+      final pluginV2 =
+          DynamicPlugin(manifest: manifestV2, rootDir: Directory('.'));
+      reg.register(pluginV2);
+      await reg.initializePlugin('p_test');
+      expect(
+        reg.getCustomPermissions('p_test'),
+        containsAll([PluginPermission.storage, PluginPermission.clipboard]),
+      );
+
       // 注销后清理相关映射
       await reg.unregister('p_test');
       expect(reg.getCustomPermissions('p_test'), isNull);

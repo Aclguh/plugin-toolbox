@@ -162,7 +162,18 @@ class PluginRegistry {
     try {
       final Set<PluginPermission> initialPermissions;
       if (_customPermissions.containsKey(plugin.id)) {
-        initialPermissions = Set.from(_customPermissions[plugin.id]!);
+        final custom =
+            Set<PluginPermission>.from(_customPermissions[plugin.id]!);
+        if (plugin is DynamicPlugin) {
+          // 插件更新升级场景：将新版本 Manifest 中声明的非敏感权限自动合并并入授权集合
+          for (final perm in plugin.manifest.permissions) {
+            if (!perm.isSensitive) {
+              custom.add(perm);
+            }
+          }
+          _customPermissions[plugin.id] = custom;
+        }
+        initialPermissions = custom;
       } else if (plugin is DynamicPlugin) {
         initialPermissions = plugin.manifest.permissions.toSet();
       } else {
