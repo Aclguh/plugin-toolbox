@@ -123,6 +123,12 @@ class PluginContext {
       _cachedUsedBytes = 0;
       return 0;
     }
+    // 在 FakeAsync 测试环境下（如 testWidgets），流式文件 IO 无法被虚拟时钟驱动，
+    // 使用同步列表避免导致 pumpAndSettle 超时挂起
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      _cachedUsedBytes = _calculateDiskUsedBytes();
+      return _cachedUsedBytes!;
+    }
     var bytes = 0;
     try {
       if (await dir.exists()) {
