@@ -57,32 +57,14 @@ class PluginDialogService {
     String? hint,
     String? defaultValue,
   }) async {
-    final controller = TextEditingController(text: defaultValue);
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(title),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: hint),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(controller.text),
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    return await showDialog<String>(
+      context: context,
+      builder: (ctx) => _PromptDialog(
+        title: title,
+        hint: hint,
+        defaultValue: defaultValue,
+      ),
+    );
   }
 
   static Future<Map<String, dynamic>?> showPickItem(
@@ -206,5 +188,58 @@ class PluginDialogService {
     final h = picked.hour.toString().padLeft(2, '0');
     final m = picked.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+}
+
+class _PromptDialog extends StatefulWidget {
+  final String title;
+  final String? hint;
+  final String? defaultValue;
+
+  const _PromptDialog({
+    required this.title,
+    this.hint,
+    this.defaultValue,
+  });
+
+  @override
+  State<_PromptDialog> createState() => _PromptDialogState();
+}
+
+class _PromptDialogState extends State<_PromptDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.defaultValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        decoration: InputDecoration(hintText: widget.hint),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('确定'),
+        ),
+      ],
+    );
   }
 }
