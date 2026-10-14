@@ -1,12 +1,15 @@
 // 覆盖率汇总与质量门禁检查脚本
-// 用法: dart run tool/check_coverage.dart [--min-coverage 80]
+// 用法: dart run tool/check_coverage.dart [--min-coverage 80] [--require-all]
 import 'dart:io';
 
 void main(List<String> args) {
   double minCoverage = 70.0;
+  bool requireAll = false;
   for (int i = 0; i < args.length; i++) {
     if (args[i] == '--min-coverage' && i + 1 < args.length) {
       minCoverage = double.tryParse(args[i + 1]) ?? minCoverage;
+    } else if (args[i] == '--require-all') {
+      requireAll = true;
     }
   }
 
@@ -18,12 +21,14 @@ void main(List<String> args) {
     'app': 'app/coverage/lcov.info',
   };
 
-  print('=== 代码覆盖率检测与门禁卡点 (最低要求: ${minCoverage.toStringAsFixed(1)}%) ===\n');
+  print(
+      '=== 代码覆盖率检测与门禁卡点 (最低要求: ${minCoverage.toStringAsFixed(1)}%${requireAll ? ', 严格模式: 全量覆盖率必须具备' : ''}) ===\n');
 
   int totalFound = 0;
   int totalHit = 0;
   final combinedLines = <String>[];
   bool anyFound = false;
+  final missingPackages = <String>[];
 
   print('| 模块 | 发现行数 (LF) | 命中行数 (LH) | 行覆盖率 | 状态 |');
   print('|---|---|---|---|---|');
@@ -34,6 +39,7 @@ void main(List<String> args) {
     final file = File(lcovPath);
 
     if (!file.existsSync()) {
+      missingPackages.add(module);
       print('| $module | - | - | 缺失 lcov.info | ⚠️ 未采集 |');
       continue;
     }
@@ -60,6 +66,15 @@ void main(List<String> args) {
     final status = rate >= minCoverage ? '✅ 达标' : '❌ 未达标';
     print(
         '| $module | $moduleFound | $moduleHit | ${rate.toStringAsFixed(2)}% | $status |');
+  }
+
+  if (requireAll && missingPackages.isNotEmpty) {
+    print(
+        '\n❌ 严格模式开启 (--require-all): 以下模块缺失 coverage/lcov.info 覆盖率报告，CI 阻断！');
+    for (final m in missingPackages) {
+      print('   - $m');
+    }
+    exit(1);
   }
 
   if (!anyFound) {
