@@ -3,6 +3,8 @@ package com.plugintoolbox.plugin_toolbox
 import android.app.Activity
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import com.google.zxing.BinaryBitmap
@@ -12,6 +14,7 @@ import com.google.zxing.common.HybridBinarizer
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.concurrent.Executors
 
 class BarcodeHandler(private val activity: Activity) : FeatureHandler {
     companion object {
@@ -19,6 +22,8 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
         const val RC_SCAN_IMAGE = 1002
     }
 
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingScanResult: MethodChannel.Result? = null
     private var scanCaptureFile: File? = null
 
@@ -27,8 +32,10 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
             "decodeBarcodeFromImage" -> {
                 val path = call.argument<String>("path")
                 if (path != null) {
-                    val decoded = decodeBarcode(path)
-                    result.success(decoded)
+                    ioExecutor.execute {
+                        val decoded = decodeBarcode(path)
+                        mainHandler.post { result.success(decoded) }
+                    }
                 } else {
                     result.success(null)
                 }
@@ -53,15 +60,20 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
             pendingScanResult = null
             return true
         } else if (requestCode == RC_SCAN_IMAGE) {
-            if (resultCode == Activity.RESULT_OK && scanCaptureFile != null && scanCaptureFile!!.exists()) {
-                val decoded = decodeBarcode(scanCaptureFile!!.absolutePath)
-                scanCaptureFile?.delete()
-                pendingScanResult?.success(decoded)
-            } else {
-                scanCaptureFile?.delete()
-                pendingScanResult?.success(null)
-            }
+            val file = scanCaptureFile
+            val resultCallback = pendingScanResult
             pendingScanResult = null
+            scanCaptureFile = null
+            if (resultCode == Activity.RESULT_OK && file != null && file.exists()) {
+                ioExecutor.execute {
+                    val decoded = decodeBarcode(file.absolutePath)
+                    file.delete()
+                    mainHandler.post { resultCallback?.success(decoded) }
+                }
+            } else {
+                file?.delete()
+                resultCallback?.success(null)
+            }
             return true
         }
         return false
@@ -71,16 +83,28 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
         val file = File(path)
         if (!file.exists()) return null
         return try {
-            val bitmap = BitmapFactory.decodeFile(path) ?: return null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            val sampleSize = ImageHandler.calculateInSampleSize(bounds.outWidth, bounds.outHeight, 2048, 2048)
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            }
+            val bitmap = BitmapFactory.decodeFile(path, opts) ?: return null
             val intArray = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(intArray, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             val source = RGBLuminanceSource(bitmap.width, bitmap.height, intArray)
             val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
             val result = MultiFormatReader().decode(binaryBitmap)
+            bitmap.recycle()
             result.text
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
+            System.gc()
             null
         }
+    }
+
+    override fun onDestroy() {
+        ioExecutor.shutdown()
     }
 
     private fun startScanBarcode(result: MethodChannel.Result) {

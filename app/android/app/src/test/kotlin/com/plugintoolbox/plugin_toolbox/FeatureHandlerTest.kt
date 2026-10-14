@@ -86,4 +86,13 @@ class FeatureHandlerTest {
         val unknown = PermissionHelper.getPermissionsForFeature("unknown_nonexistent_feat")
         assertEquals(0, unknown.size)
     }
+
+    @Test
+    fun testCalculateInSampleSize() {
+        assertEquals(1, ImageHandler.calculateInSampleSize(1000, 1000, 2048, 2048))
+        assertEquals(1, ImageHandler.calculateInSampleSize(2048, 2048, 2048, 2048))
+        assertEquals(2, ImageHandler.calculateInSampleSize(4096, 4096, 2048, 2048))
+        assertEquals(4, ImageHandler.calculateInSampleSize(8192, 8192, 2048, 2048))
+        assertEquals(1, ImageHandler.calculateInSampleSize(5000, 1000, 2048, 2048))
+    }
 }
