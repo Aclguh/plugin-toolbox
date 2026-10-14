@@ -464,6 +464,34 @@ void main() {
       expect(find.text('from host'), findsOneWidget);
     });
 
+    testWidgets('TextField 支持 debounceMs 输入防抖延时同步', (tester) async {
+      final state = DuiState();
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'TextField',
+        'ref': 'debounced_input',
+        'props': {
+          'debounceMs': 100,
+        },
+      };
+
+      await tester.pumpWidget(buildHost(renderer, node));
+
+      // 用户输入
+      await tester.enterText(find.byType(TextField), 'fast typing');
+      await tester.pump();
+      // 防抖期间，状态尚未被写入
+      expect(state.get('debounced_input'), isNull);
+
+      // 时间步进 100ms
+      await tester.pump(const Duration(milliseconds: 100));
+      // 防抖时间到，状态已同步
+      expect(state.get('debounced_input'), 'fast typing');
+    });
+
     testWidgets('TextField didUpdateWidget 保留合理光标位置 (P3-5)', (tester) async {
       final state = DuiState();
       final handler =

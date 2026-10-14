@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../dui_renderer.dart';
@@ -20,6 +21,7 @@ void registerInputFactories(DuiRenderer renderer) {
         label: node.props['label']?.toString(),
         maxLines: DuiUtils.tryInt(node.props['maxLines']) ?? 1,
         readOnly: DuiUtils.tryBool(node.props['readOnly']),
+        debounceMs: DuiUtils.tryInt(node.props['debounceMs']) ?? 0,
         onChanged: (val) {
           if (node.ref != null) {
             state.set(node.ref!, val);
@@ -300,6 +302,7 @@ class BoundTextField extends StatefulWidget {
   final int maxLines;
   final bool readOnly;
   final ValueChanged<String> onChanged;
+  final int debounceMs;
 
   const BoundTextField({
     super.key,
@@ -309,6 +312,7 @@ class BoundTextField extends StatefulWidget {
     required this.maxLines,
     required this.readOnly,
     required this.onChanged,
+    this.debounceMs = 0,
   });
 
   @override
@@ -317,11 +321,25 @@ class BoundTextField extends StatefulWidget {
 
 class _BoundTextFieldState extends State<BoundTextField> {
   late final TextEditingController _controller;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
+  }
+
+  void _handleChanged(String val) {
+    if (widget.debounceMs <= 0) {
+      widget.onChanged(val);
+      return;
+    }
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(Duration(milliseconds: widget.debounceMs), () {
+      if (mounted) {
+        widget.onChanged(val);
+      }
+    });
   }
 
   @override
@@ -343,6 +361,7 @@ class _BoundTextFieldState extends State<BoundTextField> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -357,7 +376,7 @@ class _BoundTextFieldState extends State<BoundTextField> {
         hintText: widget.hint,
         labelText: widget.label,
       ),
-      onChanged: widget.onChanged,
+      onChanged: _handleChanged,
     );
   }
 }
