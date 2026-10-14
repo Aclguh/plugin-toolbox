@@ -127,10 +127,6 @@ class PluginStoreService {
   Future<StoreInstallOutcome> install(PluginStoreEntry entry) async {
     final bytes = await _source.downloadPackage(entry);
 
-    // 安装前把"商店展示的元数据"与"实际产物的清单"对齐：
-    // 目录来自 plugin-source、安装包来自 dist, 两者由不同提交产出时可能不一致
-    final contract = inspectPluginPackage(bytes);
-
     final directory = await _temporaryDirectoryProvider();
     final file = File('${directory.path}/${entry.id}.ptx');
     try {
@@ -140,8 +136,10 @@ class PluginStoreService {
       return StoreInstallOutcome(
         plugin: plugin,
         remoteVersion: entry.version,
-        warnings: _buildWarnings(entry, plugin, contract),
+        warnings: _buildWarnings(entry, plugin),
       );
+    } on FormatException catch (e) {
+      throw PluginStoreException(e.message);
     } finally {
       // 临时安装包必须无条件清理：安装失败也不能在设备上留下残留产物
       try {
@@ -155,7 +153,6 @@ class PluginStoreService {
   List<String> _buildWarnings(
     PluginStoreEntry entry,
     DynamicPlugin plugin,
-    PluginPackageContract contract,
   ) {
     final warnings = <String>[];
     if (plugin.id != entry.id) {
@@ -163,12 +160,6 @@ class PluginStoreService {
     }
     if (PluginStoreSemantics.isUpdateAvailable(entry.version, plugin.version)) {
       warnings.add('安装包内版本 (${plugin.version}) 低于商店清单版本 (${entry.version})');
-    }
-    if (contract.missingEntryScript) {
-      warnings.add('安装包内缺少入口脚本 ${contract.manifest.entry}');
-    }
-    if (contract.missingUiDefinition) {
-      warnings.add('安装包内缺少 UI 描述 ${contract.manifest.ui}');
     }
     return warnings;
   }
