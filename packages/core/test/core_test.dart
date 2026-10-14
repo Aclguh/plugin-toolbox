@@ -612,5 +612,42 @@ void main() {
       expect(storageFile.existsSync(), isTrue);
       expect(storageFile.readAsStringSync(), contains('migrated_val'));
     });
+
+    test('PluginFileStorageImpl 并发写入串行排队保证数据不丢失无竞态异常', () async {
+      final storage =
+          PluginFileStorageImpl(namespace: 'concurrent_ns', rootDir: tempDir);
+      final futures = <Future<bool>>[];
+      for (int i = 0; i < 30; i++) {
+        futures.add(storage.setString('key_$i', 'val_$i'));
+      }
+      final results = await Future.wait(futures);
+      expect(results.every((r) => r == true), isTrue);
+
+      final storageReloaded =
+          PluginFileStorageImpl(namespace: 'concurrent_ns', rootDir: tempDir);
+      for (int i = 0; i < 30; i++) {
+        expect(await storageReloaded.getString('key_$i'), 'val_$i');
+      }
+    });
+
+    test('PluginFileStorageImpl 主文件损坏时自动从 .bak 备份恢复数据', () async {
+      final storage =
+          PluginFileStorageImpl(namespace: 'backup_ns', rootDir: tempDir);
+      await storage.setString('safe_key', 'safe_value');
+
+      final mainFile = File('${tempDir.path}/storage.json');
+      final bakFile = File('${tempDir.path}/storage.json.bak');
+      // 触发第二次写入以生成 .bak 备份
+      await storage.setString('safe_key_2', 'safe_value_2');
+      expect(bakFile.existsSync(), isTrue);
+
+      // 人为破坏主文件为乱码
+      await mainFile.writeAsString('<<<invalid_corrupted_json>>>', flush: true);
+
+      // 新建实例读取，应能自动从 .bak 恢复健康数据
+      final recoveryStorage =
+          PluginFileStorageImpl(namespace: 'backup_ns', rootDir: tempDir);
+      expect(await recoveryStorage.getString('safe_key'), 'safe_value');
+    });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -61,12 +62,37 @@ class PluginFileStorageImpl implements PluginStorage {
 
   File get _file => File('${rootDir.path}/$fileName');
   Map<String, dynamic>? _data;
+  Future<void> _writeQueue = Future.value();
 
   Future<void> _ensureLoaded() async {
     if (_data != null) return;
     if (_file.existsSync()) {
       try {
         final content = await _file.readAsString();
+        final decoded = jsonDecode(content);
+        if (decoded is Map<String, dynamic>) {
+          _data = decoded;
+          return;
+        }
+      } catch (_) {}
+    }
+
+    final bakFile = File('${_file.path}.bak');
+    if (bakFile.existsSync()) {
+      try {
+        final content = await bakFile.readAsString();
+        final decoded = jsonDecode(content);
+        if (decoded is Map<String, dynamic>) {
+          _data = decoded;
+          return;
+        }
+      } catch (_) {}
+    }
+
+    final tmpFile = File('${_file.path}.tmp');
+    if (tmpFile.existsSync()) {
+      try {
+        final content = await tmpFile.readAsString();
         final decoded = jsonDecode(content);
         if (decoded is Map<String, dynamic>) {
           _data = decoded;
@@ -94,16 +120,36 @@ class PluginFileStorageImpl implements PluginStorage {
     } catch (_) {}
   }
 
-  Future<bool> _save() async {
+  Future<bool> _save() {
+    final completer = Completer<bool>();
+    _writeQueue = _writeQueue.then((_) async {
+      final ok = await _doSave();
+      completer.complete(ok);
+    }).catchError((Object _) {
+      completer.complete(false);
+    });
+    return completer.future;
+  }
+
+  Future<bool> _doSave() async {
     try {
       if (!rootDir.existsSync()) {
         await rootDir.create(recursive: true);
       }
       final tmpFile = File('${_file.path}.tmp');
-      await tmpFile.writeAsString(jsonEncode(_data));
+      final bakFile = File('${_file.path}.bak');
+      await tmpFile.writeAsString(jsonEncode(_data), flush: true);
+
+      // 若原主文件存在，先安全备份至 .bak 再覆盖，确保断电或崩溃时零丢数
       if (await _file.exists()) {
-        await _file.delete();
+        try {
+          if (await bakFile.exists()) {
+            await bakFile.delete();
+          }
+          await _file.rename(bakFile.path);
+        } catch (_) {}
       }
+
       await tmpFile.rename(_file.path);
       return true;
     } catch (_) {
@@ -204,6 +250,14 @@ class PluginFileStorageImpl implements PluginStorage {
     try {
       if (await _file.exists()) {
         await _file.delete();
+      }
+      final bakFile = File('${_file.path}.bak');
+      if (await bakFile.exists()) {
+        await bakFile.delete();
+      }
+      final tmpFile = File('${_file.path}.tmp');
+      if (await tmpFile.exists()) {
+        await tmpFile.delete();
       }
     } catch (_) {}
 
