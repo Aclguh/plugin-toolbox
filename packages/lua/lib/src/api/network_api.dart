@@ -112,6 +112,46 @@ class NetworkApi {
     return true;
   }
 
+  /// 可注入的 DNS 解析函数，供单元测试模拟 DNS 重绑定场景
+  static Future<List<InternetAddress>> Function(String host) dnsLookup =
+      InternetAddress.lookup;
+
+  /// 异步 DNS 解析与防 DNS 重绑定校验：
+  /// 若目标 Host 为域名，执行 DNS 查询；
+  /// 若解析出的任一 IP 地址属于私有/环回/链路本地地址，且未在 allowedDomains 显式放行，则拒绝连接。
+  static Future<bool> checkDnsResolutionSafety(
+    PluginContext context,
+    String host,
+  ) async {
+    final directIp = InternetAddress.tryParse(host.trim());
+    if (directIp != null) {
+      return isHostAllowedWithSsrfCheck(context, host);
+    }
+
+    try {
+      final addresses =
+          await dnsLookup(host).timeout(const Duration(seconds: 5));
+      if (addresses.isEmpty) return false;
+      for (final addr in addresses) {
+        if (isPrivateOrLocalHost(addr.address)) {
+          final allowed = context.allowedDomains;
+          if (allowed == null || allowed.isEmpty) return false;
+          final normalized = addr.address.trim().toLowerCase();
+          final isExplicitlyAllowed = allowed.any((p) {
+            final pattern = p.trim().toLowerCase();
+            return pattern == normalized && pattern != '*';
+          });
+          if (!isExplicitlyAllowed) {
+            return false;
+          }
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void bind(
     LuaState ls,
     PluginContext context,
@@ -220,6 +260,13 @@ class NetworkApi {
       final client = http.Client();
       try {
         for (var hop = 0;; hop++) {
+          final isDnsSafe =
+              await checkDnsResolutionSafety(context, currentUri.host);
+          if (!isDnsSafe) {
+            throw Exception(
+                '目标地址解析至私有网段被拦截 (DNS Rebinding 防护): ${currentUri.host}');
+          }
+
           final req = http.Request(currentMethod, currentUri)
             ..followRedirects = false
             ..maxRedirects = 0
@@ -251,6 +298,10 @@ class NetworkApi {
             }
             if (!isHostAllowedWithSsrfCheck(context, nextUri.host)) {
               throw Exception('重定向目标为私有地址被拦截 (SSRF 防护): ${nextUri.host}');
+            }
+            if (!await checkDnsResolutionSafety(context, nextUri.host)) {
+              throw Exception(
+                  '重定向目标解析至私有网段被拦截 (DNS Rebinding 防护): ${nextUri.host}');
             }
             // 303（及浏览器惯例的 301/302 非 GET）改写为 GET 并丢弃请求体
             if (status == 303 ||

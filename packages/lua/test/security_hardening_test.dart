@@ -692,6 +692,46 @@ void main() {
       expect(delegate.getState('ssrf_ok'), isFalse);
       expect(delegate.getState('ssrf_err').toString(), contains('SSRF 防护'));
     });
+
+    test('DNS 解析至私网 IP 时被拦截 (DNS Rebinding 防护)', () async {
+      final prevDnsLookup = NetworkApi.dnsLookup;
+      addTearDown(() => NetworkApi.dnsLookup = prevDnsLookup);
+      NetworkApi.dnsLookup = (host) async {
+        if (host == 'rebind.attacker.com') {
+          return [InternetAddress('127.0.0.1')];
+        }
+        return prevDnsLookup(host);
+      };
+
+      final delegate = MockLuaHostDelegate();
+      final engine = LuaEngine(
+        context: PluginContext(
+          pluginId: 'rebind_test',
+          storage: InMemoryPluginStorage(),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {PluginPermission.network},
+        ),
+        delegate: delegate,
+      );
+      addTearDown(engine.close);
+
+      engine.loadAndExecute('''
+        network.get("http://rebind.attacker.com:8080/secret", function(res)
+          state.set("rebind_ok", res.ok)
+          state.set("rebind_err", res.error)
+        end)
+      ''');
+
+      final sw = Stopwatch()..start();
+      while (delegate.getState('rebind_ok') == null &&
+          sw.elapsedMilliseconds < 2000) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(delegate.getState('rebind_ok'), isFalse);
+      expect(delegate.getState('rebind_err').toString(),
+          contains('DNS Rebinding 防护'));
+    });
   });
 
   group('Lua 虚拟机堆内存上限保护', () {
