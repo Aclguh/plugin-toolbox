@@ -446,6 +446,53 @@ void main() {
       expect(pingRes['result'], 'pong');
     });
 
+    test('PluginIpcBroker 跨插件调用超时熔断', () async {
+      final broker = PluginIpcBroker();
+      broker.registerService('slow_service', 'hang', (arg) async {
+        await Future.delayed(const Duration(milliseconds: 100));
+        return 'delayed_result';
+      });
+
+      // 显式指定 20ms 超时，触发熔断
+      final timeoutRes = await broker.call(
+        callerPluginId: 'caller',
+        targetPluginId: 'slow_service',
+        functionName: 'hang',
+        timeout: const Duration(milliseconds: 20),
+      );
+
+      expect(timeoutRes['ok'], isFalse);
+      expect(timeoutRes['code'], 'IPC_TIMEOUT');
+      expect(timeoutRes['error'], contains('超时'));
+    });
+
+    test('PluginIpcBroker 跨插件调用频次限流保护', () async {
+      final broker = PluginIpcBroker();
+      broker.registerService('fast_service', 'ping', (arg) async => 'pong');
+
+      // 限制每秒最多 3 次调用
+      for (var i = 0; i < 3; i++) {
+        final res = await broker.call(
+          callerPluginId: 'caller',
+          targetPluginId: 'fast_service',
+          functionName: 'ping',
+          maxCallsPerSecond: 3,
+        );
+        expect(res['ok'], isTrue);
+      }
+
+      // 第 4 次调用触发限流
+      final blockedRes = await broker.call(
+        callerPluginId: 'caller',
+        targetPluginId: 'fast_service',
+        functionName: 'ping',
+        maxCallsPerSecond: 3,
+      );
+      expect(blockedRes['ok'], isFalse);
+      expect(blockedRes['code'], 'IPC_RATE_LIMITED');
+      expect(blockedRes['error'], contains('调用频次超限'));
+    });
+
     test('PluginRegistry 停用插件与自定义权限状态机及注销清理', () async {
       final reg = PluginRegistry(
         storageFactory: const PluginStorageFactory(),
