@@ -544,5 +544,18 @@ void main() {
       expect(calls.any((c) => c.method == 'stopSensor'), isTrue);
       expect(calls.any((c) => c.method == 'stopAudio'), isTrue);
     });
+
+    test('getCapabilities 平台特性协商返回基准能力与原生覆盖', () async {
+      final bridge = PluginNativeBridge(
+        pluginRootDir: tempDir,
+        nativeChannel: customChannel,
+      );
+
+      final caps = await bridge.getCapabilities();
+      expect(caps['platform'], isNotNull);
+      expect(caps['torch'], isTrue);
+      expect(caps['haptic'], isTrue);
+      expect(caps['filePicker'], isTrue);
+    });
   });
 }

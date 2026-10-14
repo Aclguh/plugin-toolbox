@@ -643,8 +643,27 @@ class PluginNativeBridge {
     return _invoke<bool>('hasPermission', false, {'permission': permission});
   }
 
-  Future<bool> requestSystemPermission(String permission) {
-    return _invoke<bool>(
-        'requestPermission', false, {'permission': permission});
+  // --- 原生特性与硬件能力协商 ---
+  /// 获取当前平台原生特性与系统硬件能力的协商字典，支持运行期特性嗅探
+  Future<Map<String, dynamic>> getCapabilities() async {
+    final nativeCaps = await _invokeMap('getCapabilities');
+    final baseCapabilities = <String, dynamic>{
+      'platform': Platform.operatingSystem,
+      'torch': true,
+      'haptic': true,
+      'clipboard': true,
+      'biometrics': true,
+      'camera': Platform.isAndroid || Platform.isIOS,
+      'sensors': Platform.isAndroid || Platform.isIOS,
+      'nfc': Platform.isAndroid,
+      'bluetooth': Platform.isAndroid || Platform.isIOS,
+      'ocr': Platform.isAndroid || Platform.isIOS,
+      'ai': false,
+      'filePicker': true,
+    };
+    if (nativeCaps != null) {
+      baseCapabilities.addAll(nativeCaps);
+    }
+    return baseCapabilities;
   }
 }
