@@ -8,8 +8,6 @@ environment:
   flutter: '>=3.24.0'
 
 dependencies:
-  flutter:
-    sdk: flutter
   plugin_toolbox_core:
     path: ../core
   # 本地维护分支 (packages/third_party/lua_dardo): 在 VM 执行循环中加入指令数预算,

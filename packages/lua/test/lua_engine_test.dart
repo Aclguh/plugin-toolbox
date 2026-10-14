@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -42,6 +41,16 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   void hideKeyboard() {
     keyboardHidden = true;
   }
+
+  String? clipboardContent;
+
+  @override
+  void setClipboardText(String text) {
+    clipboardContent = text;
+  }
+
+  @override
+  Future<String?> getClipboardText() async => clipboardContent;
 
   @override
   void hapticFeedback(String type) {
@@ -886,19 +895,15 @@ void main() {
       engine.close();
     });
 
+    test('clipboard.set 写入文本至剪贴板委托', () {
+      engine.loadAndExecute('''
+        clipboard.set("hello-clipboard-text")
+      ''');
+      expect(delegate.clipboardContent, 'hello-clipboard-text');
+    });
+
     test('clipboard.get 通过回调异步返回剪贴板文本', () async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      const channel = SystemChannels.platform;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        if (call.method == 'Clipboard.getData') {
-          return <String, dynamic>{'text': 'mock-clipboard-text'};
-        }
-        return null;
-      });
-      addTearDown(() => TestDefaultBinaryMessengerBinding
-          .instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null));
+      delegate.setClipboardText('mock-clipboard-text');
 
       engine.loadAndExecute('''
         clipboard.get(function(val) state.set("clip_value", val) end)

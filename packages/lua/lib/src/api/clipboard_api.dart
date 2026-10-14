@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
+import '../delegates/domain_delegates.dart';
 import '../lua_callback_invoker.dart';
 
 class ClipboardApi {
@@ -12,6 +12,7 @@ class ClipboardApi {
   static void bind(
     LuaState ls,
     PluginContext context,
+    LuaClipboardDelegate clipboard,
     LuaCallbackInvoker callbacks,
     void Function(String key, dynamic value) writeState,
   ) {
@@ -24,7 +25,7 @@ class ClipboardApi {
         return 0;
       }
       final text = ls.checkString(1) ?? '';
-      Clipboard.setData(ClipboardData(text: text));
+      clipboard.setClipboardText(text);
       return 0;
     });
     ls.setField(-2, 'set');
@@ -41,8 +42,7 @@ class ClipboardApi {
       // 与 storage.get 不同，clipboard.get 无必选首参：回调固定位于栈索引 1
       final cbRef = callbacks.ref(1);
       unawaited(
-        Clipboard.getData('text/plain').then((data) {
-          final text = data?.text;
+        clipboard.getClipboardText().then((text) {
           if (cbRef != null) {
             callbacks.invokeAndRelease(cbRef, [text]);
           } else if (text != null) {

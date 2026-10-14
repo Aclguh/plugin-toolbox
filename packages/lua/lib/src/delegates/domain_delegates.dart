@@ -331,6 +331,15 @@ abstract class LuaAiDelegate {
       const Stream.empty();
 }
 
+/// 剪贴板读写委托契约（解耦 Flutter 表现层依赖）
+abstract class LuaClipboardDelegate {
+  /// 写入纯文本至剪贴板
+  void setClipboardText(String text) {}
+
+  /// 从剪贴板异步读取纯文本
+  Future<String?> getClipboardText() async => null;
+}
+
 /// 复合宿主委托契约：继承各个领域专精子接口
 abstract class LuaHostDelegate
     implements
@@ -338,7 +347,8 @@ abstract class LuaHostDelegate
         LuaUiDelegate,
         LuaMediaDelegate,
         LuaDeviceDelegate,
-        LuaAiDelegate {}
+        LuaAiDelegate,
+        LuaClipboardDelegate {}
 
 /// 复合宿主委托适配器：将分领域的各个子委托组合为单一复合实例
 class CompositeLuaHostDelegate implements LuaHostDelegate {
@@ -347,6 +357,7 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
   final LuaMediaDelegate? mediaDelegate;
   final LuaDeviceDelegate? deviceDelegate;
   final LuaAiDelegate? aiDelegate;
+  final LuaClipboardDelegate? clipboardDelegate;
 
   CompositeLuaHostDelegate({
     required this.stateDelegate,
@@ -354,6 +365,7 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
     this.mediaDelegate,
     this.deviceDelegate,
     this.aiDelegate,
+    this.clipboardDelegate,
   });
 
   // State
@@ -714,6 +726,15 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
       aiDelegate?.aiStreamChat(
           messages: messages, model: model, temperature: temperature) ??
       const Stream.empty();
+
+  // Clipboard
+  @override
+  void setClipboardText(String text) =>
+      clipboardDelegate?.setClipboardText(text);
+
+  @override
+  Future<String?> getClipboardText() async =>
+      await clipboardDelegate?.getClipboardText();
 }
 
 /// 复合宿主委托标记接口
@@ -723,4 +744,5 @@ abstract class LuaHostDelegateProxy
         LuaUiDelegate,
         LuaMediaDelegate,
         LuaDeviceDelegate,
-        LuaAiDelegate {}
+        LuaAiDelegate,
+        LuaClipboardDelegate {}

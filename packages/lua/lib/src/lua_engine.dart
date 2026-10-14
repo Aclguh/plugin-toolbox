@@ -146,7 +146,7 @@ class LuaEngine {
     _timerApi!.bind(_ls, _callbacks!);
 
     StateApi.bind(_ls, delegate);
-    ClipboardApi.bind(_ls, context, _callbacks!, writeState);
+    ClipboardApi.bind(_ls, context, delegate, _callbacks!, writeState);
     StorageApi.bind(_ls, context, _callbacks!, writeState);
     NetworkApi.bind(_ls, context, _callbacks!, writeState);
     DialogApi.bind(_ls, delegate, _callbacks!);

@@ -252,6 +252,18 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     }
   }
 
+  // --- LuaClipboardDelegate 协议实现 ---
+  @override
+  void setClipboardText(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+  }
+
+  @override
+  Future<String?> getClipboardText() async {
+    final data = await Clipboard.getData('text/plain');
+    return data?.text;
+  }
+
   @override
   void hapticFeedback(String type) {
     switch (type) {
