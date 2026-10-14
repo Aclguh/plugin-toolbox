@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -532,4 +533,82 @@ void main() {
       expect(TypeConverter.parseColorHex(null), isNull);
     });
   });
+
+  group('PluginFileStorage Tests', () {
+    late Directory tempDir;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      tempDir = Directory.systemTemp.createTempSync('ptx_storage_test_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('PluginStorageFactory 根据是否提供 rootDir 返回对应实现', () {
+      const factory = PluginStorageFactory();
+      final defaultStorage = factory.create('p1');
+      expect(defaultStorage, isA<PluginStorageImpl>());
+
+      final fileStorage = factory.create('p2', rootDir: tempDir);
+      expect(fileStorage, isA<PluginFileStorageImpl>());
+    });
+
+    test('PluginFileStorageImpl 支持多种数据类型读写与持久化至 storage.json', () async {
+      final storage = PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
+      final storageFile = File('${tempDir.path}/storage.json');
+
+      expect(await storage.getString('k_str'), isNull);
+      expect(await storage.setString('k_str', 'hello'), isTrue);
+      expect(await storage.getString('k_str'), 'hello');
+
+      expect(await storage.setBool('k_bool', true), isTrue);
+      expect(await storage.getBool('k_bool'), isTrue);
+
+      expect(await storage.setInt('k_int', 42), isTrue);
+      expect(await storage.getInt('k_int'), 42);
+
+      expect(await storage.setDouble('k_double', 3.14), isTrue);
+      expect(await storage.getDouble('k_double'), 3.14);
+
+      expect(await storage.setStringList('k_list', ['a', 'b']), isTrue);
+      expect(await storage.getStringList('k_list'), ['a', 'b']);
+
+      expect(storageFile.existsSync(), isTrue);
+
+      // 验证跨实例重新从磁盘加载
+      final storage2 = PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
+      expect(await storage2.getString('k_str'), 'hello');
+      expect(await storage2.getInt('k_int'), 42);
+
+      // 单项删除
+      expect(await storage.remove('k_str'), isTrue);
+      expect(await storage.getString('k_str'), isNull);
+
+      // 清空
+      expect(await storage.clear(), isTrue);
+      expect(await storage.getInt('k_int'), isNull);
+      expect(storageFile.existsSync(), isFalse);
+    });
+
+    test('PluginFileStorageImpl 支持平滑迁移旧版 SharedPreferences 遗留数据', () async {
+      SharedPreferences.setMockInitialValues({
+        'plugin.mig_ns.legacy_text': 'migrated_val',
+        'plugin.other_ns.unrelated': 'should_ignore',
+      });
+
+      final storage = PluginFileStorageImpl(namespace: 'mig_ns', rootDir: tempDir);
+      expect(await storage.getString('legacy_text'), 'migrated_val');
+      expect(await storage.getString('unrelated'), isNull);
+
+      // 验证已落盘至 storage.json
+      final storageFile = File('${tempDir.path}/storage.json');
+      expect(storageFile.existsSync(), isTrue);
+      expect(storageFile.readAsStringSync(), contains('migrated_val'));
+    });
+  });
 }
+

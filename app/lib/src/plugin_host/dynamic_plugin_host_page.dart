@@ -102,7 +102,10 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
       if (widget.plugin.context == null) {
         await widget.plugin.initialize(PluginContext(
           pluginId: widget.plugin.id,
-          storage: const PluginStorageFactory().create(widget.plugin.id),
+          storage: const PluginStorageFactory().create(
+            widget.plugin.id,
+            rootDir: widget.plugin.rootDir,
+          ),
           eventBus: EventBusImpl(),
           logger: Logger(),
           grantedPermissions: widget.plugin.manifest.permissions.toSet(),

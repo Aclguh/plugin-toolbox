@@ -203,13 +203,13 @@ class PluginInstaller {
       pluginsBaseDir = Directory('${appDocDir.path}/plugins');
     }
     final targetDir = Directory('${pluginsBaseDir.path}/$pluginId');
-    if (await targetDir.exists()) {
-      await targetDir.delete(recursive: true);
-    }
     try {
-      await storageFactory.create(pluginId).clear();
+      await storageFactory.create(pluginId, rootDir: targetDir).clear();
     } catch (_) {
       // 容灾: 存储异常不阻断卸载主流程
+    }
+    if (await targetDir.exists()) {
+      await targetDir.delete(recursive: true);
     }
   }
 

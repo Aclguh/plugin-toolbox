@@ -180,13 +180,14 @@ class PluginRegistry {
         initialPermissions = {};
       }
 
+      final rootDir = plugin is DynamicPlugin ? plugin.rootDir : null;
       final context = PluginContext(
         pluginId: plugin.id,
-        storage: storageFactory.create(plugin.id),
+        storage: storageFactory.create(plugin.id, rootDir: rootDir),
         eventBus: eventBus,
         logger: _logger,
         grantedPermissions: initialPermissions,
-        rootDir: plugin is DynamicPlugin ? plugin.rootDir : null,
+        rootDir: rootDir,
         storageQuotaMb:
             plugin is DynamicPlugin ? plugin.manifest.storageQuotaMb : 50,
         allowedDomains:
