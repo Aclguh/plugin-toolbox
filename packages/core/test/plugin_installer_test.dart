@@ -419,10 +419,10 @@ void main() {
           SandboxPath.isSafeResolvedPath(
               '/data/plugins/x', '/data/plugins/x/a/b.txt'),
           isTrue);
-      expect(SandboxPath.isSafeResolvedPath('/data/plugins/x', '/data/plugins/x'),
-          isTrue);
       expect(
-          SandboxPath.isSafeResolvedPath('/data/plugins/x', '/etc/passwd'),
+          SandboxPath.isSafeResolvedPath('/data/plugins/x', '/data/plugins/x'),
+          isTrue);
+      expect(SandboxPath.isSafeResolvedPath('/data/plugins/x', '/etc/passwd'),
           isFalse);
       expect(
           SandboxPath.isSafeResolvedPath(

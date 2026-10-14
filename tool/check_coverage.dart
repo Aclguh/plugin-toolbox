@@ -69,8 +69,7 @@ void main(List<String> args) {
   }
 
   if (requireAll && missingPackages.isNotEmpty) {
-    print(
-        '\n❌ 严格模式开启 (--require-all): 以下模块缺失 coverage/lcov.info 覆盖率报告，CI 阻断！');
+    print('\n❌ 严格模式开启 (--require-all): 以下模块缺失 coverage/lcov.info 覆盖率报告，CI 阻断！');
     for (final m in missingPackages) {
       print('   - $m');
     }

@@ -558,7 +558,8 @@ void main() {
     });
 
     test('PluginFileStorageImpl 支持多种数据类型读写与持久化至 storage.json', () async {
-      final storage = PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
+      final storage =
+          PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
       final storageFile = File('${tempDir.path}/storage.json');
 
       expect(await storage.getString('k_str'), isNull);
@@ -580,7 +581,8 @@ void main() {
       expect(storageFile.existsSync(), isTrue);
 
       // 验证跨实例重新从磁盘加载
-      final storage2 = PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
+      final storage2 =
+          PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
       expect(await storage2.getString('k_str'), 'hello');
       expect(await storage2.getInt('k_int'), 42);
 
@@ -600,7 +602,8 @@ void main() {
         'plugin.other_ns.unrelated': 'should_ignore',
       });
 
-      final storage = PluginFileStorageImpl(namespace: 'mig_ns', rootDir: tempDir);
+      final storage =
+          PluginFileStorageImpl(namespace: 'mig_ns', rootDir: tempDir);
       expect(await storage.getString('legacy_text'), 'migrated_val');
       expect(await storage.getString('unrelated'), isNull);
 
@@ -611,4 +614,3 @@ void main() {
     });
   });
 }
-
