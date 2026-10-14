@@ -420,4 +420,88 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('Repeater 动态列表数据绑定组件', () {
+    testWidgets('基于静态 items 与 itemTemplate 渲染列表项及索引插值', (tester) async {
+      final state = DuiState();
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.build(context, {
+                'type': 'Repeater',
+                'props': {
+                  'items': ['苹果', '香蕉', '橙子'],
+                  'spacing': 8.0,
+                  'itemTemplate': {
+                    'type': 'Text',
+                    'props': {'text': r'{{$index}}: {{$item}}'},
+                  },
+                },
+              }),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('0: 苹果'), findsOneWidget);
+      expect(find.text('1: 香蕉'), findsOneWidget);
+      expect(find.text('2: 橙子'), findsOneWidget);
+    });
+
+    testWidgets('响应式绑定 dataSource 并支持对象字段属性解析与空状态', (tester) async {
+      final state = DuiState();
+      state.set('todo_list', [
+        {'title': '任务A', 'status': '进行中'},
+        {'title': '任务B', 'status': '已完成'},
+      ]);
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.build(context, {
+                'type': 'Repeater',
+                'props': {
+                  'dataSource': '{{state.todo_list}}',
+                  'emptyText': '暂无代办事项',
+                  'itemTemplate': {
+                    'type': 'Text',
+                    'props': {
+                      'text': r'{{$item.title}} - {{$item.status}}',
+                    },
+                  },
+                },
+              }),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('任务A - 进行中'), findsOneWidget);
+      expect(find.text('任务B - 已完成'), findsOneWidget);
+
+      // 更新状态列表
+      state.set('todo_list', [
+        {'title': '任务C', 'status': '已创建'},
+      ]);
+      await tester.pump();
+
+      expect(find.text('任务A - 进行中'), findsNothing);
+      expect(find.text('任务C - 已创建'), findsOneWidget);
+
+      // 清空状态列表
+      state.set('todo_list', []);
+      await tester.pump();
+
+      expect(find.text('暂无代办事项'), findsOneWidget);
+    });
+  });
 }

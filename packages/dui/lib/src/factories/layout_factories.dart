@@ -189,4 +189,108 @@ void registerLayoutFactories(DuiRenderer renderer) {
             color: DuiUtils.parseColor(
                 state.interpolate(node.props['color']?.toString() ?? '')),
           ));
+
+  renderer.registerFactory('Repeater', (node) {
+    final rawItems = node.props['items'] ?? node.props['dataSource'];
+    final spacing = DuiUtils.tryDouble(node.props['spacing']) ?? 0.0;
+    final isHorizontal = node.props['direction'] == 'horizontal';
+    final emptyText = node.props['emptyText']?.toString();
+
+    final itemTemplate = (node.props['itemTemplate'] is Map<String, dynamic>)
+        ? node.props['itemTemplate'] as Map<String, dynamic>
+        : (node.children.isNotEmpty ? node.children.first : null);
+
+    final keys = <String>{};
+    if (rawItems is String) {
+      keys.addAll(DuiState.extractKeys(rawItems));
+    }
+
+    dynamic resolveScoped(dynamic val, dynamic item, int index) {
+      if (val is String) {
+        return val
+            .replaceAll(RegExp(r'\{\{\s*\$index\s*\}\}'), index.toString())
+            .replaceAllMapped(
+                RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}'), (m) {
+              final field = m.group(1);
+              if (field == null) {
+                return item?.toString() ?? '';
+              }
+              if (item is Map) {
+                return item[field]?.toString() ?? '';
+              }
+              return '';
+            });
+      } else if (val is Map) {
+        return val.map(
+            (k, v) => MapEntry(k.toString(), resolveScoped(v, item, index)));
+      } else if (val is List) {
+        return val.map((v) => resolveScoped(v, item, index)).toList();
+      }
+      return val;
+    }
+
+    Widget buildRepeater() {
+      List<dynamic> list = const [];
+      if (rawItems is List) {
+        list = rawItems;
+      } else if (rawItems is String) {
+        final stateKey = DuiState.extractKeys(rawItems).firstOrNull;
+        if (stateKey != null) {
+          final stateVal = state.get(stateKey);
+          if (stateVal is List) {
+            list = stateVal;
+          }
+        }
+      }
+
+      if (list.isEmpty) {
+        if (emptyText != null && emptyText.isNotEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                emptyText,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      }
+
+      if (itemTemplate == null) {
+        return const SizedBox.shrink();
+      }
+
+      final children = <Widget>[];
+      for (var i = 0; i < list.length; i++) {
+        if (i > 0 && spacing > 0) {
+          children.add(isHorizontal
+              ? SizedBox(width: spacing)
+              : SizedBox(height: spacing));
+        }
+        final scopedAst = resolveScoped(itemTemplate, list[i], i);
+        if (scopedAst is Map<String, dynamic>) {
+          children.add(renderer.buildWidget(node.context, scopedAst));
+        }
+      }
+
+      return isHorizontal
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: children,
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            );
+    }
+
+    if (keys.isEmpty) return buildRepeater();
+    return ListenableBuilder(
+      listenable: state.listenableForKeys(keys),
+      builder: (_, __) => buildRepeater(),
+    );
+  });
 }
