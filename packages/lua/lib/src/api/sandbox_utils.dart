@@ -4,6 +4,8 @@
 /// `resolveSafePath` 闭包，收敛于此统一维护，避免校验逻辑漂移。
 library;
 
+import 'dart:io';
+
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
@@ -20,7 +22,37 @@ String resolveSandboxPath(LuaState ls, PluginContext context, String relPath) {
     ls.error2('非法路径: 禁止逃逸沙箱 ($relPath)');
     return '';
   }
-  return '${rootDir.path}/$relPath';
+  final fullPath = '${rootDir.path}/$relPath';
+  bool isSymlinkEscape = false;
+  try {
+    if (rootDir.existsSync()) {
+      final rootRealPath = rootDir.resolveSymbolicLinksSync();
+      FileSystemEntity current = File(fullPath);
+      while (current.path.length >= rootDir.path.length) {
+        final type =
+            FileSystemEntity.typeSync(current.path, followLinks: false);
+        if (type != FileSystemEntityType.notFound) {
+          final real = current.resolveSymbolicLinksSync();
+          if (!SandboxPath.isSafeResolvedPath(rootRealPath, real)) {
+            isSymlinkEscape = true;
+          }
+          break;
+        }
+        final parent = current.parent;
+        if (parent.path == current.path) break;
+        current = parent;
+      }
+    }
+  } on FileSystemException {
+    ls.error2('符号链接解析失败: 拒绝访问未知路径 ($relPath)');
+    return '';
+  }
+
+  if (isSymlinkEscape) {
+    ls.error2('非法符号链接: 目标逃逸沙箱根目录 ($relPath)');
+    return '';
+  }
+  return fullPath;
 }
 
 /// 按 [SandboxPath] 相同的分段归一化规则解析相对路径（剔除 `.` 与空段）。

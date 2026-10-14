@@ -141,6 +141,34 @@ void main() {
       expect(File('${tempDir.path}/plugin.json').readAsStringSync(),
           'ORIGINAL_MANIFEST');
     });
+
+    test('沙箱内符号链接指向外部目标时被拦截拒绝', () {
+      final engine = buildFsEngine();
+      addTearDown(engine.close);
+
+      final outsideFile = File(
+          '${tempDir.parent.path}/outside_secret_${DateTime.now().microsecondsSinceEpoch}.txt')
+        ..writeAsStringSync('OUTSIDE_SECRET');
+      addTearDown(() {
+        if (outsideFile.existsSync()) outsideFile.deleteSync();
+      });
+
+      try {
+        final link = Link('${tempDir.path}/symlink_escape');
+        link.createSync(outsideFile.path);
+
+        expect(
+          () => engine.loadAndExecute('fs.readFile("symlink_escape")'),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'error',
+            contains('逃逸沙箱'),
+          )),
+        );
+      } on FileSystemException {
+        // Windows 环境下未开启开发者模式可能无权创建符号链接，安全放行
+      }
+    });
   });
 
   group('沙箱字节码逃逸面封禁', () {

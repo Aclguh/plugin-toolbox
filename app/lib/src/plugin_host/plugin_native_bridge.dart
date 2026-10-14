@@ -643,6 +643,11 @@ class PluginNativeBridge {
     return _invoke<bool>('hasPermission', false, {'permission': permission});
   }
 
+  Future<bool> requestSystemPermission(String permission) {
+    return _invoke<bool>(
+        'requestPermission', false, {'permission': permission});
+  }
+
   // --- 原生特性与硬件能力协商 ---
   /// 获取当前平台原生特性与系统硬件能力的协商字典，支持运行期特性嗅探
   Future<Map<String, dynamic>> getCapabilities() async {

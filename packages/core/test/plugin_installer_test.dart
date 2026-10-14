@@ -415,6 +415,19 @@ void main() {
 
     test('isSafeSubpath 允许沙箱内路径', () {
       expect(SandboxPath.isSafeSubpath('/data/plugins/x', 'a/b.txt'), isTrue);
+      expect(
+          SandboxPath.isSafeResolvedPath(
+              '/data/plugins/x', '/data/plugins/x/a/b.txt'),
+          isTrue);
+      expect(SandboxPath.isSafeResolvedPath('/data/plugins/x', '/data/plugins/x'),
+          isTrue);
+      expect(
+          SandboxPath.isSafeResolvedPath('/data/plugins/x', '/etc/passwd'),
+          isFalse);
+      expect(
+          SandboxPath.isSafeResolvedPath(
+              '/data/plugins/x', '/data/plugins/other'),
+          isFalse);
     });
 
     test('PluginContext.checkStorageQuota 配额容量计算与拦截', () async {

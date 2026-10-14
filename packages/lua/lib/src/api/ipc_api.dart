@@ -88,13 +88,14 @@ class IpcApi {
         }
       }
 
-      if (cbRef != null) {
+      final activeRef = cbRef;
+      if (activeRef != null) {
         PluginIpcBroker.instance.registerService(
           context.pluginId,
           functionName,
           (args) async {
             // 调用 Lua 侧的处理函数
-            final result = callbacks.invokeWithResult(cbRef, [args]);
+            final result = callbacks.invokeWithResult(activeRef, [args]);
             return result;
           },
           allowedCallers: allowedCallers,

@@ -71,4 +71,21 @@ class SandboxPath {
     }
     return false;
   }
+
+  /// 校验实际规范绝对路径 [resolvedPath] 是否仍严格位于 [basePath] 内部，
+  /// 用于防范符号链接 (Symlink) 逃出沙箱根目录。
+  static bool isSafeResolvedPath(String basePath, String resolvedPath) {
+    if (basePath.isEmpty || resolvedPath.isEmpty) return false;
+    final cleanBase =
+        basePath.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
+    final cleanTarget =
+        resolvedPath.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
+    if (cleanTarget == cleanBase || cleanTarget.startsWith('$cleanBase/')) {
+      return true;
+    }
+    // 兼容 Windows 盘符与路径大小写差异
+    final lowerBase = cleanBase.toLowerCase();
+    final lowerTarget = cleanTarget.toLowerCase();
+    return lowerTarget == lowerBase || lowerTarget.startsWith('$lowerBase/');
+  }
 }
