@@ -123,8 +123,21 @@ class PluginContext {
       _cachedUsedBytes = 0;
       return 0;
     }
-    _cachedUsedBytes = _calculateDiskUsedBytes();
-    return _cachedUsedBytes!;
+    var bytes = 0;
+    try {
+      if (await dir.exists()) {
+        await for (final entity
+            in dir.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            try {
+              bytes += await entity.length();
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+    _cachedUsedBytes = bytes;
+    return bytes;
   }
 
   /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
