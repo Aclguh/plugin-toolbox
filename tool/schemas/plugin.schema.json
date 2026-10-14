@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Aclguh/plugin-toolbox/master/tool/schemas/plugin.schema.json",
+  "title": "PluginToolbox Plugin Manifest Schema",
+  "description": "JSON Schema specification for PluginToolbox plugin.json manifest file",
+  "type": "object",
+  "required": ["id", "name", "version", "entry", "ui"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{3,50}$",
+      "description": "Unique identifier for the plugin (3-50 lowercase letters, digits, and underscores)"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable display name of the plugin"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v?\\d+\\.\\d+(\\.\\d+)?(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "description": "Semantic version of the plugin (e.g. 1.0.0)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short summary of what this plugin does"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or maintainer of the plugin"
+    },
+    "minAppVersion": {
+      "type": "string",
+      "description": "Minimum PluginToolbox host version required to run this plugin"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["lua"],
+      "default": "lua",
+      "description": "Scripting engine type (currently lua is supported)"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "tools",
+        "media",
+        "utilities",
+        "developer",
+        "encoding",
+        "network",
+        "crypto",
+        "security",
+        "lifestyle",
+        "finance",
+        "education",
+        "health",
+        "system",
+        "other"
+      ],
+      "default": "other",
+      "description": "Category under which the plugin is classified"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "network",
+          "clipboard",
+          "storage",
+          "camera",
+          "location",
+          "sensor",
+          "notification",
+          "vibrate",
+          "audio",
+          "microphone",
+          "bluetooth",
+          "sqlite",
+          "file_picker",
+          "ipc"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Required capability permissions declared by the plugin"
+    },
+    "entry": {
+      "type": "string",
+      "pattern": "^[^/\\\\].*\\.lua$",
+      "description": "Relative path to main Lua entry script (e.g. main.lua)"
+    },
+    "ui": {
+      "type": "string",
+      "pattern": "^[^/\\\\].*\\.json$",
+      "description": "Relative path to declarative UI definition JSON file (e.g. ui/main.ui.json)"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Relative path to plugin icon image (recommended 128x128 PNG)"
+    },
+    "storageQuotaMb": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 10,
+      "description": "Maximum sandbox storage quota in megabytes allocated to this plugin"
+    }
+  },
+  "additionalProperties": true
+}

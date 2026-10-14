@@ -296,6 +296,26 @@ void main() {
   final packScript = File('sample_plugins/pack.py');
   expect(packScript.existsSync(), '全局插件打包脚本 sample_plugins/pack.py 存在');
 
+  final pluginSchemaFile = File('tool/schemas/plugin.schema.json');
+  expect(pluginSchemaFile.existsSync(), '插件清单 JSON Schema 规范文件 plugin.schema.json 存在');
+  Map<String, dynamic>? pluginSchemaJson;
+  try {
+    pluginSchemaJson =
+        jsonDecode(pluginSchemaFile.readAsStringSync()) as Map<String, dynamic>?;
+  } catch (_) {}
+  expect(pluginSchemaJson != null && pluginSchemaJson['properties'] != null,
+      'plugin.schema.json 结构完整且为合法 JSON Schema');
+
+  final duiSchemaFile = File('tool/schemas/dui.schema.json');
+  expect(duiSchemaFile.existsSync(), 'DUI 声明式组件树 JSON Schema 规范文件 dui.schema.json 存在');
+  Map<String, dynamic>? duiSchemaJson;
+  try {
+    duiSchemaJson =
+        jsonDecode(duiSchemaFile.readAsStringSync()) as Map<String, dynamic>?;
+  } catch (_) {}
+  expect(duiSchemaJson != null && duiSchemaJson['properties'] != null,
+      'dui.schema.json 结构完整且为合法 JSON Schema');
+
   // 5. 沙箱路径隔离与 Path Traversal 防御算法 (直接断言 packages/core 生产实现)
   print('\n--- 5. 沙箱存储与防路径穿越安全算法断言 (生产实现) ---');
   const baseBox = 'app_data/plugins/base64_tool';
