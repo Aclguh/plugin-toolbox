@@ -9,7 +9,7 @@ class DuiState extends ChangeNotifier {
   static final RegExp _interpolatePattern =
       RegExp(r'\{\{state\.([a-zA-Z0-9_]+)\}\}');
   static final RegExp _visibleExprPattern =
-      RegExp(r'^\{\{state\.([a-zA-Z0-9_]+)\}\}$');
+      RegExp(r'^(!?)\{\{state\.([a-zA-Z0-9_]+)\}\}$');
 
   static final Listenable _emptyListenable = ChangeNotifier();
 
@@ -102,15 +102,27 @@ class DuiState extends ChangeNotifier {
     if (str == 'true') return true;
     if (str == 'false') return false;
 
-    // 解析形如 "{{state.hasError}}"
+    // 解析形如 "{{state.hasError}}" 或 "!{{state.loading}}"
     final match = _visibleExprPattern.firstMatch(str);
     if (match != null) {
-      final key = match.group(1)!;
+      final isNegated = match.group(1) == '!';
+      final key = match.group(2)!;
       final val = _values[key];
-      if (val is bool) return val;
-      if (val is String) return val.isNotEmpty;
-      if (val is num) return val != 0;
-      return val != null;
+      bool truthy;
+      if (val is bool) {
+        truthy = val;
+      } else if (val is String) {
+        truthy = val.isNotEmpty;
+      } else if (val is num) {
+        truthy = val != 0;
+      } else {
+        truthy = val != null;
+      }
+      return isNegated ? !truthy : truthy;
+    }
+
+    if (str.contains('{{')) {
+      debugPrint('[DUI] Warning: 未识别的 visible 条件表达式: "$str"');
     }
     return true;
   }

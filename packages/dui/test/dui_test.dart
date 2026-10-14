@@ -45,6 +45,25 @@ void main() {
       state.set('hasError', true);
       expect(state.evaluateVisible('{{state.hasError}}'), isTrue);
     });
+
+    test('evaluates negated visible expression with !', () {
+      final state = DuiState();
+      state.set('loading', true);
+      expect(state.evaluateVisible('!{{state.loading}}'), isFalse);
+
+      state.set('loading', false);
+      expect(state.evaluateVisible('!{{state.loading}}'), isTrue);
+
+      state.set('text', 'content');
+      expect(state.evaluateVisible('!{{state.text}}'), isFalse);
+      state.set('text', '');
+      expect(state.evaluateVisible('!{{state.text}}'), isTrue);
+
+      state.set('count', 5);
+      expect(state.evaluateVisible('!{{state.count}}'), isFalse);
+      state.set('count', 0);
+      expect(state.evaluateVisible('!{{state.count}}'), isTrue);
+    });
   });
 
   group('DuiUtils 颜色解析', () {
