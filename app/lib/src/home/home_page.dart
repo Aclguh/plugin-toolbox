@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 
 class HomePage extends ConsumerWidget {
@@ -11,6 +12,7 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final init = ref.watch(appInitFutureProvider);
     // 仅跟随启用插件列表重建：无关 EventBus 事件不再触发整页刷新
     final plugins = ref.watch(enabledPluginListProvider);
@@ -21,17 +23,17 @@ class HomePage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.storefront_outlined),
-            tooltip: '插件商店',
+            tooltip: l10n?.pluginStore ?? '插件商店',
             onPressed: () => context.push('/store'),
           ),
           IconButton(
             icon: const Icon(Icons.extension_outlined),
-            tooltip: '插件管理',
+            tooltip: l10n?.pluginManager ?? '插件管理',
             onPressed: () => context.push('/manager'),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: '设置',
+            tooltip: l10n?.settings ?? '设置',
             onPressed: () => context.push('/settings'),
           ),
         ],
@@ -49,16 +51,16 @@ class HomePage extends ConsumerWidget {
                     color: Theme.of(context).colorScheme.outline,
                   ),
                   const SizedBox(height: 16),
-                  const Text('暂无已启用的插件'),
+                  Text(l10n?.emptyToolsPrompt ?? '暂无已启用的插件'),
                   const SizedBox(height: 12),
                   FilledButton.tonal(
                     onPressed: () => context.push('/store'),
-                    child: const Text('去插件商店安装'),
+                    child: Text(l10n?.goToStoreToInstall ?? '去插件商店安装'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () => context.push('/manager'),
-                    child: const Text('导入本地 .ptx'),
+                    child: Text(l10n?.importLocalPtx ?? '导入本地 .ptx'),
                   ),
                 ],
               ),

@@ -13,6 +13,7 @@ import 'package:plugin_toolbox/src/settings/settings_page.dart';
 import 'package:plugin_toolbox/src/providers/app_providers.dart';
 import 'package:plugin_toolbox/src/plugin_host/dynamic_plugin_host_page.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:plugin_toolbox/l10n/app_localizations.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -576,5 +577,28 @@ void main() {
     await notifier.setEnabled('perm_p', true);
     expect(registry.disabledPluginIds.contains('perm_p'), isFalse);
     expect(prefs.getStringList('plugin_toolbox_disabled_plugins'), isEmpty);
+  });
+
+  testWidgets('多语言国际化：切换英文 Locale 渲染对应英文文本', (tester) async {
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomePage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No enabled tools yet'), findsOneWidget);
+    expect(find.text('Install from Store'), findsOneWidget);
+    expect(find.text('Import local .ptx'), findsOneWidget);
   });
 }
