@@ -45,6 +45,34 @@ void main() {
       expect(executor.calledArgs.first, [1, 'arg2', true]);
     });
 
+    test('callLua 携带 payload 时自动追加至实参列表末尾', () {
+      final event = {
+        'action': 'callLua',
+        'function': 'onSliderChanged',
+        'args': ['volume'],
+      };
+
+      handler.handleEvent(event, 85.5);
+      expect(executor.calledFunctions, ['onSliderChanged']);
+      expect(executor.calledArgs.first, ['volume', 85.5]);
+    });
+
+    test('callLua 使用 \$payload 宏时精确替换对应位置参数', () {
+      final event = {
+        'action': 'callLua',
+        'function': 'onCustomEvent',
+        'args': ['prefix', r'$payload', 100],
+      };
+
+      handler.handleEvent(event, {'selected': true});
+      expect(executor.calledFunctions, ['onCustomEvent']);
+      expect(executor.calledArgs.first, [
+        'prefix',
+        {'selected': true},
+        100
+      ]);
+    });
+
     test('callLua 缺省 args 时默认为空参数列表', () {
       final event = {
         'action': 'callLua',

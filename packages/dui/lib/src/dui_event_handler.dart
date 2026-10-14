@@ -44,10 +44,19 @@ class DuiEventHandler {
       case 'callLua':
         final func = eventDef['function']?.toString();
         if (func == null) return;
-        final args = eventDef['args'] is List
-            ? eventDef['args'] as List<dynamic>
-            : const <dynamic>[];
-        executor.callLua(func, args);
+        final rawArgs = eventDef['args'] is List
+            ? (eventDef['args'] as List<dynamic>).toList()
+            : <dynamic>[];
+        List<dynamic> effectiveArgs;
+        if (rawArgs.contains(r'$payload')) {
+          effectiveArgs =
+              rawArgs.map((a) => a == r'$payload' ? payload : a).toList();
+        } else if (payload != null) {
+          effectiveArgs = [...rawArgs, payload];
+        } else {
+          effectiveArgs = rawArgs;
+        }
+        executor.callLua(func, effectiveArgs);
         break;
 
       case 'setState':
