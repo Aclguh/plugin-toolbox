@@ -118,6 +118,36 @@ class SensorHandler(private val context: Context) : FeatureHandler {
                 sensorListeners["compass"] = listener
                 true
             }
+            "light" -> {
+                val sensor = sm.getDefaultSensor(Sensor.TYPE_LIGHT) ?: return false
+                val listener = object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        latestSensorReadings["light"] = mapOf(
+                            "lux" to event.values[0].toDouble()
+                        )
+                    }
+                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+                }
+                sensorListeners["light"]?.let { sm.unregisterListener(it) }
+                sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                sensorListeners["light"] = listener
+                true
+            }
+            "barometer" -> {
+                val sensor = sm.getDefaultSensor(Sensor.TYPE_PRESSURE) ?: return false
+                val listener = object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        latestSensorReadings["barometer"] = mapOf(
+                            "pressure" to event.values[0].toDouble()
+                        )
+                    }
+                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+                }
+                sensorListeners["barometer"]?.let { sm.unregisterListener(it) }
+                sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                sensorListeners["barometer"] = listener
+                true
+            }
             else -> false
         }
     }

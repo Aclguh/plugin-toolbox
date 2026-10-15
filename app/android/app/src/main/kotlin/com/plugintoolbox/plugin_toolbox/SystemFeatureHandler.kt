@@ -559,6 +559,64 @@ class SystemFeatureHandler(
                 result.success(null)
                 true
             }
+            "getWifiInfo" -> {
+                try {
+                    val wifiManager = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                    val info = wifiManager?.connectionInfo
+                    if (info != null) {
+                        val ipInt = info.ipAddress
+                        val ipStr = String.format(
+                            "%d.%d.%d.%d",
+                            ipInt and 0xff,
+                            ipInt shr 8 and 0xff,
+                            ipInt shr 16 and 0xff,
+                            ipInt shr 24 and 0xff
+                        )
+                        result.success(mapOf(
+                            "ssid" to (info.ssid?.replace("\"", "") ?: "unknown"),
+                            "bssid" to (info.bssid ?: ""),
+                            "rssi" to info.rssi,
+                            "ip" to ipStr
+                        ))
+                    } else {
+                        result.success(null)
+                    }
+                } catch (e: Exception) {
+                    result.success(null)
+                }
+                true
+            }
+            "pingHost" -> {
+                val host = call.argument<String>("host") ?: ""
+                val timeoutMs = call.argument<Int>("timeoutMs") ?: 3000
+                Thread {
+                    val startTime = System.currentTimeMillis()
+                    try {
+                        val address = java.net.InetAddress.getByName(host)
+                        val reachable = address.isReachable(timeoutMs)
+                        val latency = System.currentTimeMillis() - startTime
+                        activity.runOnUiThread {
+                            result.success(mapOf(
+                                "ok" to reachable,
+                                "host" to host,
+                                "ip" to address.hostAddress,
+                                "reachable" to reachable,
+                                "latencyMs" to latency
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        activity.runOnUiThread {
+                            result.success(mapOf(
+                                "ok" to false,
+                                "host" to host,
+                                "reachable" to false,
+                                "error" to (e.message ?: "Ping failed")
+                            ))
+                        }
+                    }
+                }.start()
+                true
+            }
             else -> false
         }
     }

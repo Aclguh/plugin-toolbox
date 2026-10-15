@@ -20,12 +20,15 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
     companion object {
         const val RC_SCAN_INTENT = 1001
         const val RC_SCAN_IMAGE = 1002
+        const val RC_TAKE_PHOTO = 1003
     }
 
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingScanResult: MethodChannel.Result? = null
     private var scanCaptureFile: File? = null
+    private var pendingPhotoResult: MethodChannel.Result? = null
+    private var photoDestFile: File? = null
 
     override fun handleMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean {
         return when (call.method) {
@@ -43,6 +46,18 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
             }
             "scanBarcode" -> {
                 startScanBarcode(result)
+                true
+            }
+            "takePhoto" -> {
+                val destPath = call.argument<String>("destPath")
+                if (destPath != null) {
+                    pendingPhotoResult = result
+                    val dest = File(destPath)
+                    photoDestFile = dest
+                    startTakePhoto(dest)
+                } else {
+                    result.success(null)
+                }
                 true
             }
             else -> false
@@ -72,6 +87,17 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
                 }
             } else {
                 file?.delete()
+                resultCallback?.success(null)
+            }
+            return true
+        } else if (requestCode == RC_TAKE_PHOTO) {
+            val file = photoDestFile
+            val resultCallback = pendingPhotoResult
+            pendingPhotoResult = null
+            photoDestFile = null
+            if (resultCode == Activity.RESULT_OK && file != null && file.exists()) {
+                resultCallback?.success(file.absolutePath)
+            } else {
                 resultCallback?.success(null)
             }
             return true
@@ -135,6 +161,28 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
         } catch (e: Exception) {
             pendingScanResult?.success(null)
             pendingScanResult = null
+        }
+    }
+
+    private fun startTakePhoto(destFile: File) {
+        try {
+            destFile.parentFile?.mkdirs()
+            val photoUri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", destFile)
+            val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            if (takePictureIntent.resolveActivity(activity.packageManager) != null) {
+                activity.startActivityForResult(takePictureIntent, RC_TAKE_PHOTO)
+            } else {
+                pendingPhotoResult?.success(null)
+                pendingPhotoResult = null
+                photoDestFile = null
+            }
+        } catch (e: Exception) {
+            pendingPhotoResult?.success(null)
+            pendingPhotoResult = null
+            photoDestFile = null
         }
     }
 }

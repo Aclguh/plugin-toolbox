@@ -638,6 +638,55 @@ class PluginNativeBridge {
         UnimplementedError('aiStreamChat 流式对话尚未实现，请降级使用 aiChat'));
   }
 
+  // --- 相机拍照与截图 ---
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) async {
+    final targetPath = destPath ??
+        '${pluginRootDir.path}/camera/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final targetFile = File(targetPath);
+    if (!targetFile.parent.existsSync()) {
+      targetFile.parent.createSync(recursive: true);
+    }
+    return _invoke<String?>('takePhoto', null, {
+      'destPath': targetPath,
+      'quality': quality,
+      'lensDirection': lensDirection,
+    });
+  }
+
+  Future<bool> captureScreen({
+    required String destPath,
+    String? targetRef,
+  }) async {
+    final targetFile = File(destPath);
+    if (!targetFile.parent.existsSync()) {
+      targetFile.parent.createSync(recursive: true);
+    }
+    return _invoke<bool>('captureScreen', false, {
+      'destPath': destPath,
+      'targetRef': targetRef,
+    });
+  }
+
+  // --- 网络与 Wi-Fi 探测 ---
+  Future<Map<String, dynamic>?> getWifiInfo() async {
+    return _invokeMap('getWifiInfo');
+  }
+
+  Future<Map<String, dynamic>> pingHost(
+    String host, {
+    int timeoutMs = 3000,
+  }) async {
+    final res = await _invokeMap('pingHost', {
+      'host': host,
+      'timeoutMs': timeoutMs,
+    });
+    return res ?? {'ok': false, 'error': 'ping failed'};
+  }
+
   // --- 系统运行时动态权限 ---
   Future<bool> hasSystemPermission(String permission) {
     return _invoke<bool>('hasPermission', false, {'permission': permission});

@@ -120,4 +120,9 @@ mixin PluginHostSystemDelegate {
           String deviceId, String serviceUuid, String charUuid, String value) =>
       nativeBridge.writeBluetoothCharacteristic(
           deviceId, serviceUuid, charUuid, value);
+
+  Future<Map<String, dynamic>?> getWifiInfo() => nativeBridge.getWifiInfo();
+
+  Future<Map<String, dynamic>> pingHost(String host, {int timeoutMs = 3000}) =>
+      nativeBridge.pingHost(host, timeoutMs: timeoutMs);
 }

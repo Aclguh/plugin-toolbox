@@ -138,10 +138,42 @@ class MockLuaHostDelegate implements LuaHostDelegate {
 
   String? mockScannedCode = 'https://example.com/mock-qr';
   String? mockDecodedCode = 'mock-decoded-barcode-123';
+  String? mockTakePhotoPath = 'camera/mock_photo.jpg';
+
+  @override
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) async =>
+      mockTakePhotoPath;
+
+  bool mockCaptureScreenResult = true;
+  @override
+  Future<bool> captureScreen({
+    required String destPath,
+    String? targetRef,
+  }) async =>
+      mockCaptureScreenResult;
+
+  Map<String, dynamic>? mockWifiInfo = {
+    'ssid': 'Toolbox-WiFi',
+    'bssid': '00:11:22:33:44:55',
+    'rssi': -55,
+    'ip': '192.168.1.100',
+  };
+  @override
+  Future<Map<String, dynamic>?> getWifiInfo() async => mockWifiInfo;
+
+  @override
+  Future<Map<String, dynamic>> pingHost(String host, {int timeoutMs = 3000}) async =>
+      {'ok': true, 'host': host, 'reachable': true, 'latencyMs': 12};
   final Map<String, Map<String, dynamic>> mockSensors = {
     'accelerometer': {'x': 1.0, 'y': 2.0, 'z': 9.8},
     'gyroscope': {'x': 0.1, 'y': 0.2, 'z': 0.3},
     'compass': {'heading': 180.0},
+    'light': {'lux': 450.0},
+    'barometer': {'pressure': 1013.25},
   };
   final List<String> startedSensors = [];
   final List<String> stoppedSensors = [];
@@ -706,6 +738,52 @@ void main() {
       expect(delegate.getState('hash_md5_fn'), 'function');
       expect(delegate.getState('hash_sha1_fn'), 'function');
       expect(delegate.getState('hash_sha256_fn'), 'function');
+    });
+
+    test('CodecApi 扩展功能: Hex, HexDump, JWT, HTML 实体与 Punycode 编解码', () {
+      engine.loadAndExecute('''
+        -- Hex
+        local hex = codec.hexEncode("Hello")
+        local text = codec.hexDecode(hex)
+        state.set("hex", hex)
+        state.set("hex_text", text)
+
+        -- HexDump
+        local dump = codec.hexDump("Hello World! 123")
+        state.set("dump", dump)
+
+        -- JWT
+        local fakeJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsaWNlIiwiYWRtaW4iOnRydWV9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        local jwt = codec.jwtDecode(fakeJwt)
+        state.set("jwt_sub", jwt.payload.sub)
+        state.set("jwt_name", jwt.payload.name)
+        state.set("jwt_alg", jwt.header.alg)
+
+        -- HTML Entities
+        local rawHtml = "<script>alert('Hello & welcome!');</script>"
+        local encodedHtml = codec.htmlEntitiesEncode(rawHtml)
+        local decodedHtml = codec.htmlEntitiesDecode(encodedHtml)
+        state.set("encoded_html", encodedHtml)
+        state.set("decoded_html", decodedHtml)
+
+        -- Punycode
+        local domain = "测试.com"
+        local punyDomain = codec.punycodeEncode(domain)
+        local restoredDomain = codec.punycodeDecode(punyDomain)
+        state.set("puny_domain", punyDomain)
+        state.set("restored_domain", restoredDomain)
+      ''');
+
+      expect(delegate.getState('hex'), '48656c6c6f');
+      expect(delegate.getState('hex_text'), 'Hello');
+      expect((delegate.getState('dump') as String).contains('48 65 6c 6c 6f'), isTrue);
+      expect(delegate.getState('jwt_sub'), '1234567890');
+      expect(delegate.getState('jwt_name'), 'Alice');
+      expect(delegate.getState('jwt_alg'), 'HS256');
+      expect((delegate.getState('encoded_html') as String).contains('&lt;script&gt;'), isTrue);
+      expect(delegate.getState('decoded_html'), "<script>alert('Hello & welcome!');</script>");
+      expect(delegate.getState('puny_domain'), 'xn--0zwm56d.com');
+      expect(delegate.getState('restored_domain'), '测试.com');
     });
 
     test('宿主 API 参数类型错误被隔离为 Lua 执行错误 (不逃逸宿主)', () {
@@ -1526,6 +1604,45 @@ void main() {
       expect((delegate.getState('sha512') as String).length, 128);
     });
 
+    test('CryptoApi AES CBC/ECB 加解密、SM3、PBKDF2 与 randomBytes 计算', () {
+      engine.loadAndExecute('''
+        local secret = "Hello PluginToolbox 2026!"
+        local key = "1234567890123456"
+        local iv = "abcdefghijklmnop"
+
+        -- CBC
+        local cbc_enc = crypto.aesEncrypt(secret, key, iv, "cbc")
+        local cbc_dec = crypto.aesDecrypt(cbc_enc, key, iv, "cbc")
+        state.set("cbc_enc", cbc_enc)
+        state.set("cbc_dec", cbc_dec)
+
+        -- ECB
+        local ecb_enc = crypto.aesEncrypt(secret, key, nil, "ecb")
+        local ecb_dec = crypto.aesDecrypt(ecb_enc, key, nil, "ecb")
+        state.set("ecb_dec", ecb_dec)
+
+        -- SM3
+        local sm3_val = crypto.sm3("abc")
+        state.set("sm3_val", sm3_val)
+
+        -- PBKDF2
+        local pbkdf2_val = crypto.pbkdf2("password", "salt", 1000, 32)
+        state.set("pbkdf2_val", pbkdf2_val)
+
+        -- randomBytes
+        local rand_val = crypto.randomBytes(16)
+        state.set("rand_val", rand_val)
+      ''');
+
+      expect(delegate.getState('cbc_enc'), isA<String>());
+      expect(delegate.getState('cbc_dec'), 'Hello PluginToolbox 2026!');
+      expect(delegate.getState('ecb_dec'), 'Hello PluginToolbox 2026!');
+      // SM3("abc") 标准测试向量: 66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0
+      expect(delegate.getState('sm3_val'), '66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0');
+      expect((delegate.getState('pbkdf2_val') as String).length, 64);
+      expect((delegate.getState('rand_val') as String).length, 32);
+    });
+
     test('RegexApi 正则匹配、查找与替换', () {
       engine.loadAndExecute('''
         state.set("is_match", regex.test("^\\\\d+\$", "12345"))
@@ -1795,6 +1912,97 @@ void main() {
       expect(html, contains('<li>Item 2</li>'));
     });
 
+    test('DocumentApi: YAML 与 XML 往返解析与序列化', () {
+      engine.loadAndExecute('''
+        -- YAML
+        local yamlStr = "name: PluginToolbox\\nversion: 2\\nenabled: true\\ntags:\\n  - utility\\n  - mobile\\n"
+        local yamlData = document.yamlParse(yamlStr)
+        state.set("y_name", yamlData.name)
+        state.set("y_ver", yamlData.version)
+        state.set("y_tag1", yamlData.tags[1])
+
+        local reYaml, y_err = document.yamlStringify(yamlData)
+        state.set("re_yaml", reYaml)
+        state.set("y_err", y_err)
+
+        -- XML
+        local xmlStr = '<plugin id="tool_1" version="1.0"><title>Tool Title</title><author>Dev</author></plugin>'
+        local xmlData = document.xmlParse(xmlStr)
+        state.set("x_tag", xmlData.tag)
+        state.set("x_id", xmlData.attrs.id)
+        state.set("x_child_count", #xmlData.children)
+        state.set("x_c1_tag", xmlData.children[1].tag)
+        state.set("x_c1_text", xmlData.children[1].text)
+
+        local reXml = document.xmlStringify(xmlData)
+        state.set("re_xml", reXml)
+      ''');
+
+      expect(delegate.getState('y_name'), 'PluginToolbox');
+      expect(delegate.getState('y_ver'), 2);
+      expect(delegate.getState('y_tag1'), 'utility');
+      expect((delegate.getState('re_yaml') as String), contains('name: PluginToolbox'));
+
+      expect(delegate.getState('x_tag'), 'plugin');
+      expect(delegate.getState('x_id'), 'tool_1');
+      expect(delegate.getState('x_child_count'), 2);
+      expect(delegate.getState('x_c1_tag'), 'title');
+      expect(delegate.getState('x_c1_text'), 'Tool Title');
+      expect((delegate.getState('re_xml') as String), contains('id="tool_1"'));
+      expect((delegate.getState('re_xml') as String), contains('version="1.0"'));
+      expect((delegate.getState('re_xml') as String), contains('<title>Tool Title</title>'));
+    });
+
+    test('I18nApi: 语言查询、动态切换、沙箱字典加载与插值回退', () {
+      final tempDir = Directory.systemTemp.createTempSync('i18n_test_');
+      final localesDir = Directory('${tempDir.path}/locales')..createSync(recursive: true);
+      File('${localesDir.path}/zh.json').writeAsStringSync('{"welcome": "你好，{{name}}！", "app_title": "工具箱"}');
+      File('${localesDir.path}/en.json').writeAsStringSync('{"welcome": "Hello, {{name}}!", "app_title": "Toolbox"}');
+
+      final i18nCtx = PluginContext(
+        pluginId: 'i18n_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: const {},
+        rootDir: tempDir,
+      );
+      final i18nEngine = LuaEngine(context: i18nCtx, delegate: delegate);
+
+      i18nEngine.loadAndExecute('''
+        -- 初始 locale
+        state.set("init_locale", i18n.locale())
+
+        -- 设置为中文
+        i18n.setLocale("zh")
+        state.set("zh_t", i18n.t("welcome", { name = "小明" }))
+        state.set("zh_title", i18n.t("app_title"))
+
+        -- 切换为英文
+        i18n.setLocale("en")
+        state.set("en_t", i18n.t("welcome", { name = "Alice" }))
+        state.set("en_title", i18n.t("app_title"))
+
+        -- 回退测试: 不存在的 key 返回 key 本身
+        state.set("fallback_key", i18n.t("non_exist_key"))
+
+        -- 查询所有语言
+        local all = i18n.allLocales()
+        state.set("locale_count", #all)
+      ''');
+
+      expect(delegate.getState('init_locale'), isA<String>());
+      expect(delegate.getState('zh_t'), '你好，小明！');
+      expect(delegate.getState('zh_title'), '工具箱');
+      expect(delegate.getState('en_t'), 'Hello, Alice!');
+      expect(delegate.getState('en_title'), 'Toolbox');
+      expect(delegate.getState('fallback_key'), 'non_exist_key');
+      expect(delegate.getState('locale_count'), 2);
+
+      i18nEngine.close();
+      tempDir.deleteSync(recursive: true);
+    });
+
     test('TorchApi: 权限控制与开关状态', () {
       // 未声明权限报错
       expect(
@@ -1877,6 +2085,33 @@ void main() {
           delegate.getState('__scanned_code'), 'https://example.com/mock-qr');
     });
 
+    test('CameraApi: takePhoto 拍照保存至沙箱与权限控制', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_photo_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final camCtx = PluginContext(
+        pluginId: 'camera_photo_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.camera, PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final camEngine = LuaEngine(context: camCtx, delegate: delegate);
+
+      camEngine.loadAndExecute('''
+        camera.takePhoto({ quality = 85, lens = "front", destPath = "camera/mock_photo.jpg" }, function(path)
+          state.set("photo_path", path)
+        end)
+      ''');
+      await _waitFor(() => delegate.getState('photo_path') != null);
+      expect(delegate.getState('photo_path'), 'camera/mock_photo.jpg');
+
+      camEngine.close();
+    });
+
     test('CameraApi & VisionApi: 离线图片条码解码与沙箱防护', () async {
       final tempDir = Directory.systemTemp.createTempSync('ptx_vision_test_');
       addTearDown(() {
@@ -1944,12 +2179,16 @@ void main() {
         state.set("has_gyro", sensor.isAvailable("gyroscope"))
         state.set("has_comp", sensor.isAvailable("compass"))
         state.set("has_mag", sensor.isAvailable("magnetometer"))
+        state.set("has_light", sensor.isAvailable("light"))
+        state.set("has_baro", sensor.isAvailable("barometer"))
         state.set("has_foo", sensor.isAvailable("unknown_sensor"))
       ''');
       expect(delegate.getState('has_acc'), isTrue);
       expect(delegate.getState('has_gyro'), isTrue);
       expect(delegate.getState('has_comp'), isTrue);
       expect(delegate.getState('has_mag'), isTrue);
+      expect(delegate.getState('has_light'), isTrue);
+      expect(delegate.getState('has_baro'), isTrue);
       expect(delegate.getState('has_foo'), isFalse);
 
       // 4. 启动监听并接收周期回调与状态自动写入
@@ -2367,18 +2606,27 @@ void main() {
           state.set("scan_done", true)
           state.set("scan_open", res.open)
         end)
+
+        network.getWifiInfo(function(info)
+          state.set("wifi_done", true)
+          state.set("wifi_ssid", info.ssid)
+          state.set("wifi_ip", info.ip)
+        end)
       ''');
 
       await _waitFor(() =>
           delegate.getState('dns_ok') != null &&
           delegate.getState('ping_done') != null &&
-          delegate.getState('scan_done') != null);
+          delegate.getState('scan_done') != null &&
+          delegate.getState('wifi_done') != null);
       expect(delegate.getState('dns_ok'), isTrue);
       expect(delegate.getState('dns_ips'), '127.0.0.1');
       expect(delegate.getState('ping_done'), isTrue);
       expect(delegate.getState('ping_host'), '127.0.0.1');
       expect(delegate.getState('scan_done'), isTrue);
       expect(delegate.getState('scan_open'), isFalse);
+      expect(delegate.getState('wifi_ssid'), 'Toolbox-WiFi');
+      expect(delegate.getState('wifi_ip'), '192.168.1.100');
 
       netEngine.close();
     });
@@ -2674,6 +2922,34 @@ void main() {
       screenEngine.close();
       expect(delegate.keepScreenOn, isFalse);
       expect(delegate.brightnessReset, isTrue);
+    });
+
+    test('ScreenApi: capture 截图保存至沙箱与权限控制', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ptx_capture_test_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+
+      final screenCtx = PluginContext(
+        pluginId: 'screen_capture_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.screen, PluginPermission.storage},
+        rootDir: tempDir,
+      );
+      final screenEngine = LuaEngine(context: screenCtx, delegate: delegate);
+
+      screenEngine.loadAndExecute('''
+        screen.capture({ destPath = "captures/shot.png" }, function(path)
+          state.set("capture_path", path)
+        end)
+      ''');
+
+      await _waitFor(() => delegate.getState('capture_path') != null);
+      expect(delegate.getState('capture_path'), 'captures/shot.png');
+
+      screenEngine.close();
     });
 
     test('LocationApi: 权限控制与定位数据获取', () async {

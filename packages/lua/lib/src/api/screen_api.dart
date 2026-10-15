@@ -3,6 +3,7 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
+import 'sandbox_utils.dart';
 
 /// `screen` — 屏幕常亮与亮度控制宿主 API。
 class ScreenApi {
@@ -91,6 +92,53 @@ class ScreenApi {
       return 0;
     });
     ls.setField(-2, 'resetBrightness');
+
+    // screen.capture([optionsTable | callback, callback])
+    // 截取视图或组件并保存至沙箱 (需 storage 权限)
+    ls.pushDartFunction((ls) {
+      if (!context.hasPermission(PluginPermission.storage)) {
+        ls.error2('权限不足: 插件未声明 storage 权限');
+        return 0;
+      }
+      String? targetRef;
+      String? destRelPath;
+      int? cbRef;
+
+      if (ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      } else if (ls.type(1) == LuaType.luaTable) {
+        ls.getField(1, 'ref');
+        if (ls.isString(-1)) targetRef = ls.toStr(-1);
+        ls.pop(1);
+
+        ls.getField(1, 'destPath');
+        if (ls.isString(-1)) destRelPath = ls.toStr(-1);
+        ls.pop(1);
+
+        if (ls.type(2) == LuaType.luaFunction) {
+          cbRef = callbacks.ref(2);
+        }
+      }
+
+      final effectiveRel = destRelPath ??
+          'captures/screen_${DateTime.now().millisecondsSinceEpoch}.png';
+      final fullPath = resolveSandboxPath(ls, context, effectiveRel);
+
+      delegate
+          .captureScreen(destPath: fullPath, targetRef: targetRef)
+          .then((ok) {
+        final res = ok ? effectiveRel : null;
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [res]);
+        }
+      }).catchError((Object _) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [null]);
+        }
+      });
+      return 0;
+    });
+    ls.setField(-2, 'capture');
 
     ls.setGlobal('screen');
   }

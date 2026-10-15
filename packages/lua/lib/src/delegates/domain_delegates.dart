@@ -153,6 +153,21 @@ abstract class LuaMediaDelegate {
 
   /// 对沙箱内的图片进行文字识别
   Future<Map<String, dynamic>?> recognizeText(String filePath) async => null;
+
+  /// 拍照并保存至沙箱目标路径，返回保存后的沙箱绝对路径 (取消或失败返回 null)
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) async =>
+      null;
+
+  /// 截取当前插件视图或指定组件区域并保存至沙箱目标路径 (返回是否成功)
+  Future<bool> captureScreen({
+    required String destPath,
+    String? targetRef,
+  }) async =>
+      false;
 }
 
 /// 插件系统与硬件底层外设委托契约
@@ -307,6 +322,16 @@ abstract class LuaDeviceDelegate {
     Map<String, dynamic>? initialData,
   }) async =>
       false;
+
+  /// 获取当前 Wi-Fi 连接详细信息
+  Future<Map<String, dynamic>?> getWifiInfo() async => null;
+
+  /// 对目标主机发起网络 Ping 连通与延迟探测
+  Future<Map<String, dynamic>> pingHost(
+    String host, {
+    int timeoutMs = 3000,
+  }) async =>
+      {'ok': false, 'error': 'not_supported'};
 }
 
 /// 宿主大模型与统一 AI 网关委托契约
@@ -525,6 +550,29 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
   Future<Map<String, dynamic>?> recognizeText(String filePath) async =>
       await mediaDelegate?.recognizeText(filePath);
 
+  @override
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) async =>
+      await mediaDelegate?.takePhoto(
+        destPath: destPath,
+        quality: quality,
+        lensDirection: lensDirection,
+      );
+
+  @override
+  Future<bool> captureScreen({
+    required String destPath,
+    String? targetRef,
+  }) async =>
+      await mediaDelegate?.captureScreen(
+        destPath: destPath,
+        targetRef: targetRef,
+      ) ??
+      false;
+
   // Device
   @override
   void hapticFeedback(String type) => deviceDelegate?.hapticFeedback(type);
@@ -703,6 +751,16 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
       await deviceDelegate?.openPlugin(targetPluginId,
           initialData: initialData) ??
       false;
+
+  @override
+  Future<Map<String, dynamic>?> getWifiInfo() async =>
+      await deviceDelegate?.getWifiInfo();
+
+  @override
+  Future<Map<String, dynamic>> pingHost(String host,
+          {int timeoutMs = 3000}) async =>
+      await deviceDelegate?.pingHost(host, timeoutMs: timeoutMs) ??
+      {'ok': false, 'error': 'not_supported'};
 
   // AI
   @override

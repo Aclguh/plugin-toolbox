@@ -69,4 +69,24 @@ mixin PluginHostMediaDelegate {
 
   Future<Map<String, dynamic>?> recognizeText(String filePath) =>
       nativeBridge.recognizeText(filePath);
+
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) =>
+      nativeBridge.takePhoto(
+        destPath: destPath,
+        quality: quality,
+        lensDirection: lensDirection,
+      );
+
+  Future<bool> captureScreen({
+    required String destPath,
+    String? targetRef,
+  }) =>
+      nativeBridge.captureScreen(
+        destPath: destPath,
+        targetRef: targetRef,
+      );
 }

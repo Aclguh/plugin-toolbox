@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
+import '../delegates/domain_delegates.dart';
 import '../lua_callback_invoker.dart';
 
 /// `network` — 现代 HTTP 网络请求 API。
@@ -156,8 +157,9 @@ class NetworkApi {
     LuaState ls,
     PluginContext context,
     LuaCallbackInvoker callbacks,
-    void Function(String key, dynamic value) writeState,
-  ) {
+    void Function(String key, dynamic value) writeState, [
+    LuaHostDelegate? delegate,
+  ]) {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
@@ -715,6 +717,39 @@ class NetworkApi {
       return 0;
     });
     ls.setField(-2, 'scanPort');
+
+    // network.getWifiInfo([callback]) -> table { ssid, bssid, rssi, ip }
+    ls.pushDartFunction((ls) {
+      checkPermission(ls);
+      int? cbRef;
+      if (ls.type(1) == LuaType.luaFunction) {
+        cbRef = callbacks.ref(1);
+      }
+
+      if (delegate != null) {
+        unawaited(
+          delegate.getWifiInfo().then((info) {
+            if (cbRef != null) {
+              callbacks.invokeAndRelease(cbRef, [info]);
+            } else {
+              writeState('__wifi_info', info);
+            }
+          }).catchError((Object _) {
+            if (cbRef != null) {
+              callbacks.invokeAndRelease(cbRef, [null]);
+            } else {
+              writeState('__wifi_info', null);
+            }
+          }),
+        );
+      } else {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [null]);
+        }
+      }
+      return 0;
+    });
+    ls.setField(-2, 'getWifiInfo');
 
     ls.setGlobal('network');
   }

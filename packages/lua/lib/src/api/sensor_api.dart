@@ -56,7 +56,9 @@ class SensorApi {
         'accelerometer',
         'gyroscope',
         'magnetometer',
-        'compass'
+        'compass',
+        'light',
+        'barometer',
       ];
       ls.pushBoolean(supported.contains(type));
       return 1;
