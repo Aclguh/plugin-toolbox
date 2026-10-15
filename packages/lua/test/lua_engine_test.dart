@@ -3522,6 +3522,60 @@ void main() {
       expect(composite.batteryLevel, 100);
       expect(composite.isTorchOn, isFalse);
     });
+
+    test('DisposableTracker 集中资源生命周期逆序清理与异常隔离保护', () {
+      final tracker = DisposableTracker();
+      final logs = <String>[];
+
+      tracker.addCallback(() => logs.add('step1'));
+      tracker.addCallback(() {
+        logs.add('step2_error');
+        throw Exception('Boom');
+      });
+      tracker.addCallback(() => logs.add('step3'));
+
+      // 逆序执行且异常隔离
+      tracker.disposeAll();
+      expect(logs, ['step3', 'step2_error', 'step1']);
+    });
+
+    test('fs.hashAsync 与 fs.hash 异步后台 Isolate 哈希计算', () async {
+      final tempDir =
+          await Directory.systemTemp.createTemp('ptx_fs_hash_test_');
+      final ctx = PluginContext(
+        pluginId: 'hash_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.storage},
+      );
+      final eng = LuaEngine(context: ctx, delegate: delegate);
+
+      final sampleFile = File('${tempDir.path}/hello.txt');
+      await sampleFile.writeAsString('Hello Plugin Toolbox!');
+
+      eng.loadAndExecute('''
+        fs.hash("hello.txt", "sha256", function(res, err)
+          state.set("sha256_result", res)
+        end)
+        fs.hashAsync("hello.txt", function(res, err)
+          state.set("table_size", res.size)
+          state.set("table_md5", res.md5)
+        end)
+      ''');
+
+      await _waitFor(() =>
+          delegate.getState('sha256_result') != null &&
+          delegate.getState('table_md5') != null);
+
+      expect(delegate.getState('sha256_result'), isNotEmpty);
+      expect(delegate.getState('table_size'), 21);
+      expect(delegate.getState('table_md5'), isNotEmpty);
+
+      eng.close();
+      await tempDir.delete(recursive: true);
+    });
   });
 }
 

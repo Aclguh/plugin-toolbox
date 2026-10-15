@@ -44,10 +44,12 @@ import 'api/ipc_api.dart';
 import 'api/i18n_api.dart';
 import 'delegates/domain_delegates.dart';
 import 'lua_callback_invoker.dart';
+import 'lua_disposable.dart';
 import 'lua_value_codec.dart';
 
 export 'delegates/domain_delegates.dart';
 export 'api/plugin_database.dart';
+export 'lua_disposable.dart';
 
 /// 安全隔离的 Lua 运行时引擎，提供宿主 API 绑定注入与指令数死循环预算保护
 class LuaEngine {
@@ -74,7 +76,11 @@ class LuaEngine {
   SocketApi? _socketApi;
   WebSocketApi? _webSocketApi;
   DatabaseApi? _databaseApi;
+  final DisposableTracker _disposableTracker = DisposableTracker();
   bool _closed = false;
+
+  /// 集中资源生命周期追踪器
+  DisposableTracker get disposables => _disposableTracker;
 
   /// 引擎是否已被关闭
   bool get isClosed => _closed;
@@ -145,6 +151,7 @@ class LuaEngine {
 
     _timerApi = TimerApi();
     _timerApi!.bind(_ls, _callbacks!);
+    _disposableTracker.addCallback(() => _timerApi?.dispose(_callbacks));
 
     StateApi.bind(_ls, delegate);
     ClipboardApi.bind(_ls, context, delegate, _callbacks!, writeState);
@@ -172,13 +179,20 @@ class LuaEngine {
     VisionApi.bind(_ls, context, delegate, _callbacks!);
     _sensorApi = SensorApi();
     _sensorApi!.bind(_ls, context, delegate, _callbacks!);
+    _disposableTracker
+        .addCallback(() => _sensorApi?.dispose(delegate, _callbacks!));
+
     ImageApi.bind(_ls, context, delegate, _callbacks!);
     NotificationApi.bind(_ls, context, delegate, _callbacks!);
     AudioApi.bind(_ls, context, delegate, _callbacks!);
     _socketApi = SocketApi();
     _socketApi!.bind(_ls, context, _callbacks!);
+    _disposableTracker.addCallback(() => _socketApi?.dispose(_callbacks));
+
     _webSocketApi = WebSocketApi();
     _webSocketApi!.bind(_ls, context, _callbacks!);
+    _disposableTracker.addCallback(() => _webSocketApi?.dispose(_callbacks));
+
     BiometricsApi.bind(_ls, context, delegate, _callbacks!);
     TaskApi.bind(_ls, context, _callbacks!);
     ScreenApi.bind(_ls, context, delegate, _callbacks!);
@@ -187,8 +201,17 @@ class LuaEngine {
     BluetoothApi.bind(_ls, context, delegate, _callbacks!);
     _databaseApi = DatabaseApi(databaseFactory: databaseFactory);
     _databaseApi!.bindInstance(_ls, context, _callbacks!);
+    _disposableTracker.addCallback(() => _databaseApi?.dispose());
+
     AiApi.bind(_ls, context, delegate, _callbacks!);
     IpcApi.bind(_ls, context, delegate, _callbacks!);
+    _disposableTracker.addCallback(
+        () => PluginIpcBroker.instance.unregisterService(context.pluginId));
+    _disposableTracker.addCallback(() => delegate.stopAudio());
+    _disposableTracker.addCallback(() => delegate.stopBluetoothScan());
+    _disposableTracker.addCallback(() => delegate.setKeepScreenOn(false));
+    _disposableTracker.addCallback(() => delegate.resetBrightness());
+
     I18nApi.bind(_ls, context);
   }
 
@@ -247,16 +270,7 @@ class LuaEngine {
   void close() {
     if (_closed) return;
     _closed = true;
-    PluginIpcBroker.instance.unregisterService(context.pluginId);
-    delegate.stopAudio();
-    delegate.stopBluetoothScan();
-    delegate.setKeepScreenOn(false);
-    delegate.resetBrightness();
-    _sensorApi?.dispose(delegate, _callbacks!);
-    _timerApi?.dispose(_callbacks);
-    _socketApi?.dispose(_callbacks);
-    _webSocketApi?.dispose(_callbacks);
-    _databaseApi?.dispose();
+    _disposableTracker.disposeAll();
     _callbacks?.clear();
   }
 }

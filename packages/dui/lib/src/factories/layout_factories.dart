@@ -150,13 +150,128 @@ void registerLayoutFactories(DuiRenderer renderer) {
     );
   });
 
-  renderer.registerFactory(
-      'ListView',
-      (node) => ListView(
-            shrinkWrap: DuiUtils.tryBool(node.props['shrinkWrap']),
-            padding: DuiUtils.parsePadding(node.props['padding']),
-            children: node.childrenWidgets,
-          ));
+  dynamic resolveScoped(dynamic val, dynamic item, int index) {
+    if (val is String) {
+      return val
+          .replaceAll(RegExp(r'\{\{\s*\$index\s*\}\}'), index.toString())
+          .replaceAllMapped(
+              RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}'), (m) {
+        final field = m.group(1);
+        if (field == null) {
+          return item?.toString() ?? '';
+        }
+        if (item is Map) {
+          return item[field]?.toString() ?? '';
+        }
+        return '';
+      });
+    } else if (val is Map) {
+      return val
+          .map((k, v) => MapEntry(k.toString(), resolveScoped(v, item, index)));
+    } else if (val is List) {
+      return val.map((v) => resolveScoped(v, item, index)).toList();
+    }
+    return val;
+  }
+
+  Widget buildListView(DuiNodeContext node) {
+    final rawItems = node.props['items'] ?? node.props['dataSource'];
+    // 静态 children 模式保持兼容
+    if (rawItems == null) {
+      return ListView(
+        shrinkWrap: DuiUtils.tryBool(node.props['shrinkWrap']),
+        padding: DuiUtils.parsePadding(node.props['padding']),
+        children: node.childrenWidgets,
+      );
+    }
+
+    final itemTemplate = (node.props['itemTemplate'] is Map<String, dynamic>)
+        ? node.props['itemTemplate'] as Map<String, dynamic>
+        : (node.children.isNotEmpty ? node.children.first : null);
+
+    final keys = <String>{};
+    if (rawItems is String) {
+      keys.addAll(DuiState.extractKeys(rawItems));
+    }
+
+    Widget buildLazyList() {
+      List<dynamic> list = const [];
+      if (rawItems is List) {
+        list = rawItems;
+      } else if (rawItems is String) {
+        final stateKey = DuiState.extractKeys(rawItems).firstOrNull;
+        if (stateKey != null) {
+          final stateVal = state.get(stateKey);
+          if (stateVal is List) {
+            list = stateVal;
+          }
+        }
+      }
+
+      final emptyText = node.props['emptyText']?.toString();
+      if (list.isEmpty) {
+        if (emptyText != null && emptyText.isNotEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                emptyText,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      }
+
+      if (itemTemplate == null) {
+        return const SizedBox.shrink();
+      }
+
+      final shrinkWrap = DuiUtils.tryBool(node.props['shrinkWrap']);
+      final padding = DuiUtils.parsePadding(node.props['padding']);
+      final separatorHeight = DuiUtils.tryDouble(
+          node.props['separatorHeight'] ?? node.props['spacing']);
+
+      if (separatorHeight != null && separatorHeight > 0) {
+        return ListView.separated(
+          shrinkWrap: shrinkWrap,
+          padding: padding,
+          itemCount: list.length,
+          separatorBuilder: (_, __) => SizedBox(height: separatorHeight),
+          itemBuilder: (ctx, index) {
+            final scopedAst = resolveScoped(itemTemplate, list[index], index);
+            if (scopedAst is Map<String, dynamic>) {
+              return renderer.buildWidget(node.context, scopedAst);
+            }
+            return const SizedBox.shrink();
+          },
+        );
+      }
+
+      return ListView.builder(
+        shrinkWrap: shrinkWrap,
+        padding: padding,
+        itemCount: list.length,
+        itemBuilder: (ctx, index) {
+          final scopedAst = resolveScoped(itemTemplate, list[index], index);
+          if (scopedAst is Map<String, dynamic>) {
+            return renderer.buildWidget(node.context, scopedAst);
+          }
+          return const SizedBox.shrink();
+        },
+      );
+    }
+
+    if (keys.isEmpty) return buildLazyList();
+    return ListenableBuilder(
+      listenable: state.listenableForKeys(keys),
+      builder: (_, __) => buildLazyList(),
+    );
+  }
+
+  renderer.registerFactory('ListView', buildListView);
+  renderer.registerFactory('LazyListView', buildListView);
 
   renderer.registerFactory(
       'ListTile',
@@ -203,30 +318,6 @@ void registerLayoutFactories(DuiRenderer renderer) {
     final keys = <String>{};
     if (rawItems is String) {
       keys.addAll(DuiState.extractKeys(rawItems));
-    }
-
-    dynamic resolveScoped(dynamic val, dynamic item, int index) {
-      if (val is String) {
-        return val
-            .replaceAll(RegExp(r'\{\{\s*\$index\s*\}\}'), index.toString())
-            .replaceAllMapped(
-                RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}'), (m) {
-          final field = m.group(1);
-          if (field == null) {
-            return item?.toString() ?? '';
-          }
-          if (item is Map) {
-            return item[field]?.toString() ?? '';
-          }
-          return '';
-        });
-      } else if (val is Map) {
-        return val.map(
-            (k, v) => MapEntry(k.toString(), resolveScoped(v, item, index)));
-      } else if (val is List) {
-        return val.map((v) => resolveScoped(v, item, index)).toList();
-      }
-      return val;
     }
 
     Widget buildRepeater() {

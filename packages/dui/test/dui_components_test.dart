@@ -503,5 +503,51 @@ void main() {
 
       expect(find.text('暂无代办事项'), findsOneWidget);
     });
+
+    testWidgets('ListView 与 LazyListView 支持 dataSource 懒加载与动态数据绑定',
+        (tester) async {
+      final state = DuiState();
+      state.set('users', [
+        {'name': 'Alice', 'role': 'Admin'},
+        {'name': 'Bob', 'role': 'User'},
+      ]);
+      final handler =
+          DuiEventHandler(state: state, executor: MockActionExecutor());
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.build(context, {
+                'type': 'LazyListView',
+                'props': {
+                  'dataSource': '{{state.users}}',
+                  'separatorHeight': 8,
+                  'itemTemplate': {
+                    'type': 'Text',
+                    'props': {
+                      'text': r'{{$index}}: {{$item.name}} ({{$item.role}})',
+                    },
+                  },
+                },
+              }),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('0: Alice (Admin)'), findsOneWidget);
+      expect(find.text('1: Bob (User)'), findsOneWidget);
+
+      // 动态更新数据源
+      state.set('users', [
+        {'name': 'Charlie', 'role': 'Guest'},
+      ]);
+      await tester.pump();
+
+      expect(find.text('0: Alice (Admin)'), findsNothing);
+      expect(find.text('0: Charlie (Guest)'), findsOneWidget);
+    });
   });
 }
