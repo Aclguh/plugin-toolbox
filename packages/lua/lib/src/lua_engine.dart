@@ -41,6 +41,7 @@ import 'api/database_api.dart';
 import 'api/plugin_database.dart';
 import 'api/ai_api.dart';
 import 'api/ipc_api.dart';
+import 'api/i18n_api.dart';
 import 'delegates/domain_delegates.dart';
 import 'lua_callback_invoker.dart';
 import 'lua_value_codec.dart';
@@ -148,7 +149,7 @@ class LuaEngine {
     StateApi.bind(_ls, delegate);
     ClipboardApi.bind(_ls, context, delegate, _callbacks!, writeState);
     StorageApi.bind(_ls, context, _callbacks!, writeState);
-    NetworkApi.bind(_ls, context, _callbacks!, writeState);
+    NetworkApi.bind(_ls, context, _callbacks!, writeState, delegate);
     DialogApi.bind(_ls, delegate, _callbacks!);
     CodecApi.bind(_ls);
     JsonApi.bind(_ls);
@@ -188,6 +189,7 @@ class LuaEngine {
     _databaseApi!.bindInstance(_ls, context, _callbacks!);
     AiApi.bind(_ls, context, delegate, _callbacks!);
     IpcApi.bind(_ls, context, delegate, _callbacks!);
+    I18nApi.bind(_ls, context);
   }
 
   /// 执行 Lua 源代码字符串

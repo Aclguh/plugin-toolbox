@@ -1,4 +1,7 @@
 import 'package:lua_dardo/lua.dart';
+import '../lua_value_codec.dart';
+import 'xml_parser.dart';
+import 'yaml_parser.dart';
 
 /// `document` — 文档解析与格式转换 API。
 ///
@@ -68,6 +71,73 @@ class DocumentApi {
       return 1;
     });
     ls.setField(-2, 'markdownToHtml');
+
+    // document.yamlParse(yaml) -> table
+    ls.pushDartFunction((ls) {
+      final yaml = ls.checkString(1) ?? '';
+      try {
+        final parsed = YamlParser.parse(yaml);
+        LuaValueCodec.push(ls, parsed);
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'yamlParse');
+
+    // document.yamlStringify(table) -> string
+    ls.pushDartFunction((ls) {
+      ls.pushValue(1);
+      final obj = LuaValueCodec.pop(ls);
+      try {
+        final res = YamlParser.stringify(obj);
+        ls.pushString(res);
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'yamlStringify');
+
+    // document.xmlParse(xml) -> table
+    ls.pushDartFunction((ls) {
+      final xml = ls.checkString(1) ?? '';
+      try {
+        final parsed = XmlParser.parse(xml);
+        LuaValueCodec.push(ls, parsed);
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'xmlParse');
+
+    // document.xmlStringify(table) -> string
+    ls.pushDartFunction((ls) {
+      ls.pushValue(1);
+      final obj = LuaValueCodec.pop(ls);
+      if (obj is! Map) {
+        ls.pushNil();
+        ls.pushString('参数必须为 XML 节点字典');
+        return 2;
+      }
+      try {
+        final res = XmlParser.stringify(obj);
+        ls.pushString(res);
+        return 1;
+      } catch (e) {
+        ls.pushNil();
+        ls.pushString(e.toString());
+        return 2;
+      }
+    });
+    ls.setField(-2, 'xmlStringify');
 
     ls.setGlobal('document');
   }
