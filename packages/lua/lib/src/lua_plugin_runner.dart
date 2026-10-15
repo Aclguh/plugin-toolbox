@@ -7,6 +7,7 @@ class LuaPluginRunner {
   final DynamicPlugin plugin;
   final LuaHostDelegate delegate;
   late final LuaEngine _engine;
+  LuaEngine get engine => _engine;
 
   LuaPluginRunner({
     required this.plugin,

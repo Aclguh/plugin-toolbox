@@ -56,6 +56,16 @@ class PluginContext {
       ..addAll(permissions);
   }
 
+  /// 动态为插件授予单个权限
+  void grantPermission(PluginPermission perm) {
+    grantedPermissions.add(perm);
+  }
+
+  /// 动态撤销插件的单个权限
+  void revokePermission(PluginPermission perm) {
+    grantedPermissions.remove(perm);
+  }
+
   /// 检查目标主机 [host] 是否在允许访问的域名白名单中
   bool isHostAllowed(String host) {
     if (allowedDomains == null || allowedDomains!.isEmpty) {
@@ -164,5 +174,25 @@ class PluginContext {
   /// 清除缓存，下次检查时重新扫描全盘
   void invalidateStorageQuotaCache() {
     _cachedUsedBytes = null;
+  }
+
+  /// 诊断控制台内存日志条目队列（最多保留 200 条，用于运行期诊断面板）
+  final List<String> _diagnosticLogs = [];
+
+  /// 获取不可变诊断日志视图
+  List<String> get diagnosticLogs => List.unmodifiable(_diagnosticLogs);
+
+  /// 记录一条诊断日志
+  void recordLog(String message) {
+    if (_diagnosticLogs.length >= 200) {
+      _diagnosticLogs.removeAt(0);
+    }
+    final time = DateTime.now().toIso8601String().substring(11, 19);
+    _diagnosticLogs.add('[$time] $message');
+  }
+
+  /// 清空诊断日志
+  void clearDiagnosticLogs() {
+    _diagnosticLogs.clear();
   }
 }

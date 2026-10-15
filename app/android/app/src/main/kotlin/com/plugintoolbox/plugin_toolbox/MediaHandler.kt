@@ -91,7 +91,7 @@ class MediaHandler(
                 result.success(true)
                 true
             }
-            "startAudioRecording" -> {
+            "startRecording", "startAudioRecording" -> {
                 val destPath = call.argument<String>("path") ?: ""
                 val doStart = {
                     try {
@@ -133,7 +133,7 @@ class MediaHandler(
                 }
                 true
             }
-            "stopAudioRecording" -> {
+            "stopRecording", "stopAudioRecording" -> {
                 try {
                     val durationMs = (System.currentTimeMillis() - recordingStartTime).toInt()
                     val path = recordingFilePath
@@ -161,21 +161,21 @@ class MediaHandler(
                 }
                 true
             }
-            "getAudioDecibel" -> {
+            "getRecordingAmplitude", "getAudioDecibel" -> {
                 try {
                     val maxAmp = activeMediaRecorder?.maxAmplitude ?: 0
                     if (maxAmp > 0) {
                         val db = 20 * Math.log10(maxAmp.toDouble())
-                        result.success(db)
+                        result.success(mapOf("max" to db))
                     } else {
-                        result.success(0.0)
+                        result.success(mapOf("max" to 0.0))
                     }
                 } catch (e: Exception) {
-                    result.success(0.0)
+                    result.success(mapOf("max" to 0.0))
                 }
                 true
             }
-            "speakText" -> {
+            "speak", "speakText" -> {
                 val text = call.argument<String>("text") ?: ""
                 val lang = call.argument<String?>("language")
                 val pitch = call.argument<Double?>("pitch")?.toFloat() ?: 1.0f

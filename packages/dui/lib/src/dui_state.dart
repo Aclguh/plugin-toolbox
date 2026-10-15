@@ -8,8 +8,6 @@ class DuiState extends ChangeNotifier {
   /// 正则在 UI 构建期被高频命中，静态化避免每次调用重新编译
   static final RegExp _interpolatePattern =
       RegExp(r'\{\{state\.([a-zA-Z0-9_]+)\}\}');
-  static final RegExp _visibleExprPattern =
-      RegExp(r'^(!?)\{\{state\.([a-zA-Z0-9_]+)\}\}$');
 
   static final Listenable _emptyListenable = ChangeNotifier();
 
@@ -71,10 +69,13 @@ class DuiState extends ChangeNotifier {
     return Listenable.merge(list);
   }
 
-  /// 从模板字符串中提取所有引用的状态键名
+  static final RegExp _keyExtractorPattern =
+      RegExp(r'(?:\{\{\s*)?state\.([a-zA-Z0-9_]+)');
+
+  /// 从模板字符串或条件表达式中提取所有引用的状态键名
   static Set<String> extractKeys(String? template) {
-    if (template == null || !template.contains('{{state.')) return const {};
-    final matches = _interpolatePattern.allMatches(template);
+    if (template == null || !template.contains('state.')) return const {};
+    final matches = _keyExtractorPattern.allMatches(template);
     final set = <String>{};
     for (final m in matches) {
       final key = m.group(1);
@@ -93,7 +94,7 @@ class DuiState extends ChangeNotifier {
     });
   }
 
-  /// 计算布尔可见性表达式
+  /// 计算布尔可见性表达式（支持数值比较、逻辑运算与符合语法）
   bool evaluateVisible(dynamic expr) {
     if (expr == null) return true;
     if (expr is bool) return expr;
@@ -102,29 +103,7 @@ class DuiState extends ChangeNotifier {
     if (str == 'true') return true;
     if (str == 'false') return false;
 
-    // 解析形如 "{{state.hasError}}" 或 "!{{state.loading}}"
-    final match = _visibleExprPattern.firstMatch(str);
-    if (match != null) {
-      final isNegated = match.group(1) == '!';
-      final key = match.group(2)!;
-      final val = _values[key];
-      bool truthy;
-      if (val is bool) {
-        truthy = val;
-      } else if (val is String) {
-        truthy = val.isNotEmpty;
-      } else if (val is num) {
-        truthy = val != 0;
-      } else {
-        truthy = val != null;
-      }
-      return isNegated ? !truthy : truthy;
-    }
-
-    if (str.contains('{{')) {
-      debugPrint('[DUI] Warning: 未识别的 visible 条件表达式: "$str"');
-    }
-    return true;
+    return DuiExpressionEvaluator.evaluate(str, _values);
   }
 
   @override
@@ -139,4 +118,204 @@ class DuiState extends ChangeNotifier {
 
 class _KeyNotifier extends ChangeNotifier {
   void notify() => notifyListeners();
+}
+
+/// 轻量条件表达式解析与计算器，支持数值比较、逻辑复合与类型推导
+class DuiExpressionEvaluator {
+  static bool evaluate(String rawExpr, Map<String, dynamic> stateValues) {
+    var expr = rawExpr.trim();
+    if (expr.isEmpty) return true;
+    if (expr == 'true') return true;
+    if (expr == 'false') return false;
+
+    // 剥离可能包裹的顶层大括号 {{ ... }}
+    if (expr.startsWith('{{') && expr.endsWith('}}')) {
+      expr = expr.substring(2, expr.length - 2).trim();
+    }
+    if (expr.isEmpty) return true;
+
+    try {
+      return _evalOr(expr, stateValues);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static bool _evalOr(String expr, Map<String, dynamic> values) {
+    final parts = _splitTopLevel(expr, '||');
+    if (parts.length > 1) {
+      for (final part in parts) {
+        if (_evalAnd(part, values)) return true;
+      }
+      return false;
+    }
+    return _evalAnd(expr, values);
+  }
+
+  static bool _evalAnd(String expr, Map<String, dynamic> values) {
+    final parts = _splitTopLevel(expr, '&&');
+    if (parts.length > 1) {
+      for (final part in parts) {
+        if (!_evalComparison(part, values)) return false;
+      }
+      return true;
+    }
+    return _evalComparison(expr, values);
+  }
+
+  static bool _evalComparison(String rawExpr, Map<String, dynamic> values) {
+    final expr = rawExpr.trim();
+    if (expr.isEmpty) return true;
+
+    if (expr.startsWith('!') && !expr.startsWith('!=')) {
+      final inner = expr.substring(1).trim();
+      return !_evalComparison(inner, values);
+    }
+
+    const ops = ['==', '!=', '>=', '<=', '>', '<'];
+    for (final op in ops) {
+      final idx = _indexOfOp(expr, op);
+      if (idx != -1) {
+        final leftStr = expr.substring(0, idx).trim();
+        final rightStr = expr.substring(idx + op.length).trim();
+        final leftVal = _evalOperand(leftStr, values);
+        final rightVal = _evalOperand(rightStr, values);
+        return _compare(leftVal, rightVal, op);
+      }
+    }
+
+    final val = _evalOperand(expr, values);
+    return _isTruthy(val);
+  }
+
+  static dynamic _evalOperand(String raw, Map<String, dynamic> values) {
+    var s = raw.trim();
+    if (s.startsWith('{{') && s.endsWith('}}')) {
+      s = s.substring(2, s.length - 2).trim();
+    }
+    if (s.isEmpty) return null;
+
+    // 字符串字面量: '...' 或 "..."
+    if ((s.startsWith("'") && s.endsWith("'") && s.length >= 2) ||
+        (s.startsWith('"') && s.endsWith('"') && s.length >= 2)) {
+      return s.substring(1, s.length - 1);
+    }
+
+    // 布尔与空
+    if (s == 'true') return true;
+    if (s == 'false') return false;
+    if (s == 'null') return null;
+
+    // 数字
+    final numVal = num.tryParse(s);
+    if (numVal != null) return numVal;
+
+    // 状态变量引用: state.key 或 key
+    if (s.startsWith('state.')) {
+      final key = s.substring(6).trim();
+      return values[key];
+    }
+    if (values.containsKey(s)) {
+      return values[s];
+    }
+
+    return s;
+  }
+
+  static bool _compare(dynamic left, dynamic right, String op) {
+    if (op == '==') {
+      if (left == right) return true;
+      if (left is num && right is num) return left == right;
+      return left?.toString() == right?.toString();
+    }
+    if (op == '!=') {
+      return !_compare(left, right, '==');
+    }
+
+    final leftNum = (left is num) ? left : num.tryParse(left?.toString() ?? '');
+    final rightNum =
+        (right is num) ? right : num.tryParse(right?.toString() ?? '');
+
+    if (leftNum != null && rightNum != null) {
+      switch (op) {
+        case '>':
+          return leftNum > rightNum;
+        case '<':
+          return leftNum < rightNum;
+        case '>=':
+          return leftNum >= rightNum;
+        case '<=':
+          return leftNum <= rightNum;
+      }
+    }
+
+    final leftStr = left?.toString() ?? '';
+    final rightStr = right?.toString() ?? '';
+    final cmp = leftStr.compareTo(rightStr);
+    switch (op) {
+      case '>':
+        return cmp > 0;
+      case '<':
+        return cmp < 0;
+      case '>=':
+        return cmp >= 0;
+      case '<=':
+        return cmp <= 0;
+    }
+    return false;
+  }
+
+  static bool _isTruthy(dynamic val) {
+    if (val == null) return false;
+    if (val is bool) return val;
+    if (val is num) return val != 0;
+    if (val is String) return val.isNotEmpty && val != 'false' && val != '0';
+    return true;
+  }
+
+  static int _indexOfOp(String expr, String op) {
+    var inSingle = false;
+    var inDouble = false;
+    for (var i = 0; i <= expr.length - op.length; i++) {
+      final c = expr[i];
+      if (c == "'" && !inDouble) {
+        inSingle = !inSingle;
+      } else if (c == '"' && !inSingle) {
+        inDouble = !inDouble;
+      } else if (!inSingle && !inDouble) {
+        if (expr.substring(i, i + op.length) == op) {
+          if (op == '>' && i + 1 < expr.length && expr[i + 1] == '=') continue;
+          if (op == '<' && i + 1 < expr.length && expr[i + 1] == '=') continue;
+          if (op == '!' && i + 1 < expr.length && expr[i + 1] == '=') continue;
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  static List<String> _splitTopLevel(String expr, String delimiter) {
+    final result = <String>[];
+    var inSingle = false;
+    var inDouble = false;
+    var lastIdx = 0;
+    final dLen = delimiter.length;
+
+    for (var i = 0; i <= expr.length - dLen; i++) {
+      final c = expr[i];
+      if (c == "'" && !inDouble) {
+        inSingle = !inSingle;
+      } else if (c == '"' && !inSingle) {
+        inDouble = !inDouble;
+      } else if (!inSingle && !inDouble) {
+        if (expr.substring(i, i + dLen) == delimiter) {
+          result.add(expr.substring(lastIdx, i).trim());
+          lastIdx = i + dLen;
+          i += dLen - 1;
+        }
+      }
+    }
+    result.add(expr.substring(lastIdx).trim());
+    return result;
+  }
 }

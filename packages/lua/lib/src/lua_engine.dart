@@ -142,10 +142,36 @@ class LuaEngine {
       _ls,
       instructionBudget,
       onError: (err) {
+        context.recordLog('[ERROR] $err');
         context.logger.e('Lua Callback Execution Error: $err');
         onCallbackError?.call(err);
       },
     );
+
+    // 重定向 Lua print 函数至 context.recordLog 与 logger
+    _ls.pushDartFunction((ls) {
+      final top = ls.getTop();
+      final buf = StringBuffer();
+      for (var i = 1; i <= top; i++) {
+        if (i > 1) buf.write('\t');
+        final type = ls.type(i);
+        if (type == LuaType.luaString || type == LuaType.luaNumber) {
+          buf.write(ls.toStr(i) ?? '');
+        } else if (type == LuaType.luaBoolean) {
+          buf.write(ls.toBoolean(i));
+        } else if (type == LuaType.luaNil) {
+          buf.write('nil');
+        } else {
+          buf.write(ls.typeName(type));
+        }
+      }
+      final msg = buf.toString();
+      context.recordLog(msg);
+      context.logger.i('[Lua print] $msg');
+      return 0;
+    });
+    _ls.setGlobal('print');
+
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);
 

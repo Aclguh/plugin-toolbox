@@ -16,6 +16,8 @@ import 'desktop_simulation_adapter.dart';
 import 'plugin_host_ai_delegate.dart';
 import 'plugin_host_media_delegate.dart';
 import 'plugin_host_system_delegate.dart';
+import 'plugin_permission_prompt.dart';
+import 'plugin_diagnostic_sheet.dart';
 
 /// 动态插件宿主页面容器
 class DynamicPluginHostPage extends ConsumerStatefulWidget {
@@ -324,8 +326,21 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     }
   }
 
+  Future<bool> _ensurePermission(PluginPermission perm) async {
+    final granted = widget.plugin.context?.hasPermission(perm) ?? false;
+    if (granted) return true;
+    if (!mounted) return false;
+    return await PluginPermissionPrompt.requestPermission(
+      context,
+      plugin: widget.plugin,
+      permission: perm,
+      ref: ref,
+    );
+  }
+
   @override
   Future<String?> scanBarcode({String? prompt}) async {
+    if (!await _ensurePermission(PluginPermission.camera)) return null;
     final res = await nativeBridge.scanBarcode(prompt: prompt);
     if (res != null) return res;
     if (!mounted) return null;
@@ -345,6 +360,28 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
   Widget build(BuildContext context) {
     return PluginPageScaffold(
       title: widget.plugin.name,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.bug_report_outlined),
+          tooltip: '运行诊断与控制台',
+          onPressed: () {
+            PluginDiagnosticSheet.show(
+              context,
+              plugin: widget.plugin,
+              runner: _runner,
+              onReload: () {
+                setState(() {
+                  _isLoading = true;
+                  _loadError = null;
+                });
+                _runner?.dispose();
+                _runner = null;
+                _startPlugin();
+              },
+            );
+          },
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null

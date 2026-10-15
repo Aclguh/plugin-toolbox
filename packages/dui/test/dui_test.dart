@@ -64,6 +64,35 @@ void main() {
       state.set('count', 0);
       expect(state.evaluateVisible('!{{state.count}}'), isTrue);
     });
+
+    test(
+        'evaluates composite visible expressions with comparison and logical operators',
+        () {
+      final state = DuiState();
+      state.set('count', 10);
+      state.set('isReady', true);
+      state.set('status', 'active');
+
+      // 逻辑与和大小比较
+      expect(state.evaluateVisible('{{state.count > 0 && state.isReady}}'),
+          isTrue);
+      state.set('isReady', false);
+      expect(state.evaluateVisible('{{state.count > 0 && state.isReady}}'),
+          isFalse);
+
+      // 逻辑或
+      state.set('isVip', true);
+      expect(state.evaluateVisible('{{state.isReady || state.isVip}}'), isTrue);
+
+      // 等值与不等值比较
+      expect(state.evaluateVisible("{{state.status}} == 'active'"), isTrue);
+      expect(state.evaluateVisible("{{state.status}} != 'active'"), isFalse);
+
+      // extractKeys 提取复合表达式中的键
+      final keys = DuiState.extractKeys(
+          'state.count > 0 && state.isReady || {{state.isVip}}');
+      expect(keys, containsAll(['count', 'isReady', 'isVip']));
+    });
   });
 
   group('DuiUtils 颜色解析', () {
@@ -1096,6 +1125,86 @@ void main() {
       // 故障组件局部降级为 DuiErrorPlaceholder
       expect(find.byType(DuiErrorPlaceholder), findsOneWidget);
       expect(find.textContaining('BrokenWidget'), findsOneWidget);
+    });
+
+    testWidgets('DUI 畸形 AST 对抗性模糊测试 (Fuzzing): 异常类型、缺失属性与非法结构均优雅局部降级',
+        (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final eventHandler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: eventHandler);
+
+      final malformedRoot = {
+        'type': 'Column',
+        'children': [
+          // 1. 正常组件
+          {
+            'type': 'Text',
+            'props': {'text': '首部正常文本'},
+          },
+          // 2. 缺失 type 字段
+          <String, dynamic>{},
+          // 3. 非法的 type 类型 (数字)
+          {'type': 99999},
+          // 4. 未知未注册的组件类型
+          {'type': 'NoSuchCustomComponentXYZ'},
+          // 5. props 为非 Map 的非法类型 (字符串)
+          {
+            'type': 'Text',
+            'props': 'invalid_props_string',
+          },
+          // 6. children 为非 List 的非法类型
+          {
+            'type': 'Row',
+            'children': 'invalid_children_string',
+          },
+          // 7. children 列表中掺杂 null 与基础标量
+          {
+            'type': 'Column',
+            'children': [
+              null,
+              123,
+              'garbage_string',
+              {
+                'type': 'Text',
+                'props': {'text': '嵌套正常子项'},
+              },
+            ],
+          },
+          // 8. 属性类型严重错乱 (ProgressBar 要求 double/num，给出错乱对象)
+          {
+            'type': 'ProgressBar',
+            'props': {'value': 'not_a_number'},
+          },
+          // 9. Slider 属性反向 (min > max)
+          {
+            'type': 'Slider',
+            'props': {'value': 50.0, 'min': 100.0, 'max': 0.0},
+          },
+          // 10. 尾部正常组件
+          {
+            'type': 'FilledButton',
+            'props': {'text': '尾部可用按钮'},
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.build(context, malformedRoot),
+            ),
+          ),
+        ),
+      );
+
+      // 绝无未捕获异常抛出导致崩溃
+      expect(tester.takeException(), isNull);
+      // 头部和尾部正常组件均可稳定渲染并可交互
+      expect(find.text('首部正常文本'), findsOneWidget);
+      expect(find.text('尾部可用按钮'), findsOneWidget);
+      expect(find.text('嵌套正常子项'), findsOneWidget);
     });
   });
 }

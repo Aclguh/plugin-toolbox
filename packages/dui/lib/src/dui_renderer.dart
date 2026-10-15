@@ -111,27 +111,35 @@ class DuiRenderer {
 
   /// 将 JSON 节点递归转换为 Flutter Widget
   Widget buildWidget(BuildContext context, Map<String, dynamic> node) {
-    final compiled = _compile(node);
+    try {
+      final compiled = _compile(node);
 
-    // 条件可见性含响应式绑定：仅在本节点边界订阅对应键，
-    // 键变化只触发该节点子树的取舍，不波及兄弟与祖先
-    if (compiled.visibleKeys.isNotEmpty) {
-      return ListenableBuilder(
-        listenable: state.listenableForKeys(compiled.visibleKeys),
-        builder: (ctx, _) {
-          if (!state.evaluateVisible(compiled.visibleExpr)) {
-            return const SizedBox.shrink();
-          }
-          return _buildNodeContent(ctx, compiled);
-        },
+      // 条件可见性含响应式绑定：仅在本节点边界订阅对应键，
+      // 键变化只触发该节点子树的取舍，不波及兄弟与祖先
+      if (compiled.visibleKeys.isNotEmpty) {
+        return ListenableBuilder(
+          listenable: state.listenableForKeys(compiled.visibleKeys),
+          builder: (ctx, _) {
+            if (!state.evaluateVisible(compiled.visibleExpr)) {
+              return const SizedBox.shrink();
+            }
+            return _buildNodeContent(ctx, compiled);
+          },
+        );
+      }
+
+      if (!state.evaluateVisible(compiled.visibleExpr)) {
+        return const SizedBox.shrink();
+      }
+
+      return _buildNodeContent(context, compiled);
+    } catch (e, st) {
+      return DuiErrorPlaceholder(
+        type: node['type']?.toString() ?? 'Unknown',
+        error: e,
+        stackTrace: st,
       );
     }
-
-    if (!state.evaluateVisible(compiled.visibleExpr)) {
-      return const SizedBox.shrink();
-    }
-
-    return _buildNodeContent(context, compiled);
   }
 
   /// 装载期预编译：同一节点实例只提取一次 type 与绑定键
@@ -140,6 +148,7 @@ class DuiRenderer {
     if (cached != null) return cached;
 
     final visibleExpr = node['visible'];
+    final rawChildren = node['children'];
     final compiled = _CompiledNode(
       type: node['type']?.toString() ?? 'Container',
       visibleExpr: visibleExpr,
@@ -148,8 +157,9 @@ class DuiRenderer {
           : const <String>{},
       props: _asMap(node['props']),
       children: [
-        for (final c in node['children'] as List<dynamic>? ?? const [])
-          if (c is Map) _asMap(c),
+        if (rawChildren is List)
+          for (final c in rawChildren)
+            if (c is Map) _asMap(c),
       ],
       events: _asMap(node['events']),
       ref: node['ref']?.toString(),
