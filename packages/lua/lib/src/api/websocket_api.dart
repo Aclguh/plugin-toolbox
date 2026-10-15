@@ -5,6 +5,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
+import 'network_api.dart';
 
 /// `websocket` — 原生 WebSocket 双向全双工网络连接 API。
 ///
@@ -102,17 +103,35 @@ class WebSocketApi {
         return 1;
       }
 
+      if (!NetworkApi.isHostAllowedWithSsrfCheck(context, uri.host)) {
+        if (onErrorRef != null) {
+          callbacks.invoke(
+              onErrorRef, ['', '禁止访问局域网或私有本地地址 (SSRF 防护): ${uri.host}']);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
       final wsId = 'ws_${_nextId++}';
       _pendingWs.add(wsId);
 
-      unawaited(
-        // 握手必须设超时：目标主机黑洞（收包不回）时 Future 永不完成，
-        // 回调句柄与 pending 状态会永久悬挂泄漏
-        WebSocket.connect(url, headers: customHeaders)
-            .timeout(const Duration(seconds: 15))
-            .then((ws) {
+      unawaited(() async {
+        final isDnsSafe =
+            await NetworkApi.checkDnsResolutionSafety(context, uri.host);
+        if (!isDnsSafe) {
+          _pendingWs.remove(wsId);
+          if (onErrorRef != null) {
+            callbacks.invoke(onErrorRef,
+                ['', '目标地址解析至私有网段被拦截 (DNS Rebinding 防护): ${uri.host}']);
+          }
+          return;
+        }
+
+        try {
+          final ws = await WebSocket.connect(url, headers: customHeaders)
+              .timeout(const Duration(seconds: 15));
           if (!_pendingWs.remove(wsId)) {
-            ws.close();
+            unawaited(ws.close());
             return;
           }
           _sockets[wsId] = ws;
@@ -135,7 +154,7 @@ class WebSocketApi {
             onDone: () {
               final code = ws.closeCode ?? 1000;
               final reason = ws.closeReason ?? '';
-              _closeWs(wsId);
+              _closeWs(wsId, code, reason);
               if (onCloseRef != null) {
                 callbacks.invoke(onCloseRef, [wsId, code, reason]);
               }
@@ -143,13 +162,13 @@ class WebSocketApi {
             cancelOnError: false,
           );
           _subscriptions[wsId] = sub;
-        }).catchError((Object error) {
+        } catch (error) {
           _pendingWs.remove(wsId);
           if (onErrorRef != null) {
             callbacks.invoke(onErrorRef, [wsId, error.toString()]);
           }
-        }),
-      );
+        }
+      }());
 
       ls.pushString(wsId);
       return 1;

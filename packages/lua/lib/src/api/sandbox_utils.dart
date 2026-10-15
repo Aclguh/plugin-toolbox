@@ -77,9 +77,19 @@ bool isProtectedSandboxFile(PluginContext context, String relPath) {
   if (rootDir == null) return false;
   final rootPath =
       rootDir.path.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '');
-  final normalizedRel = normalizeSandboxRelPath(relPath);
+  final normalizedRel = normalizeSandboxRelPath(relPath).toLowerCase();
   if (normalizedRel.isEmpty) return false;
   final absPath = '$rootPath/$normalizedRel';
-  return absPath == '$rootPath/plugin.json' ||
-      absPath == '$rootPath/manifest.json';
+  if (absPath == '$rootPath/plugin.json' ||
+      absPath == '$rootPath/manifest.json') {
+    return true;
+  }
+  // 保护所有 Lua 脚本与 UI 描述文件，防止被覆写或删除导致代码注入与界面篡改
+  if (normalizedRel == 'main.lua' ||
+      normalizedRel == 'ui/main.ui.json' ||
+      normalizedRel.endsWith('.lua') ||
+      normalizedRel.endsWith('.ui.json')) {
+    return true;
+  }
+  return false;
 }

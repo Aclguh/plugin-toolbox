@@ -231,8 +231,8 @@ dart analyze
 # 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，141 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 389 用例）
-#    packages/core 101 / packages/lua 129 / packages/dui 70 / packages/ui 13 / app 76
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 393 用例）
+#    packages/core 101 / packages/lua 131 / packages/dui 70 / packages/ui 13 / app 78
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test

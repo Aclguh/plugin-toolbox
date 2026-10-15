@@ -142,6 +142,21 @@ void main() {
           'ORIGINAL_MANIFEST');
     });
 
+    test('入口脚本与 UI 结构定义被严格保护禁止覆写', () {
+      final engine = buildFsEngine();
+      addTearDown(engine.close);
+
+      expect(
+        () => engine.loadAndExecute('fs.writeFile("main.lua", "evil code")'),
+        throwsException,
+      );
+      expect(
+        () =>
+            engine.loadAndExecute('fs.writeFile("ui/main.ui.json", "evil ui")'),
+        throwsException,
+      );
+    });
+
     test('沙箱内符号链接指向外部目标时被拦截拒绝', () {
       final engine = buildFsEngine();
       addTearDown(engine.close);
@@ -759,6 +774,38 @@ void main() {
       expect(delegate.getState('rebind_ok'), isFalse);
       expect(delegate.getState('rebind_err').toString(),
           contains('DNS Rebinding 防护'));
+    });
+
+    test('socket 与 websocket 向未放行的私有 IP 发起连接被安全拦截', () async {
+      final delegate = MockLuaHostDelegate();
+      final engine = LuaEngine(
+        context: PluginContext(
+          pluginId: 'ssrf_socket_test',
+          storage: InMemoryPluginStorage(),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {PluginPermission.network},
+        ),
+        delegate: delegate,
+      );
+      addTearDown(engine.close);
+
+      engine.loadAndExecute('''
+        local tcpId = socket.tcpConnect("127.0.0.1", 8080, {
+          onError = function(id, err) state.set("tcp_ssrf_err", err) end
+        })
+        state.set("tcp_id", tcpId)
+
+        local wsId = websocket.connect("ws://192.168.1.1:8080", {
+          onError = function(id, err) state.set("ws_ssrf_err", err) end
+        })
+        state.set("ws_id", wsId)
+      ''');
+
+      expect(delegate.getState('tcp_id'), '');
+      expect(delegate.getState('ws_id'), '');
+      expect(delegate.getState('tcp_ssrf_err').toString(), contains('SSRF 防护'));
+      expect(delegate.getState('ws_ssrf_err').toString(), contains('SSRF 防护'));
     });
   });
 

@@ -2508,13 +2508,14 @@ void main() {
         throwsException,
       );
 
-      // 2. 有 network 权限时正常调用
+      // 2. 有 network 权限且白名单放行测试主机时正常调用
       final netCtx = PluginContext(
         pluginId: 'net_test',
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
         grantedPermissions: {PluginPermission.network},
+        allowedDomains: ['127.0.0.1'],
       );
       final netEngine = LuaEngine(context: netCtx, delegate: delegate);
 
@@ -2565,13 +2566,14 @@ void main() {
         throwsException,
       );
 
-      // 2. 有 network 权限
+      // 2. 有 network 权限且白名单放行测试主机
       final netCtx = PluginContext(
         pluginId: 'net_test',
         storage: InMemoryPluginStorage(),
         eventBus: EventBusImpl(),
         logger: Logger(),
         grantedPermissions: {PluginPermission.network},
+        allowedDomains: ['127.0.0.1'],
       );
       final netEngine = LuaEngine(context: netCtx, delegate: delegate);
 

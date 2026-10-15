@@ -6,6 +6,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
+import 'network_api.dart';
 
 /// `socket` — TCP 与 UDP 原生网络套接字 API。
 ///
@@ -90,12 +91,32 @@ class SocketApi {
         return 1;
       }
 
+      if (!NetworkApi.isHostAllowedWithSsrfCheck(context, host)) {
+        if (onErrorRef != null) {
+          callbacks.invoke(onErrorRef, ['', '禁止访问局域网或私有本地地址 (SSRF 防护): $host']);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
       final socketId = 'tcp_${_nextId++}';
       _pendingTcp.add(socketId);
 
-      unawaited(
-        Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
-            .then((socket) {
+      unawaited(() async {
+        final isDnsSafe =
+            await NetworkApi.checkDnsResolutionSafety(context, host);
+        if (!isDnsSafe) {
+          _pendingTcp.remove(socketId);
+          if (onErrorRef != null) {
+            callbacks.invoke(onErrorRef,
+                [socketId, '目标地址解析至私有网段被拦截 (DNS Rebinding 防护): $host']);
+          }
+          return;
+        }
+
+        try {
+          final socket = await Socket.connect(host, port,
+              timeout: Duration(milliseconds: timeoutMs));
           if (!_pendingTcp.remove(socketId)) {
             socket.destroy();
             return;
@@ -127,13 +148,13 @@ class SocketApi {
             cancelOnError: false,
           );
           _tcpSubscriptions[socketId] = sub;
-        }).catchError((Object error) {
+        } catch (error) {
           _pendingTcp.remove(socketId);
           if (onErrorRef != null) {
             callbacks.invoke(onErrorRef, [socketId, error.toString()]);
           }
-        }),
-      );
+        }
+      }());
 
       ls.pushString(socketId);
       return 1;
@@ -290,7 +311,8 @@ class SocketApi {
         return 1;
       }
 
-      if (!context.isHostAllowed(host)) {
+      if (!context.isHostAllowed(host) ||
+          !NetworkApi.isHostAllowedWithSsrfCheck(context, host)) {
         ls.pushBoolean(false);
         return 1;
       }
@@ -301,14 +323,18 @@ class SocketApi {
         ls.pushBoolean(sent > 0);
         return 1;
       } else {
-        // 域名解析后发送
-        unawaited(
-          InternetAddress.lookup(host).then((addresses) {
+        // 域名安全解析后发送
+        unawaited(() async {
+          final isDnsSafe =
+              await NetworkApi.checkDnsResolutionSafety(context, host);
+          if (!isDnsSafe) return;
+          try {
+            final addresses = await NetworkApi.dnsLookup(host);
             if (addresses.isNotEmpty) {
               socket.send(bytes, addresses.first, port);
             }
-          }),
-        );
+          } catch (_) {}
+        }());
         ls.pushBoolean(true);
         return 1;
       }

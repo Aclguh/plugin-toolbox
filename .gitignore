@@ -56,4 +56,7 @@ PTX-plugins/
 
 # Archify 生成的图表产物
 .archify/
+
+# 临时架构与质量改进建议文档
+IMPROVEMENTS.md
 

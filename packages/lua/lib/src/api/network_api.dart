@@ -614,10 +614,42 @@ class NetworkApi {
         return 0;
       }
 
-      final stopwatch = Stopwatch()..start();
-      unawaited(
-        Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
-            .then((socket) {
+      if (!isHostAllowedWithSsrfCheck(context, host)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {
+              'ok': false,
+              'host': host,
+              'port': port,
+              'reachable': false,
+              'error': '禁止访问局域网或私有本地地址 (SSRF 防护): $host',
+            }
+          ]);
+        }
+        return 0;
+      }
+
+      unawaited(() async {
+        final isDnsSafe = await checkDnsResolutionSafety(context, host);
+        if (!isDnsSafe) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'ok': false,
+                'host': host,
+                'port': port,
+                'reachable': false,
+                'error': '目标地址解析至私有网段被拦截 (DNS Rebinding 防护): $host',
+              }
+            ]);
+          }
+          return;
+        }
+
+        final stopwatch = Stopwatch()..start();
+        try {
+          final socket = await Socket.connect(host, port,
+              timeout: Duration(milliseconds: timeoutMs));
           stopwatch.stop();
           final ip = socket.remoteAddress.address;
           socket.destroy();
@@ -633,7 +665,7 @@ class NetworkApi {
               }
             ]);
           }
-        }).catchError((Object error) {
+        } catch (error) {
           stopwatch.stop();
           if (cbRef != null) {
             callbacks.invokeAndRelease(cbRef, [
@@ -646,8 +678,8 @@ class NetworkApi {
               }
             ]);
           }
-        }),
-      );
+        }
+      }());
       return 0;
     });
     ls.setField(-2, 'ping');
@@ -684,10 +716,42 @@ class NetworkApi {
         return 0;
       }
 
-      final stopwatch = Stopwatch()..start();
-      unawaited(
-        Socket.connect(host, port, timeout: Duration(milliseconds: timeoutMs))
-            .then((socket) {
+      if (!isHostAllowedWithSsrfCheck(context, host)) {
+        if (cbRef != null) {
+          callbacks.invokeAndRelease(cbRef, [
+            {
+              'host': host,
+              'port': port,
+              'open': false,
+              'latencyMs': 0,
+              'error': '禁止访问局域网或私有本地地址 (SSRF 防护): $host',
+            }
+          ]);
+        }
+        return 0;
+      }
+
+      unawaited(() async {
+        final isDnsSafe = await checkDnsResolutionSafety(context, host);
+        if (!isDnsSafe) {
+          if (cbRef != null) {
+            callbacks.invokeAndRelease(cbRef, [
+              {
+                'host': host,
+                'port': port,
+                'open': false,
+                'latencyMs': 0,
+                'error': '目标地址解析至私有网段被拦截 (DNS Rebinding 防护): $host',
+              }
+            ]);
+          }
+          return;
+        }
+
+        final stopwatch = Stopwatch()..start();
+        try {
+          final socket = await Socket.connect(host, port,
+              timeout: Duration(milliseconds: timeoutMs));
           stopwatch.stop();
           socket.destroy();
           if (cbRef != null) {
@@ -700,7 +764,7 @@ class NetworkApi {
               }
             ]);
           }
-        }).catchError((_) {
+        } catch (_) {
           stopwatch.stop();
           if (cbRef != null) {
             callbacks.invokeAndRelease(cbRef, [
@@ -712,8 +776,8 @@ class NetworkApi {
               }
             ]);
           }
-        }),
-      );
+        }
+      }());
       return 0;
     });
     ls.setField(-2, 'scanPort');

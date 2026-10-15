@@ -557,5 +557,40 @@ void main() {
       expect(caps['haptic'], isTrue);
       expect(caps['filePicker'], isTrue);
     });
+
+    test('PluginNativeBridge 支持规范沙箱绝对路径放行与越界拦截', () async {
+      final bridge = PluginNativeBridge(
+        pluginRootDir: tempDir,
+        nativeChannel: customChannel,
+      );
+
+      final safeFile = File('${tempDir.path}/safe.png')
+        ..writeAsStringSync('img');
+      // 传入绝对路径
+      final res = await bridge.decodeBarcodeFromImage(safeFile.path);
+      expect(res, 'mock_decoded_qrcode');
+
+      // 越界绝对路径被拦截
+      final outsideFile = File('${tempDir.parent.path}/evil.png');
+      final evilRes = await bridge.decodeBarcodeFromImage(outsideFile.path);
+      expect(evilRes, isNull);
+    });
+
+    test('PluginNativeBridge takePhoto 与 captureScreen 配额超限拦截', () async {
+      // 设置存储配额仅 1MB，塞入 1.5MB 填满配额
+      final bridge = PluginNativeBridge(
+        pluginRootDir: tempDir,
+        storageQuotaMb: 1,
+        nativeChannel: customChannel,
+      );
+      File('${tempDir.path}/big.bin')
+          .writeAsBytesSync(List.filled(1500 * 1024, 0));
+
+      final photo = await bridge.takePhoto();
+      expect(photo, isNull);
+
+      final capOk = await bridge.captureScreen(destPath: 'captures/s.png');
+      expect(capOk, isFalse);
+    });
   });
 }

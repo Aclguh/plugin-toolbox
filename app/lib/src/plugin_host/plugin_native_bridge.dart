@@ -69,17 +69,26 @@ class PluginNativeBridge {
     }
   }
 
-  /// 将插件侧传入的相对路径解析为沙箱内绝对路径。
+  /// 将插件侧传入的相对或绝对路径解析为沙箱内合法的规范绝对路径。
   ///
-  /// Lua 脚本可传任意字符串（如 `../../etc/passwd` 或绝对路径），
-  /// 不经白名单校验直接下发原生即等于开放全设备文件面；
+  /// 若传入绝对路径（部分 Lua 绑定在 delegate 前已做 resolveSandboxPath），
+  /// 校验其规范路径是否严格落在插件沙箱内部；
+  /// 若传入相对路径，校验防穿越并拼接为完整沙箱路径。
   /// 越界时返回 null 并记录告警，调用方必须拒绝执行。
-  String? _resolveSandboxPath(String relativePath, String op) {
-    if (!SandboxPath.isSafeSubpath(pluginRootDir.path, relativePath)) {
-      _logger?.w('PluginNativeBridge: $op 拒绝越界路径: $relativePath');
+  String? _resolveSandboxPath(String path, String op) {
+    if (path.isEmpty) return null;
+    if (SandboxPath.isAbsolutePath(path)) {
+      if (SandboxPath.isSafeResolvedPath(pluginRootDir.path, path)) {
+        return path;
+      }
+      _logger?.w('PluginNativeBridge: $op 拒绝越界绝对路径: $path');
       return null;
     }
-    return '${pluginRootDir.path}/$relativePath';
+    if (!SandboxPath.isSafeSubpath(pluginRootDir.path, path)) {
+      _logger?.w('PluginNativeBridge: $op 拒绝越界路径: $path');
+      return null;
+    }
+    return '${pluginRootDir.path}/$path';
   }
 
   // --- 选取文件入沙箱的清洗工具 ---
@@ -644,14 +653,23 @@ class PluginNativeBridge {
     int quality = 90,
     String lensDirection = 'back',
   }) async {
-    final targetPath = destPath ??
-        '${pluginRootDir.path}/camera/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final targetFile = File(targetPath);
+    final effectivePath =
+        destPath ?? 'camera/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final resolved = _resolveSandboxPath(effectivePath, 'takePhoto');
+    if (resolved == null) return null;
+
+    // 预检拍照配额 (预估单张 5MB)
+    if (!hasQuotaFor(5 * 1024 * 1024)) {
+      _logger?.w('PluginNativeBridge: takePhoto 超出沙箱存储配额');
+      return null;
+    }
+
+    final targetFile = File(resolved);
     if (!targetFile.parent.existsSync()) {
       targetFile.parent.createSync(recursive: true);
     }
     return _invoke<String?>('takePhoto', null, {
-      'destPath': targetPath,
+      'destPath': resolved,
       'quality': quality,
       'lensDirection': lensDirection,
     });
@@ -661,12 +679,21 @@ class PluginNativeBridge {
     required String destPath,
     String? targetRef,
   }) async {
-    final targetFile = File(destPath);
+    final resolved = _resolveSandboxPath(destPath, 'captureScreen');
+    if (resolved == null) return false;
+
+    // 预检截屏配额 (预估单张 3MB)
+    if (!hasQuotaFor(3 * 1024 * 1024)) {
+      _logger?.w('PluginNativeBridge: captureScreen 超出沙箱存储配额');
+      return false;
+    }
+
+    final targetFile = File(resolved);
     if (!targetFile.parent.existsSync()) {
       targetFile.parent.createSync(recursive: true);
     }
     return _invoke<bool>('captureScreen', false, {
-      'destPath': destPath,
+      'destPath': resolved,
       'targetRef': targetRef,
     });
   }
