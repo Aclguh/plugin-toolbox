@@ -166,7 +166,8 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   Future<Map<String, dynamic>?> getWifiInfo() async => mockWifiInfo;
 
   @override
-  Future<Map<String, dynamic>> pingHost(String host, {int timeoutMs = 3000}) async =>
+  Future<Map<String, dynamic>> pingHost(String host,
+          {int timeoutMs = 3000}) async =>
       {'ok': true, 'host': host, 'reachable': true, 'latencyMs': 12};
   final Map<String, Map<String, dynamic>> mockSensors = {
     'accelerometer': {'x': 1.0, 'y': 2.0, 'z': 9.8},
@@ -776,12 +777,17 @@ void main() {
 
       expect(delegate.getState('hex'), '48656c6c6f');
       expect(delegate.getState('hex_text'), 'Hello');
-      expect((delegate.getState('dump') as String).contains('48 65 6c 6c 6f'), isTrue);
+      expect((delegate.getState('dump') as String).contains('48 65 6c 6c 6f'),
+          isTrue);
       expect(delegate.getState('jwt_sub'), '1234567890');
       expect(delegate.getState('jwt_name'), 'Alice');
       expect(delegate.getState('jwt_alg'), 'HS256');
-      expect((delegate.getState('encoded_html') as String).contains('&lt;script&gt;'), isTrue);
-      expect(delegate.getState('decoded_html'), "<script>alert('Hello & welcome!');</script>");
+      expect(
+          (delegate.getState('encoded_html') as String)
+              .contains('&lt;script&gt;'),
+          isTrue);
+      expect(delegate.getState('decoded_html'),
+          "<script>alert('Hello & welcome!');</script>");
       expect(delegate.getState('puny_domain'), 'xn--0zwm56d.com');
       expect(delegate.getState('restored_domain'), '测试.com');
     });
@@ -1638,7 +1644,8 @@ void main() {
       expect(delegate.getState('cbc_dec'), 'Hello PluginToolbox 2026!');
       expect(delegate.getState('ecb_dec'), 'Hello PluginToolbox 2026!');
       // SM3("abc") 标准测试向量: 66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0
-      expect(delegate.getState('sm3_val'), '66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0');
+      expect(delegate.getState('sm3_val'),
+          '66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0');
       expect((delegate.getState('pbkdf2_val') as String).length, 64);
       expect((delegate.getState('rand_val') as String).length, 32);
     });
@@ -1941,7 +1948,8 @@ void main() {
       expect(delegate.getState('y_name'), 'PluginToolbox');
       expect(delegate.getState('y_ver'), 2);
       expect(delegate.getState('y_tag1'), 'utility');
-      expect((delegate.getState('re_yaml') as String), contains('name: PluginToolbox'));
+      expect((delegate.getState('re_yaml') as String),
+          contains('name: PluginToolbox'));
 
       expect(delegate.getState('x_tag'), 'plugin');
       expect(delegate.getState('x_id'), 'tool_1');
@@ -1949,15 +1957,20 @@ void main() {
       expect(delegate.getState('x_c1_tag'), 'title');
       expect(delegate.getState('x_c1_text'), 'Tool Title');
       expect((delegate.getState('re_xml') as String), contains('id="tool_1"'));
-      expect((delegate.getState('re_xml') as String), contains('version="1.0"'));
-      expect((delegate.getState('re_xml') as String), contains('<title>Tool Title</title>'));
+      expect(
+          (delegate.getState('re_xml') as String), contains('version="1.0"'));
+      expect((delegate.getState('re_xml') as String),
+          contains('<title>Tool Title</title>'));
     });
 
     test('I18nApi: 语言查询、动态切换、沙箱字典加载与插值回退', () {
       final tempDir = Directory.systemTemp.createTempSync('i18n_test_');
-      final localesDir = Directory('${tempDir.path}/locales')..createSync(recursive: true);
-      File('${localesDir.path}/zh.json').writeAsStringSync('{"welcome": "你好，{{name}}！", "app_title": "工具箱"}');
-      File('${localesDir.path}/en.json').writeAsStringSync('{"welcome": "Hello, {{name}}!", "app_title": "Toolbox"}');
+      final localesDir = Directory('${tempDir.path}/locales')
+        ..createSync(recursive: true);
+      File('${localesDir.path}/zh.json')
+          .writeAsStringSync('{"welcome": "你好，{{name}}！", "app_title": "工具箱"}');
+      File('${localesDir.path}/en.json').writeAsStringSync(
+          '{"welcome": "Hello, {{name}}!", "app_title": "Toolbox"}');
 
       final i18nCtx = PluginContext(
         pluginId: 'i18n_test',

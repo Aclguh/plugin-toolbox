@@ -131,10 +131,10 @@ class CameraApi {
       unawaited(
         delegate
             .takePhoto(
-              destPath: fullPath,
-              quality: quality,
-              lensDirection: lensDirection,
-            )
+          destPath: fullPath,
+          quality: quality,
+          lensDirection: lensDirection,
+        )
             .then((savedFullPath) {
           final res = savedFullPath != null ? effectiveRel : null;
           if (cbRef != null) {

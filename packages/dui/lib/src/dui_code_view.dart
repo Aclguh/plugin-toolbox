@@ -36,17 +36,14 @@ class DuiCodeView extends StatelessWidget {
         ? const Color(0xFF141926) // 工具箱深色内衬底色
         : const Color(0xFFF2F4F8);
 
-    final baseTextColor = isDark
-        ? const Color(0xFFE2E8F0)
-        : const Color(0xFF1E293B);
+    final baseTextColor =
+        isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B);
 
-    final lineNumberColor = isDark
-        ? const Color(0xFF64748B)
-        : const Color(0xFF94A3B8);
+    final lineNumberColor =
+        isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
 
-    final borderColor = isDark
-        ? const Color(0xFF2D3748)
-        : const Color(0xFFE2E8F0);
+    final borderColor =
+        isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
 
     final lines = text.split('\n');
     final totalLines = lines.length;
@@ -67,7 +64,8 @@ class DuiCodeView extends StatelessWidget {
         lineSpans.add(TextSpan(text: '$padded\n'));
       }
 
-      final highlightedSpans = _highlightCode(text, language, monoStyle, isDark);
+      final highlightedSpans =
+          _highlightCode(text, language, monoStyle, isDark);
 
       final codeWidget = SelectableText.rich(
         TextSpan(style: monoStyle, children: highlightedSpans),
@@ -86,7 +84,10 @@ class DuiCodeView extends StatelessWidget {
               ),
             ),
             child: Text(
-              [for (var i = 1; i <= totalLines; i++) i.toString().padLeft(maxLineNumberDigits)].join('\n'),
+              [
+                for (var i = 1; i <= totalLines; i++)
+                  i.toString().padLeft(maxLineNumberDigits)
+              ].join('\n'),
               textAlign: TextAlign.right,
               style: monoStyle.copyWith(
                 color: lineNumberColor,
@@ -111,7 +112,8 @@ class DuiCodeView extends StatelessWidget {
         child: rowContent,
       );
     } else {
-      final highlightedSpans = _highlightCode(text, language, monoStyle, isDark);
+      final highlightedSpans =
+          _highlightCode(text, language, monoStyle, isDark);
       final codeWidget = SelectableText.rich(
         TextSpan(style: monoStyle, children: highlightedSpans),
       );
@@ -187,23 +189,35 @@ class DuiCodeView extends StatelessWidget {
     }
 
     // 配色定义
-    final keywordColor = isDark ? const Color(0xFFC792EA) : const Color(0xFF7C3AED); // 紫色
-    final stringColor = isDark ? const Color(0xFFC3E88D) : const Color(0xFF16A34A); // 绿色
-    final numberColor = isDark ? const Color(0xFFF78C6C) : const Color(0xFFEA580C); // 橙色
-    final commentColor = isDark ? const Color(0xFF6B7280) : const Color(0xFF94A3B8); // 灰色斜体
-    final boolColor = isDark ? const Color(0xFFFF5370) : const Color(0xFFDC2626); // 红色
-    final tagOrKeyColor = isDark ? const Color(0xFF82AAFF) : const Color(0xFF2563EB); // 蓝色
+    final keywordColor =
+        isDark ? const Color(0xFFC792EA) : const Color(0xFF7C3AED); // 紫色
+    final stringColor =
+        isDark ? const Color(0xFFC3E88D) : const Color(0xFF16A34A); // 绿色
+    final numberColor =
+        isDark ? const Color(0xFFF78C6C) : const Color(0xFFEA580C); // 橙色
+    final commentColor =
+        isDark ? const Color(0xFF6B7280) : const Color(0xFF94A3B8); // 灰色斜体
+    final boolColor =
+        isDark ? const Color(0xFFFF5370) : const Color(0xFFDC2626); // 红色
+    final tagOrKeyColor =
+        isDark ? const Color(0xFF82AAFF) : const Color(0xFF2563EB); // 蓝色
 
     // 正则规则组装
     String? pattern;
     if (normalizedLang == 'json') {
-      pattern = r'(?<string>"(?:\\.|[^"\\])*")|(?<number>\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(?<bool>\b(?:true|false|null)\b)|(?<punct>[{}[\],:])';
+      pattern =
+          r'(?<string>"(?:\\.|[^"\\])*")|(?<number>\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(?<bool>\b(?:true|false|null)\b)|(?<punct>[{}[\],:])';
     } else if (normalizedLang == 'lua') {
-      pattern = r'(?<comment>--[^\n]*)|(?<string>"(?:\\.|[^"\\])*"|' r"'(?:\\.|[^'\\])*')"
+      pattern = r'(?<comment>--[^\n]*)|(?<string>"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')"
           r'|(?<keyword>\b(?:and|break|do|else|elseif|end|false|for|function|if|in|local|nil|not|or|repeat|return|then|true|until|while)\b)'
           r'|(?<number>\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?\b)';
-    } else if (normalizedLang == 'dart' || normalizedLang == 'javascript' || normalizedLang == 'js') {
-      pattern = r'(?<comment>//[^\n]*|/\*[\s\S]*?\*/)|(?<string>"(?:\\.|[^"\\])*"|' r"'(?:\\.|[^'\\])*')"
+    } else if (normalizedLang == 'dart' ||
+        normalizedLang == 'javascript' ||
+        normalizedLang == 'js') {
+      pattern =
+          r'(?<comment>//[^\n]*|/\*[\s\S]*?\*/)|(?<string>"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')"
           r'|(?<keyword>\b(?:abstract|as|assert|async|await|break|case|catch|class|const|continue|default|deferred|do|dynamic|else|enum|export|extends|extension|external|factory|false|final|finally|for|get|if|implements|import|in|interface|is|late|library|mixin|new|null|operator|part|rethrow|return|set|static|super|switch|sync|this|throw|true|try|typedef|var|void|while|with|yield)\b)'
           r'|(?<number>\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?\b)';
     } else if (normalizedLang == 'sql') {
@@ -211,10 +225,14 @@ class DuiCodeView extends StatelessWidget {
           r'|(?<keyword>\b(?:SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|DROP|ALTER|ADD|INDEX|JOIN|INNER|LEFT|RIGHT|FULL|ON|GROUP|BY|ORDER|ASC|DESC|LIMIT|OFFSET|HAVING|UNION|ALL|DISTINCT|AS|AND|OR|NOT|IN|BETWEEN|LIKE|IS|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|DEFAULT)\b)'
           r'|(?<number>\b\d+(?:\.\d+)?\b)';
     } else if (normalizedLang == 'yaml' || normalizedLang == 'yml') {
-      pattern = r'(?<comment>#[^\n]*)|(?<key>^[ \t]*[a-zA-Z0-9_\-\.]+(?=:))|(?<string>"(?:\\.|[^"\\])*"|' r"'(?:\\.|[^'\\])*')"
+      pattern =
+          r'(?<comment>#[^\n]*)|(?<key>^[ \t]*[a-zA-Z0-9_\-\.]+(?=:))|(?<string>"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')"
           r'|(?<number>\b\d+(?:\.\d+)?\b)|(?<bool>\b(?:true|false|null|yes|no)\b)';
     } else if (normalizedLang == 'xml' || normalizedLang == 'html') {
-      pattern = r'(?<comment><!--[\s\S]*?-->)|(?<tag></?[a-zA-Z0-9_\-\:]+)|(?<string>"(?:\\.|[^"\\])*"|' r"'(?:\\.|[^'\\])*')"
+      pattern =
+          r'(?<comment><!--[\s\S]*?-->)|(?<tag></?[a-zA-Z0-9_\-\:]+)|(?<string>"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')"
           r'|(?<bool>\b(?:true|false)\b)';
     }
 
@@ -222,7 +240,8 @@ class DuiCodeView extends StatelessWidget {
       return [TextSpan(text: code, style: baseStyle)];
     }
 
-    final regExp = RegExp(pattern, multiLine: true, caseSensitive: normalizedLang != 'sql');
+    final regExp = RegExp(pattern,
+        multiLine: true, caseSensitive: normalizedLang != 'sql');
     final matches = regExp.allMatches(code);
     final spans = <TextSpan>[];
     var lastIndex = 0;
@@ -242,22 +261,28 @@ class DuiCodeView extends StatelessWidget {
           m.groupNames.contains(name) && m.namedGroup(name) != null;
 
       if (hasGroup('comment')) {
-        spanStyle = baseStyle.copyWith(color: commentColor, fontStyle: FontStyle.italic);
+        spanStyle = baseStyle.copyWith(
+            color: commentColor, fontStyle: FontStyle.italic);
       } else if (hasGroup('keyword')) {
-        spanStyle = baseStyle.copyWith(color: keywordColor, fontWeight: FontWeight.w600);
+        spanStyle = baseStyle.copyWith(
+            color: keywordColor, fontWeight: FontWeight.w600);
       } else if (hasGroup('string')) {
         // 在 JSON 中，如果是 key 则使用 keyColor
-        if (normalizedLang == 'json' && code.substring(m.end).trimLeft().startsWith(':')) {
-          spanStyle = baseStyle.copyWith(color: tagOrKeyColor, fontWeight: FontWeight.w500);
+        if (normalizedLang == 'json' &&
+            code.substring(m.end).trimLeft().startsWith(':')) {
+          spanStyle = baseStyle.copyWith(
+              color: tagOrKeyColor, fontWeight: FontWeight.w500);
         } else {
           spanStyle = baseStyle.copyWith(color: stringColor);
         }
       } else if (hasGroup('key') || hasGroup('tag')) {
-        spanStyle = baseStyle.copyWith(color: tagOrKeyColor, fontWeight: FontWeight.w500);
+        spanStyle = baseStyle.copyWith(
+            color: tagOrKeyColor, fontWeight: FontWeight.w500);
       } else if (hasGroup('number')) {
         spanStyle = baseStyle.copyWith(color: numberColor);
       } else if (hasGroup('bool')) {
-        spanStyle = baseStyle.copyWith(color: boolColor, fontWeight: FontWeight.bold);
+        spanStyle =
+            baseStyle.copyWith(color: boolColor, fontWeight: FontWeight.bold);
       }
 
       spans.add(TextSpan(text: matchedText, style: spanStyle));

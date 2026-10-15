@@ -196,7 +196,8 @@ class CodecApi {
           .replaceAll('&nbsp;', ' ');
 
       // 正则匹配 &#123; 或 &#x1a;
-      decoded = decoded.replaceAllMapped(RegExp(r'&#(x[0-9a-fA-F]+|[0-9]+);'), (m) {
+      decoded =
+          decoded.replaceAllMapped(RegExp(r'&#(x[0-9a-fA-F]+|[0-9]+);'), (m) {
         final codeStr = m.group(1)!;
         int? code;
         if (codeStr.startsWith('x') || codeStr.startsWith('X')) {

@@ -97,7 +97,9 @@ class I18nApi {
       }
 
       // 3. 仍未命中，尝试在 "en" 字典中查询
-      if (val == null && currentLocale != 'en' && defaultFallbackLocale != 'en') {
+      if (val == null &&
+          currentLocale != 'en' &&
+          defaultFallbackLocale != 'en') {
         final enDict = loadLocaleDict('en');
         val = enDict?[key];
       }
@@ -123,8 +125,7 @@ class I18nApi {
     ls.pushDartFunction((ls) {
       final locales = <String>[];
       try {
-        final localesDirFull =
-            resolveSandboxPath(ls, context, 'locales');
+        final localesDirFull = resolveSandboxPath(ls, context, 'locales');
         final dir = Directory(localesDirFull);
         if (dir.existsSync()) {
           for (final entity in dir.listSync()) {

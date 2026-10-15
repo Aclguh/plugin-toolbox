@@ -14,7 +14,8 @@ class XmlParser {
     clean = clean.replaceAll(RegExp(r'<\?xml[\s\S]*?\?>'), '');
     clean = clean.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
     // 彻底忽略 DOCTYPE 实体声明 (防御 XXE)
-    clean = clean.replaceAll(RegExp(r'<!DOCTYPE[\s\S]*?>', caseSensitive: false), '');
+    clean = clean.replaceAll(
+        RegExp(r'<!DOCTYPE[\s\S]*?>', caseSensitive: false), '');
     clean = clean.trim();
     if (clean.isEmpty) return null;
 
@@ -104,7 +105,8 @@ class XmlParser {
         }
       } else {
         final nextOpen = s.indexOf('<', i);
-        final textPart = nextOpen == -1 ? s.substring(i) : s.substring(i, nextOpen);
+        final textPart =
+            nextOpen == -1 ? s.substring(i) : s.substring(i, nextOpen);
         if (textPart.trim().isNotEmpty) {
           tokens.add(_XmlToken.text(textPart));
         }

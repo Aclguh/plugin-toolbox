@@ -60,7 +60,8 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
   void initState() {
     super.initState();
     _currentColor = _parseColor(widget.value);
-    _hexController = TextEditingController(text: _toHex(_currentColor, widget.showAlpha));
+    _hexController =
+        TextEditingController(text: _toHex(_currentColor, widget.showAlpha));
   }
 
   @override
@@ -118,8 +119,10 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = isDark ? const Color(0xFF141926) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
+    final backgroundColor =
+        isDark ? const Color(0xFF141926) : const Color(0xFFF8FAFC);
+    final borderColor =
+        isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
 
     final paletteColors = widget.palette ?? _defaultPalette;
 
@@ -170,7 +173,9 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                        color: isDark
+                            ? const Color(0xFFE2E8F0)
+                            : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -181,7 +186,9 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -195,10 +202,13 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
                   child: TextField(
                     controller: _hexController,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 13),
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6)),
                       isDense: true,
                     ),
                     onChanged: (text) {
@@ -222,7 +232,8 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             child: Text(
               '预设调色盘',
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           Padding(
@@ -244,7 +255,8 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             child: Text(
               '色彩通道微调',
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           _buildSliderRow('R', r, Colors.red, (val) {
@@ -272,7 +284,9 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
         border: Border.all(color: borderColor),
       ),
       clipBehavior: Clip.antiAlias,
-      child: widget.height == null ? content : SingleChildScrollView(child: content),
+      child: widget.height == null
+          ? content
+          : SingleChildScrollView(child: content),
     );
 
     if (widget.height != null) {
@@ -295,7 +309,9 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
           color: swatchColor,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isSelected ? Colors.white : (isDark ? Colors.white12 : Colors.black12),
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.white12 : Colors.black12),
             width: isSelected ? 2.5 : 1.0,
           ),
           boxShadow: isSelected
@@ -311,7 +327,9 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
             ? Icon(
                 Icons.check,
                 size: 14,
-                color: swatchColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                color: swatchColor.computeLuminance() > 0.5
+                    ? Colors.black
+                    : Colors.white,
               )
             : null,
       ),

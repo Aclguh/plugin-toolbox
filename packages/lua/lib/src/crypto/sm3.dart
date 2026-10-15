@@ -4,13 +4,20 @@ import 'dart:typed_data';
 /// 纯 Dart 实现的标准国密 SM3 密码杂凑算法 (GM/T 0004-2012)
 class Sm3Digest {
   static const List<int> _iv = [
-    0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
-    0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e,
+    0x7380166f,
+    0x4914b2b9,
+    0x172442d7,
+    0xda8a0600,
+    0xa96f30bc,
+    0x163138aa,
+    0xe38dee4d,
+    0xb0fb0e4e,
   ];
 
   static int _rotl(int x, int n) {
     n %= 32;
-    return (((x << n) & 0xffffffff) | ((x >> (32 - n)) & 0xffffffff)) & 0xffffffff;
+    return (((x << n) & 0xffffffff) | ((x >> (32 - n)) & 0xffffffff)) &
+        0xffffffff;
   }
 
   static int _p0(int x) => x ^ _rotl(x, 9) ^ _rotl(x, 17);
@@ -76,7 +83,8 @@ class Sm3Digest {
       int h = v[7];
 
       for (int j = 0; j < 64; j++) {
-        final ss1 = _rotl((_rotl(a, 12) + e + _rotl(_tj(j), j)) & 0xffffffff, 7);
+        final ss1 =
+            _rotl((_rotl(a, 12) + e + _rotl(_tj(j), j)) & 0xffffffff, 7);
         final ss2 = ss1 ^ _rotl(a, 12);
         final tt1 = (_ff(j, a, b, c) + d + ss2 + wPrime[j]) & 0xffffffff;
         final tt2 = (_gg(j, e, f, g) + h + ss1 + w[j]) & 0xffffffff;

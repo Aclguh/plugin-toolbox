@@ -63,7 +63,8 @@ class Punycode {
         if (c == n) {
           int q = delta;
           for (int k = _base;; k += _base) {
-            final t = k <= bias ? _tMin : (k >= bias + _tMax ? _tMax : k - bias);
+            final t =
+                k <= bias ? _tMin : (k >= bias + _tMax ? _tMax : k - bias);
             if (q < t) break;
             output.writeCharCode(_encodeDigit(t + ((q - t) % (_base - t))));
             q = (q - t) ~/ (_base - t);

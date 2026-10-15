@@ -68,7 +68,9 @@ class CryptoApi {
     // 辅助：规范化 AES Key (若恰好为 16/24/32 字节则直接用，否则用 SHA-256 派生 32 字节)
     Uint8List normalizeKey(String keyStr) {
       final keyBytes = utf8.encode(keyStr);
-      if (keyBytes.length == 16 || keyBytes.length == 24 || keyBytes.length == 32) {
+      if (keyBytes.length == 16 ||
+          keyBytes.length == 24 ||
+          keyBytes.length == 32) {
         return Uint8List.fromList(keyBytes);
       }
       return Uint8List.fromList(sha256.convert(keyBytes).bytes);
@@ -91,7 +93,8 @@ class CryptoApi {
       final plaintext = ls.checkString(1) ?? '';
       final keyStr = ls.checkString(2) ?? '';
       final ivStr = ls.type(3) == LuaType.luaString ? ls.toStr(3) : null;
-      final mode = ls.type(4) == LuaType.luaString ? ls.toStr(4)!.toLowerCase() : 'cbc';
+      final mode =
+          ls.type(4) == LuaType.luaString ? ls.toStr(4)!.toLowerCase() : 'cbc';
 
       try {
         final keyBytes = normalizeKey(keyStr);
@@ -120,7 +123,8 @@ class CryptoApi {
       final ciphertextBase64 = ls.checkString(1) ?? '';
       final keyStr = ls.checkString(2) ?? '';
       final ivStr = ls.type(3) == LuaType.luaString ? ls.toStr(3) : null;
-      final mode = ls.type(4) == LuaType.luaString ? ls.toStr(4)!.toLowerCase() : 'cbc';
+      final mode =
+          ls.type(4) == LuaType.luaString ? ls.toStr(4)!.toLowerCase() : 'cbc';
 
       try {
         final keyBytes = normalizeKey(keyStr);
@@ -148,8 +152,10 @@ class CryptoApi {
     ls.pushDartFunction((ls) {
       final password = ls.checkString(1) ?? '';
       final salt = ls.checkString(2) ?? '';
-      final iterations = (ls.type(3) == LuaType.luaNumber) ? ls.toInteger(3) : 10000;
-      final keyLength = (ls.type(4) == LuaType.luaNumber) ? ls.toInteger(4) : 32;
+      final iterations =
+          (ls.type(3) == LuaType.luaNumber) ? ls.toInteger(3) : 10000;
+      final keyLength =
+          (ls.type(4) == LuaType.luaNumber) ? ls.toInteger(4) : 32;
 
       try {
         final hex = Pbkdf2.deriveHex(

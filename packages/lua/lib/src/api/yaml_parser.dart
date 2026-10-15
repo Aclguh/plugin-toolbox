@@ -50,7 +50,8 @@ class YamlParser {
     return line;
   }
 
-  static dynamic _parseNode(List<_YamlLine> lines, _IntRef index, int parentIndent) {
+  static dynamic _parseNode(
+      List<_YamlLine> lines, _IntRef index, int parentIndent) {
     if (index.value >= lines.length) return null;
 
     final firstLine = lines[index.value];
@@ -62,12 +63,15 @@ class YamlParser {
       while (index.value < lines.length) {
         final line = lines[index.value];
         if (line.indent < currentIndent) break;
-        if (line.indent == currentIndent && (line.text.startsWith('- ') || line.text == '-')) {
+        if (line.indent == currentIndent &&
+            (line.text.startsWith('- ') || line.text == '-')) {
           index.value++;
-          final itemStr = line.text.startsWith('- ') ? line.text.substring(2).trim() : '';
+          final itemStr =
+              line.text.startsWith('- ') ? line.text.substring(2).trim() : '';
           if (itemStr.isEmpty) {
             // 子对象
-            if (index.value < lines.length && lines[index.value].indent > currentIndent) {
+            if (index.value < lines.length &&
+                lines[index.value].indent > currentIndent) {
               list.add(_parseNode(lines, index, currentIndent));
             } else {
               list.add(null);
@@ -80,13 +84,15 @@ class YamlParser {
             final subMap = <String, dynamic>{};
             if (vStr.isNotEmpty) {
               subMap[k] = _parseScalar(vStr);
-            } else if (index.value < lines.length && lines[index.value].indent > currentIndent) {
+            } else if (index.value < lines.length &&
+                lines[index.value].indent > currentIndent) {
               subMap[k] = _parseNode(lines, index, currentIndent);
             } else {
               subMap[k] = null;
             }
             // 后续同级 Map 行
-            while (index.value < lines.length && lines[index.value].indent > currentIndent) {
+            while (index.value < lines.length &&
+                lines[index.value].indent > currentIndent) {
               final subLine = lines[index.value];
               if (subLine.text.contains(':')) {
                 index.value++;
@@ -95,7 +101,8 @@ class YamlParser {
                 final subV = subLine.text.substring(c + 1).trim();
                 if (subV.isNotEmpty) {
                   subMap[subK] = _parseScalar(subV);
-                } else if (index.value < lines.length && lines[index.value].indent > subLine.indent) {
+                } else if (index.value < lines.length &&
+                    lines[index.value].indent > subLine.indent) {
                   subMap[subK] = _parseNode(lines, index, subLine.indent);
                 } else {
                   subMap[subK] = null;
@@ -130,7 +137,8 @@ class YamlParser {
           if (valStr.isNotEmpty) {
             map[key] = _parseScalar(valStr);
           } else {
-            if (index.value < lines.length && lines[index.value].indent > currentIndent) {
+            if (index.value < lines.length &&
+                lines[index.value].indent > currentIndent) {
               map[key] = _parseNode(lines, index, currentIndent);
             } else {
               map[key] = null;
@@ -212,7 +220,10 @@ class YamlParser {
     if (value is bool) return value ? 'true' : 'false';
     if (value is num) return value.toString();
     final str = value.toString();
-    if (str.contains('\n') || str.contains(':') || str.contains('#') || str.startsWith('-')) {
+    if (str.contains('\n') ||
+        str.contains(':') ||
+        str.contains('#') ||
+        str.startsWith('-')) {
       return '"${str.replaceAll('"', r'\"')}"';
     }
     return str;

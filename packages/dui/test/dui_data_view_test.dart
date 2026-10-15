@@ -253,7 +253,8 @@ void main() {
   });
 
   group('DuiRenderer 声明式渲染与数据绑定', () {
-    testWidgets('DuiRenderer 渲染 CodeView、DiffView、TreeView 与 ColorPicker', (tester) async {
+    testWidgets('DuiRenderer 渲染 CodeView、DiffView、TreeView 与 ColorPicker',
+        (tester) async {
       final state = DuiState();
       state.set('code_content', 'print("hello lua")');
       state.set('old_content', 'line 1');

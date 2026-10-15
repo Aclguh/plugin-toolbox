@@ -42,7 +42,8 @@ class _DuiTreeViewState extends State<DuiTreeView> {
   @override
   void didUpdateWidget(covariant DuiTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.expandAll != oldWidget.expandAll || widget.data != oldWidget.data) {
+    if (widget.expandAll != oldWidget.expandAll ||
+        widget.data != oldWidget.data) {
       _initExpandedState();
     }
   }
@@ -70,8 +71,10 @@ class _DuiTreeViewState extends State<DuiTreeView> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = isDark ? const Color(0xFF141926) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
+    final backgroundColor =
+        isDark ? const Color(0xFF141926) : const Color(0xFFF8FAFC);
+    final borderColor =
+        isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
 
     final roots = _parseNodes(widget.data);
 
@@ -122,8 +125,10 @@ class _DuiTreeViewState extends State<DuiTreeView> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final selectedBg = isDark ? const Color(0x33788CFF) : const Color(0x22788CFF);
-    final hoverColor = isDark ? const Color(0x1AFFFFFF) : const Color(0x0A000000);
+    final selectedBg =
+        isDark ? const Color(0x33788CFF) : const Color(0x22788CFF);
+    final hoverColor =
+        isDark ? const Color(0x1AFFFFFF) : const Color(0x0A000000);
 
     final row = InkWell(
       onTap: () {
@@ -165,9 +170,13 @@ class _DuiTreeViewState extends State<DuiTreeView> {
               height: 20,
               child: hasChildren
                   ? Icon(
-                      isExpanded ? Icons.keyboard_arrow_down : Icons.chevron_right,
+                      isExpanded
+                          ? Icons.keyboard_arrow_down
+                          : Icons.chevron_right,
                       size: 16,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     )
                   : const SizedBox.shrink(),
             ),
@@ -189,8 +198,12 @@ class _DuiTreeViewState extends State<DuiTreeView> {
                 fontSize: 12.5,
                 fontWeight: hasChildren ? FontWeight.w600 : FontWeight.normal,
                 color: isSelected
-                    ? (isDark ? const Color(0xFFB4C9FF) : theme.colorScheme.primary)
-                    : (isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B)),
+                    ? (isDark
+                        ? const Color(0xFFB4C9FF)
+                        : theme.colorScheme.primary)
+                    : (isDark
+                        ? const Color(0xFFE2E8F0)
+                        : const Color(0xFF1E293B)),
               ),
             ),
             // 叶子节点展示具体值
@@ -214,7 +227,9 @@ class _DuiTreeViewState extends State<DuiTreeView> {
                 '(${node.childrenCount})',
                 style: TextStyle(
                   fontSize: 11.0,
-                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  color: isDark
+                      ? const Color(0xFF64748B)
+                      : const Color(0xFF94A3B8),
                 ),
               ),
             ],
@@ -292,10 +307,14 @@ class _DuiTreeViewState extends State<DuiTreeView> {
         try {
           parsed = jsonDecode(trimmed);
         } catch (_) {
-          return [_TreeNode(path: 'root', label: trimmed, valueType: _NodeType.string)];
+          return [
+            _TreeNode(path: 'root', label: trimmed, valueType: _NodeType.string)
+          ];
         }
       } else {
-        return [_TreeNode(path: 'root', label: trimmed, valueType: _NodeType.string)];
+        return [
+          _TreeNode(path: 'root', label: trimmed, valueType: _NodeType.string)
+        ];
       }
     }
 
@@ -328,7 +347,12 @@ class _DuiTreeViewState extends State<DuiTreeView> {
       return roots;
     }
 
-    return [_TreeNode(path: 'root', label: parsed.toString(), valueType: _NodeType.primitive)];
+    return [
+      _TreeNode(
+          path: 'root',
+          label: parsed.toString(),
+          valueType: _NodeType.primitive)
+    ];
   }
 
   static _TreeNode _parseExplicitNode(Map raw, String currentPath) {
@@ -340,7 +364,8 @@ class _DuiTreeViewState extends State<DuiTreeView> {
     if (rawChildren is List) {
       for (var i = 0; i < rawChildren.length; i++) {
         if (rawChildren[i] is Map) {
-          children.add(_parseExplicitNode(rawChildren[i] as Map, '$currentPath/$i'));
+          children.add(
+              _parseExplicitNode(rawChildren[i] as Map, '$currentPath/$i'));
         }
       }
     }
