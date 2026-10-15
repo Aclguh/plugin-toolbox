@@ -11,3 +11,7 @@ export 'src/dui_drawing_pad.dart';
 export 'src/dui_chart.dart';
 export 'src/dui_html.dart';
 export 'src/dui_error_boundary.dart';
+export 'src/dui_code_view.dart';
+export 'src/dui_diff_view.dart';
+export 'src/dui_tree_view.dart';
+export 'src/dui_color_picker.dart';

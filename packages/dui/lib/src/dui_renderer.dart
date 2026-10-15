@@ -6,6 +6,7 @@ import 'dui_error_boundary.dart';
 import 'dui_event_handler.dart';
 import 'dui_state.dart';
 import 'dui_utils.dart';
+import 'factories/data_view_factories.dart';
 import 'factories/input_factories.dart';
 import 'factories/layout_factories.dart';
 import 'factories/media_factories.dart';
@@ -188,6 +189,7 @@ class DuiRenderer {
     registerTextFactories(this);
     registerInputFactories(this);
     registerMediaFactories(this);
+    registerDataViewFactories(this);
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，
