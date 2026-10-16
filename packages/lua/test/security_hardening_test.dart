@@ -855,5 +855,28 @@ void main() {
         )),
       );
     });
+
+    test('loadAndExecute 拦截预编译 Lua 字节码魔数', () {
+      final delegate = MockLuaHostDelegate();
+      final engine = LuaEngine(
+        context: buildContext(null, {}),
+        delegate: delegate,
+      );
+      addTearDown(engine.close);
+
+      final bytecodeStr =
+          String.fromCharCodes([0x1B, 0x4C, 0x75, 0x61, 0x51, 0x00]);
+      expect(
+        () => engine.loadAndExecute(bytecodeStr),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('安全策略拦截: 禁止执行预编译 Lua 字节码'),
+        )),
+      );
+
+      expect(LuaEngine.isLuaBytecodeString(bytecodeStr), isTrue);
+      expect(LuaEngine.isLuaBytecodeString('print("hello")'), isFalse);
+    });
   });
 }

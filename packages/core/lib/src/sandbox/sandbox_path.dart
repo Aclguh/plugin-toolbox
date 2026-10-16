@@ -88,4 +88,13 @@ class SandboxPath {
     final lowerTarget = cleanTarget.toLowerCase();
     return lowerTarget == lowerBase || lowerTarget.startsWith('$lowerBase/');
   }
+
+  /// 校验字节序列是否为预编译的 Lua 二进制字节码（以 \x1bLua 魔数开头）
+  static bool isLuaBytecode(List<int> bytes) {
+    if (bytes.length < 4) return false;
+    return bytes[0] == 0x1B &&
+        bytes[1] == 0x4C &&
+        bytes[2] == 0x75 &&
+        bytes[3] == 0x61;
+  }
 }

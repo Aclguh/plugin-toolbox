@@ -241,10 +241,24 @@ class LuaEngine {
     I18nApi.bind(_ls, context);
   }
 
+  /// 校验脚本字符串是否以 Lua 预编译字节码魔数 (\x1bLua) 开头
+  static bool isLuaBytecodeString(String script) {
+    if (script.length >= 4) {
+      return script.codeUnitAt(0) == 0x1B &&
+          script.codeUnitAt(1) == 0x4C &&
+          script.codeUnitAt(2) == 0x75 &&
+          script.codeUnitAt(3) == 0x61;
+    }
+    return false;
+  }
+
   /// 执行 Lua 源代码字符串
   void loadAndExecute(String scriptContent) {
     if (_closed) {
       throw StateError('Cannot use closed LuaEngine');
+    }
+    if (isLuaBytecodeString(scriptContent)) {
+      throw const FormatException('安全策略拦截: 禁止执行预编译 Lua 字节码，必须为源码文本');
     }
     _ls.setInstructionBudget(instructionBudget);
     final status = _ls.loadString(scriptContent);

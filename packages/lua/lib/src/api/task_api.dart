@@ -5,6 +5,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
+import '../lua_engine.dart';
 import '../lua_value_codec.dart';
 import 'codec_api.dart';
 import 'crypto_api.dart';
@@ -178,6 +179,9 @@ class TaskApi {
     required dynamic args,
     required int instructionBudget,
   }) {
+    if (LuaEngine.isLuaBytecodeString(script)) {
+      return {'ok': false, 'error': '安全策略拦截: 禁止执行预编译 Lua 字节码，必须为源码文本'};
+    }
     final ls = LuaState.newState();
     ls.openLibs();
 

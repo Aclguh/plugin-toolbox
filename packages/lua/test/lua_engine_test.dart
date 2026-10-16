@@ -672,6 +672,21 @@ class InMemoryPluginStorage implements PluginStorage {
     _data.clear();
     return true;
   }
+
+  @override
+  Future<dynamic> getValue(String key) async => _data[key];
+
+  @override
+  Future<bool> setValue(String key, dynamic value) async {
+    _data[key] = value;
+    return true;
+  }
+
+  @override
+  Future<dynamic> get(String key) => getValue(key);
+
+  @override
+  Future<bool> set(String key, dynamic value) => setValue(key, value);
 }
 
 Future<void> _waitFor(
