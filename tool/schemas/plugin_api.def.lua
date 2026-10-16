@@ -419,3 +419,64 @@ function i18n.getLocale() end
 ---@param defaultText? string 缺省文本
 ---@return string
 function i18n.t(translations, defaultText) end
+
+-- ==============================================================================
+-- 14. 扩展宿主 API 命名空间
+-- ==============================================================================
+---@class UtilApi
+util = {}
+
+---@class RegexApi
+regex = {}
+
+---@class ColorApi
+color = {}
+
+---@class ArchiveApi
+archive = {}
+
+---@class DocumentApi
+document = {}
+
+---@class MediaApi
+media = {}
+
+---@class ImageApi
+image = {}
+
+---@class VisionApi
+vision = {}
+
+---@class SensorApi
+sensor = {}
+
+---@class NotificationApi
+notification = {}
+
+---@class AudioApi
+audio = {}
+
+---@class SocketApi
+socket = {}
+
+---@class WebSocketApi
+websocket = {}
+
+---@class ScreenApi
+screen = {}
+
+---@class LocationApi
+location = {}
+
+---@class NfcApi
+nfc = {}
+
+---@class BluetoothApi
+bluetooth = {}
+
+---@class DatabaseApi
+database = {}
+
+---@class AiApi
+ai = {}
+

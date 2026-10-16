@@ -127,7 +127,7 @@ class SocketApi {
             callbacks.invoke(onConnectRef, [socketId]);
           }
 
-          final sub = socket.listen(
+          _tcpSubscriptions[socketId] = socket.listen(
             (data) {
               if (onDataRef != null) {
                 final text = utf8.decode(data, allowMalformed: true);
@@ -147,7 +147,6 @@ class SocketApi {
             },
             cancelOnError: false,
           );
-          _tcpSubscriptions[socketId] = sub;
         } catch (error) {
           _pendingTcp.remove(socketId);
           if (onErrorRef != null) {
@@ -165,7 +164,7 @@ class SocketApi {
     ls.pushDartFunction((ls) {
       checkPermission(ls);
       final socketId = ls.checkString(1) ?? '';
-      final socket = _tcpSockets[socketId];
+      final dynamic socket = _tcpSockets[socketId];
       if (socket == null) {
         ls.pushBoolean(false);
         return 1;
@@ -246,7 +245,7 @@ class SocketApi {
           }
           _udpSockets[socketId] = socket;
 
-          final sub = socket.listen(
+          _udpSubscriptions[socketId] = socket.listen(
             (event) {
               if (event == RawSocketEvent.read) {
                 final datagram = socket.receive();
@@ -267,7 +266,6 @@ class SocketApi {
               }
             },
           );
-          _udpSubscriptions[socketId] = sub;
         }).catchError((Object error) {
           _pendingUdp.remove(socketId);
           if (onErrorRef != null) {

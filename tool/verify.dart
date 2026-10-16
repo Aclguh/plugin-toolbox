@@ -318,22 +318,100 @@ void main() {
   expect(duiSchemaJson != null && duiSchemaJson['properties'] != null,
       'dui.schema.json 结构完整且为合法 JSON Schema');
 
+  // 校验 DUI Schema 双向对齐门禁
+  final duiSchemaData = duiSchemaJson as Map<String, dynamic>;
+  final schemaEnum =
+      ((duiSchemaData['properties'] as Map)['type']['enum'] as List)
+          .cast<String>()
+          .toSet();
+
+  final factoryPattern = RegExp(r"registerFactory\('([a-zA-Z0-9_]+)'");
+  final registeredFactories = <String>{};
+  final factoriesDir = Directory('packages/dui/lib/src/factories');
+  if (factoriesDir.existsSync()) {
+    for (final entity in factoriesDir.listSync()) {
+      if (entity is File && entity.path.endsWith('.dart')) {
+        for (final m in factoryPattern.allMatches(entity.readAsStringSync())) {
+          registeredFactories.add(m.group(1)!);
+        }
+      }
+    }
+  }
+  final missingInSchema = registeredFactories.difference(schemaEnum);
+  expect(
+    missingInSchema.isEmpty,
+    'packages/dui 注册的所有组件工厂在 dui.schema.json 中均有合法声明',
+    '未在 Schema 声明的组件: $missingInSchema',
+  );
+
   final luaDefFile = File('tool/schemas/plugin_api.def.lua');
   expect(
       luaDefFile.existsSync(), '官方 EmmyLua/LuaLS 类型定义文件 plugin_api.def.lua 存在');
   final luaDefContent =
       luaDefFile.existsSync() ? luaDefFile.readAsStringSync() : '';
+  final emmyNamespaces = RegExp(r'^([a-zA-Z0-9_]+)\s*=\s*\{\}', multiLine: true)
+      .allMatches(luaDefContent)
+      .map((m) => m.group(1)!)
+      .toSet();
+  const expectedHostApis = [
+    'state',
+    'clipboard',
+    'storage',
+    'network',
+    'dialog',
+    'codec',
+    'json',
+    'hash',
+    'util',
+    'system',
+    'haptic',
+    'ui',
+    'share',
+    'media',
+    'fs',
+    'crypto',
+    'regex',
+    'color',
+    'archive',
+    'document',
+    'torch',
+    'qrcode',
+    'camera',
+    'vision',
+    'sensor',
+    'image',
+    'notification',
+    'audio',
+    'socket',
+    'websocket',
+    'biometrics',
+    'task',
+    'screen',
+    'location',
+    'nfc',
+    'bluetooth',
+    'database',
+    'ai',
+    'ipc',
+    'i18n',
+    'timer',
+  ];
+  final missingHostApis =
+      expectedHostApis.where((ns) => !emmyNamespaces.contains(ns)).toList();
   expect(
-      luaDefContent.contains('state =') &&
-          luaDefContent.contains('clipboard =') &&
-          luaDefContent.contains('network =') &&
-          luaDefContent.contains('storage =') &&
-          luaDefContent.contains('task =') &&
-          luaDefContent.contains('fs ='),
-      'plugin_api.def.lua 完整定义了全部核心宿主 API 命名空间');
+    missingHostApis.isEmpty,
+    'plugin_api.def.lua 完整定义了全部核心宿主 API 命名空间',
+    '缺失定义的 API 命名空间: $missingHostApis',
+  );
 
   final ptxCliFile = File('tool/ptx.py');
   expect(ptxCliFile.existsSync(), '官方插件开发者脚手架 CLI tool/ptx.py 存在');
+  final ptxPyContent = ptxCliFile.readAsStringSync();
+  expect(
+    ptxPyContent.contains('"ref": "input_text"') &&
+        !ptxPyContent.contains('"stateKey": "input_text"'),
+    'ptx.py 模板严格使用 ref 属性进行双向绑定 (消除属性漂移)',
+  );
 
   final installerFile =
       File('packages/core/lib/src/installer/plugin_installer.dart');

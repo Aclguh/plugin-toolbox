@@ -140,7 +140,7 @@ class WebSocketApi {
             callbacks.invoke(onOpenRef, [wsId]);
           }
 
-          final sub = ws.listen(
+          _subscriptions[wsId] = ws.listen(
             (data) {
               if (onMessageRef != null) {
                 callbacks.invoke(onMessageRef, [wsId, data.toString()]);
@@ -161,7 +161,6 @@ class WebSocketApi {
             },
             cancelOnError: false,
           );
-          _subscriptions[wsId] = sub;
         } catch (error) {
           _pendingWs.remove(wsId);
           if (onErrorRef != null) {
@@ -180,7 +179,7 @@ class WebSocketApi {
       checkPermission(ls);
       final wsId = ls.checkString(1) ?? '';
       final message = ls.checkString(2) ?? '';
-      final ws = _sockets[wsId];
+      final dynamic ws = _sockets[wsId];
       if (ws == null) {
         ls.pushBoolean(false);
         return 1;
