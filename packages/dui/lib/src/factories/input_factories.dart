@@ -42,15 +42,14 @@ void registerInputFactories(DuiRenderer renderer) {
     return buildTextField();
   });
 
-  // ---- 按钮类 ----
-  renderer.registerFactory('FilledButton', (node) {
+  Widget buildFilledButton(DuiNodeContext node) {
     final rawText = node.props['text']?.toString() ?? '';
-    final keys = DuiState.extractKeys(rawText);
+    final keys = node.textKeys;
     final iconStr = node.props['icon']?.toString();
-    void onPressed() => eventHandler.handleEvent(node.events['onPressed']);
+    void onPressed() => node.handleEvent(node.events['onPressed']);
 
     Widget buildButton() {
-      final label = state.interpolate(rawText);
+      final label = node.interpolate(rawText);
       return iconStr != null
           ? FilledButton.icon(
               icon: Icon(DuiUtils.parseIcon(iconStr)),
@@ -67,16 +66,16 @@ void registerInputFactories(DuiRenderer renderer) {
       );
     }
     return buildButton();
-  });
+  }
 
-  renderer.registerFactory('OutlinedButton', (node) {
+  Widget buildOutlinedButton(DuiNodeContext node) {
     final rawText = node.props['text']?.toString() ?? '';
-    final keys = DuiState.extractKeys(rawText);
+    final keys = node.textKeys;
     final iconStr = node.props['icon']?.toString();
-    void onPressed() => eventHandler.handleEvent(node.events['onPressed']);
+    void onPressed() => node.handleEvent(node.events['onPressed']);
 
     Widget buildButton() {
-      final label = state.interpolate(rawText);
+      final label = node.interpolate(rawText);
       return iconStr != null
           ? OutlinedButton.icon(
               icon: Icon(DuiUtils.parseIcon(iconStr)),
@@ -93,6 +92,16 @@ void registerInputFactories(DuiRenderer renderer) {
       );
     }
     return buildButton();
+  }
+
+  renderer.registerFactory('FilledButton', buildFilledButton);
+  renderer.registerFactory('OutlinedButton', buildOutlinedButton);
+  renderer.registerFactory('Button', (node) {
+    final type = node.props['type']?.toString().toLowerCase();
+    if (type == 'outlined') {
+      return buildOutlinedButton(node);
+    }
+    return buildFilledButton(node);
   });
 
   renderer.registerFactory(

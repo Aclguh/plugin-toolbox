@@ -4,6 +4,7 @@ import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../lua_callback_invoker.dart';
+import '../lua_value_codec.dart';
 
 class StorageApi {
   /// [writeState] 即 LuaHostDelegate.onStateChanged：未提供回调时，
@@ -16,15 +17,42 @@ class StorageApi {
   ) {
     ls.newTable();
 
-    // storage.set(key, value)
+    // storage.set(key, value [, callback])
     ls.pushDartFunction((ls) {
       if (!context.hasPermission(PluginPermission.storage)) {
         ls.error2('权限不足: 插件未声明 storage 权限');
         return 0;
       }
       final key = ls.checkString(1) ?? '';
-      final val = ls.checkString(2) ?? '';
-      unawaited(context.storage.setString(key, val));
+      dynamic val;
+      final type = ls.type(2);
+      if (type == LuaType.luaTable) {
+        val = LuaValueCodec.readTable(ls, 2);
+      } else if (type == LuaType.luaBoolean) {
+        val = ls.toBoolean(2);
+      } else if (type == LuaType.luaNumber) {
+        val = ls.isInteger(2) ? ls.toInteger(2) : ls.toNumber(2);
+      } else if (type == LuaType.luaString) {
+        val = ls.toStr(2);
+      } else if (type == LuaType.luaNil) {
+        val = null;
+      }
+      final cbRef = callbacks.ref(3);
+      final future = val == null
+          ? context.storage.remove(key)
+          : context.storage.setValue(key, val);
+
+      if (cbRef != null) {
+        unawaited(
+          future.then((ok) {
+            callbacks.invokeAndRelease(cbRef, [ok]);
+          }).catchError((Object e) {
+            callbacks.invokeAndRelease(cbRef, [false, e.toString()]);
+          }),
+        );
+      } else {
+        unawaited(future);
+      }
       return 0;
     });
     ls.setField(-2, 'set');
@@ -40,7 +68,7 @@ class StorageApi {
       final key = ls.checkString(1) ?? '';
       final cbRef = callbacks.ref(2);
       unawaited(
-        context.storage.getString(key).then((value) {
+        context.storage.getValue(key).then((value) {
           if (cbRef != null) {
             callbacks.invokeAndRelease(cbRef, [value]);
           } else if (value != null) {
@@ -49,7 +77,7 @@ class StorageApi {
         }).catchError((Object e) {
           writeState('__storage_error', e.toString());
           if (cbRef != null) {
-            callbacks.invokeAndRelease(cbRef, [null]);
+            callbacks.invokeAndRelease(cbRef, [null, e.toString()]);
           }
         }),
       );
@@ -57,14 +85,26 @@ class StorageApi {
     });
     ls.setField(-2, 'get');
 
-    // storage.remove(key)
+    // storage.remove(key [, callback])
     ls.pushDartFunction((ls) {
       if (!context.hasPermission(PluginPermission.storage)) {
         ls.error2('权限不足: 插件未声明 storage 权限');
         return 0;
       }
       final key = ls.checkString(1) ?? '';
-      unawaited(context.storage.remove(key));
+      final cbRef = callbacks.ref(2);
+      final future = context.storage.remove(key);
+      if (cbRef != null) {
+        unawaited(
+          future.then((ok) {
+            callbacks.invokeAndRelease(cbRef, [ok]);
+          }).catchError((Object e) {
+            callbacks.invokeAndRelease(cbRef, [false, e.toString()]);
+          }),
+        );
+      } else {
+        unawaited(future);
+      }
       return 0;
     });
     ls.setField(-2, 'remove');

@@ -91,9 +91,9 @@ TEMPLATE_MAIN_UI_JSON = {
                                 },
                                 {
                                     "type": "TextField",
+                                    "ref": "input_text",
                                     "props": {
                                         "label": "输入文本",
-                                        "stateKey": "input_text",
                                         "hint": "在此输入需要转换的文本..."
                                     }
                                 },
@@ -262,6 +262,38 @@ def cmd_pack(args):
     print(f"📦 成功打包插件: {out_file.resolve()} ({out_file.stat().st_size} 字节)")
 
 
+def cmd_watch(args):
+    import time
+
+    target_dir = Path(args.dir)
+    if not target_dir.is_dir():
+        print(f"❌ 错误: 目标路径 [{target_dir}] 不是合法目录")
+        sys.exit(1)
+
+    print(f"👀 正在监听插件目录变更: {target_dir.resolve()} (按 Ctrl+C 退出)")
+    cmd_pack(args)
+    last_mtime = 0
+
+    try:
+        while True:
+            max_m = 0
+            for root, dirs, files in os.walk(target_dir):
+                for f in files:
+                    if not f.endswith(".ptx"):
+                        p = Path(root) / f
+                        try:
+                            max_m = max(max_m, p.stat().st_mtime)
+                        except OSError:
+                            pass
+            if last_mtime != 0 and max_m > last_mtime:
+                print("🔄 检测到源码变更，正在自动重新打包...")
+                cmd_pack(args)
+            last_mtime = max_m
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n👋 已停止监听")
+
+
 def main():
     parser = argparse.ArgumentParser(description="PluginToolbox 插件开发者脚手架工具")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -283,6 +315,12 @@ def main():
     p_pack.add_argument("dir", help="待打包的插件目录")
     p_pack.add_argument("--out", help="打包文件输出目录 (默认与插件目录同级)")
     p_pack.set_defaults(func=cmd_pack)
+
+    # watch
+    p_watch = subparsers.add_parser("watch", help="监听插件目录变更并自动重新打包")
+    p_watch.add_argument("dir", help="待监听的插件目录")
+    p_watch.add_argument("--out", help="打包文件输出目录 (默认与插件目录同级)")
+    p_watch.set_defaults(func=cmd_watch)
 
     args = parser.parse_args()
     args.func(args)

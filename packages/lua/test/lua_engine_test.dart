@@ -687,6 +687,9 @@ class InMemoryPluginStorage implements PluginStorage {
 
   @override
   Future<bool> set(String key, dynamic value) => setValue(key, value);
+
+  @override
+  Future<bool> flush() async => true;
 }
 
 Future<void> _waitFor(
@@ -3590,6 +3593,91 @@ void main() {
 
       eng.close();
       await tempDir.delete(recursive: true);
+    });
+
+    test('StateApi 支持 Table 与复合结构双向读写', () async {
+      final delegate = MockLuaHostDelegate();
+      delegate.onStateChanged('initial_user', {'name': 'Bob', 'role': 'admin'});
+      delegate.onStateChanged('initial_list', ['first', 'second']);
+
+      final eng = LuaEngine(
+        context: PluginContext(
+          pluginId: 'test_state_table',
+          storage: InMemoryPluginStorage(),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {},
+        ),
+        delegate: delegate,
+      );
+
+      eng.loadAndExecute('''
+        local user = state.get("initial_user")
+        local list = state.get("initial_list")
+        state.set("user_name", user.name)
+        state.set("list_item_1", list[1])
+        state.set("new_table", {
+          score = 100,
+          tags = {"lua", "dart"}
+        })
+      ''');
+
+      expect(delegate.getState('user_name'), 'Bob');
+      expect(delegate.getState('list_item_1'), 'first');
+      expect(delegate.getState('new_table'), isA<Map>());
+      expect((delegate.getState('new_table') as Map)['score'], 100);
+      expect((delegate.getState('new_table') as Map)['tags'], ['lua', 'dart']);
+      eng.close();
+    });
+
+    test('StorageApi 支持丰富类型持久化与回调', () async {
+      final storage = InMemoryPluginStorage();
+      final delegate = MockLuaHostDelegate();
+      final eng = LuaEngine(
+        context: PluginContext(
+          pluginId: 'test_storage_types',
+          storage: storage,
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {PluginPermission.storage},
+        ),
+        delegate: delegate,
+      );
+
+      eng.loadAndExecute('''
+        storage.set("num_key", 42, function(ok)
+          state.set("set_num_ok", ok)
+        end)
+        storage.set("table_key", {title = "plugin", count = 3}, function(ok)
+          state.set("set_table_ok", ok)
+        end)
+      ''');
+
+      await _waitFor(() =>
+          delegate.getState('set_num_ok') == true &&
+          delegate.getState('set_table_ok') == true);
+
+      expect(await storage.getValue('num_key'), 42);
+      final storedTable = await storage.getValue('table_key');
+      expect(storedTable, isA<Map>());
+      expect((storedTable as Map)['title'], 'plugin');
+
+      // 读取并通过回调接收
+      eng.loadAndExecute('''
+        storage.get("table_key", function(val)
+          state.set("read_title", val.title)
+          state.set("read_count", val.count)
+        end)
+      ''');
+
+      await _waitFor(() =>
+          delegate.getState('read_title') == 'plugin' &&
+          delegate.getState('read_count') == 3);
+
+      expect(delegate.getState('read_title'), 'plugin');
+      expect(delegate.getState('read_count'), 3);
+
+      eng.close();
     });
   });
 }

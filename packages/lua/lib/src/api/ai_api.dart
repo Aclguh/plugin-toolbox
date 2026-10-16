@@ -114,11 +114,16 @@ class AiApi {
       final model = rawReq['model']?.toString();
       final temperature = (rawReq['temperature'] as num?)?.toDouble();
 
-      final stream = delegate.aiStreamChat(
-        messages: messages,
-        model: model,
-        temperature: temperature,
-      );
+      Stream<String> stream;
+      try {
+        stream = delegate.aiStreamChat(
+          messages: messages,
+          model: model,
+          temperature: temperature,
+        );
+      } catch (e) {
+        stream = Stream.error(e);
+      }
 
       stream.listen(
         (chunk) {
@@ -140,6 +145,9 @@ class AiApi {
           }
           if (errorCbRef != null) {
             callbacks.invokeAndRelease(errorCbRef, [e.toString()]);
+          } else {
+            context.recordLog('[AI Stream Error] $e');
+            context.logger.w('Unhandled AI Stream Error: $e');
           }
         },
       );
