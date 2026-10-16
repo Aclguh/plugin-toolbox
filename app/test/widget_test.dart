@@ -309,6 +309,96 @@ void main() {
     expect(find.textContaining('版本 0.2.0'), findsOneWidget);
   });
 
+  testWidgets('SettingsPage 支持自定义插件仓库配置与重置为默认', (WidgetTester tester) async {
+    final container = await createContainer();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('自定义插件仓库'), findsOneWidget);
+    expect(find.text('当前: Aclguh/PTX-plugins（官方默认）'), findsOneWidget);
+
+    // 点击打开自定义插件仓库对话框
+    await tester.tap(find.text('自定义插件仓库'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('GitHub 仓库链接'), findsOneWidget);
+
+    // 输入非法内容保存，应提示错误
+    await tester.enterText(find.byType(TextField), 'invalid_single_token');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('请输入有效的 GitHub 仓库链接，例如：owner/repo'), findsOneWidget);
+
+    // 输入合法链接并保存
+    await tester.enterText(
+        find.byType(TextField), 'https://github.com/custom-team/cool-plugins');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前: custom-team/cool-plugins'), findsOneWidget);
+
+    // 再次点击打开，点击恢复默认
+    await tester.tap(find.text('自定义插件仓库'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('恢复默认'), findsOneWidget);
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前: Aclguh/PTX-plugins（官方默认）'), findsOneWidget);
+  });
+
+  testWidgets('SettingsPage 点击关于展示全量软件信息（包名、GitHub 仓库、开源许可等）',
+      (WidgetTester tester) async {
+    final container = await createContainer();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 点击关于项
+    await tester.tap(find.textContaining('版本 0.2.0'));
+    await tester.pumpAndSettle();
+
+    // 验证全量软件信息展示
+    expect(find.text('com.plugintoolbox.plugin_toolbox'), findsOneWidget);
+    expect(
+        find.text('https://github.com/Aclguh/plugin-toolbox'), findsOneWidget);
+    expect(find.text('MIT License'), findsOneWidget);
+    expect(find.text('核心架构'), findsOneWidget);
+    expect(find.text('开发团队'), findsOneWidget);
+    expect(find.text('复制信息'), findsOneWidget);
+
+    // 点击查看协议
+    await tester.tap(find.text('查看协议'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Permission is hereby granted'), findsOneWidget);
+
+    // 关闭协议弹窗 (顶层对话框)
+    await tester.tap(find.text('关闭').last);
+    await tester.pumpAndSettle();
+
+    // 关闭关于详情弹窗
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
       'DynamicPluginHostPage handles missing UI file with graceful ErrorView',
       (WidgetTester tester) async {

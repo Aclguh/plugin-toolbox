@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/app_providers.dart';
 import 'store_service.dart';
@@ -21,21 +22,78 @@ const String kPluginStoreRef = kPluginStoreFallbackRef;
 /// 动态解析或本地缓存的最新仓库 ref。
 final pluginStoreResolvedRefProvider = FutureProvider<String>((ref) async {
   final prefs = ref.watch(sharedPreferencesProvider);
+  final repoConfig = ref.watch(customPluginRepositoryProvider);
   return JsDelivrPluginStoreSource.resolveLatestRef(
-    owner: kPluginStoreOwner,
-    repository: kPluginStoreRepository,
-    fallbackRef: kPluginStoreFallbackRef,
+    owner: repoConfig.owner,
+    repository: repoConfig.repository,
+    fallbackRef: repoConfig.isDefault ? kPluginStoreFallbackRef : 'HEAD',
     preferences: prefs,
   );
 });
 
+/// 自定义插件仓库配置 Notifier，负责持久化至 SharedPreferences。
+class PluginRepositoryNotifier extends StateNotifier<PluginRepositoryConfig> {
+  PluginRepositoryNotifier(this._prefs) : super(_load(_prefs));
+
+  final SharedPreferences _prefs;
+  static const customRepoKey = 'custom_plugin_store_repository';
+
+  static PluginRepositoryConfig _load(SharedPreferences prefs) {
+    final saved = safeRead(prefs, customRepoKey, null, prefs.getString);
+    if (saved != null && saved.trim().isNotEmpty) {
+      final parsed = PluginRepositoryConfig.tryParse(saved);
+      if (parsed != null) return parsed;
+    }
+    return PluginRepositoryConfig.defaultConfig;
+  }
+
+  /// 设置新的自定义插件仓库。若输入为空则恢复默认。返回解析并设置是否成功。
+  Future<bool> setRepository(String input) async {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) {
+      await resetToDefault();
+      return true;
+    }
+    final parsed = PluginRepositoryConfig.tryParse(trimmed);
+    if (parsed == null) return false;
+
+    state = parsed;
+    try {
+      if (parsed.isDefault) {
+        await _prefs.remove(customRepoKey);
+      } else {
+        await _prefs.setString(customRepoKey, parsed.githubUrl);
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  /// 恢复为官方默认插件仓库
+  Future<void> resetToDefault() async {
+    state = PluginRepositoryConfig.defaultConfig;
+    try {
+      await _prefs.remove(customRepoKey);
+    } catch (_) {}
+  }
+}
+
+/// 自定义插件仓库配置 Provider
+final customPluginRepositoryProvider =
+    StateNotifierProvider<PluginRepositoryNotifier, PluginRepositoryConfig>(
+        (ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return PluginRepositoryNotifier(prefs);
+});
+
 /// 商店页依赖的服务。测试通过 override 注入内存替身，避免真实网络请求。
 final pluginStoreServiceProvider = Provider<PluginStoreService>((ref) {
-  final resolvedRef = ref.watch(pluginStoreResolvedRefProvider).valueOrNull ??
-      kPluginStoreFallbackRef;
+  final repoConfig = ref.watch(customPluginRepositoryProvider);
+  final fallbackRef = repoConfig.isDefault ? kPluginStoreFallbackRef : 'HEAD';
+  final resolvedRef =
+      ref.watch(pluginStoreResolvedRefProvider).valueOrNull ?? fallbackRef;
   final client = JsDelivrPluginStoreSource(
-    owner: kPluginStoreOwner,
-    repository: kPluginStoreRepository,
+    owner: repoConfig.owner,
+    repository: repoConfig.repository,
     ref: resolvedRef,
     // 借用已注入的 SharedPreferences 缓存清单：源码未变化的插件刷新时
     // 不再重复下载 plugin.json，把一次刷新的请求数压到接近 1 次

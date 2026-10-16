@@ -21,6 +21,7 @@ export 'src/store/plugin_store_exception.dart';
 export 'src/store/plugin_package_inspection.dart';
 export 'src/store/jsdelivr_plugin_store_source.dart';
 export 'src/store/plugin_store_semantics.dart';
+export 'src/store/plugin_repository_config.dart';
 
 // 基础服务
 export 'src/event/event_bus.dart';

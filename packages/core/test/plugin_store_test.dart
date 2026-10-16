@@ -625,4 +625,66 @@ void main() {
       );
     });
   });
+
+  group('PluginRepositoryConfig 自定义仓库坐标模型', () {
+    test('正确解析各种格式的 GitHub 仓库链接与简写', () {
+      final fromHttps = PluginRepositoryConfig.tryParse(
+          'https://github.com/my-org/custom-plugins');
+      expect(fromHttps, isNotNull);
+      expect(fromHttps!.owner, 'my-org');
+      expect(fromHttps.repository, 'custom-plugins');
+      expect(fromHttps.githubUrl, 'https://github.com/my-org/custom-plugins');
+      expect(fromHttps.summary, 'my-org/custom-plugins');
+
+      // 带 .git 与末尾斜杠
+      final fromGit = PluginRepositoryConfig.tryParse(
+          'https://github.com/my-org/custom-plugins.git/');
+      expect(fromGit, isNotNull);
+      expect(fromGit!.owner, 'my-org');
+      expect(fromGit.repository, 'custom-plugins');
+
+      // 简写形式 owner/repo
+      final fromShort =
+          PluginRepositoryConfig.tryParse('developer_team/tools.v2');
+      expect(fromShort, isNotNull);
+      expect(fromShort!.owner, 'developer_team');
+      expect(fromShort.repository, 'tools.v2');
+
+      // 无协议头 github.com/owner/repo
+      final fromDomain = PluginRepositoryConfig.tryParse('github.com/foo/bar');
+      expect(fromDomain, isNotNull);
+      expect(fromDomain!.owner, 'foo');
+      expect(fromDomain.repository, 'bar');
+    });
+
+    test('默认官方仓库状态与等价性判定', () {
+      const config = PluginRepositoryConfig.defaultConfig;
+      expect(config.isDefault, isTrue);
+      expect(config.owner, 'Aclguh');
+      expect(config.repository, 'PTX-plugins');
+      expect(config.githubUrl, 'https://github.com/Aclguh/PTX-plugins');
+
+      final parsedDefault = PluginRepositoryConfig.tryParse(
+          'https://github.com/aclguh/ptx-plugins');
+      expect(parsedDefault, isNotNull);
+      expect(parsedDefault!.isDefault, isTrue);
+      expect(parsedDefault == config, isTrue);
+
+      final custom = PluginRepositoryConfig.tryParse('other/repo');
+      expect(custom!.isDefault, isFalse);
+      expect(custom == config, isFalse);
+    });
+
+    test('拒绝非法格式与注入字符', () {
+      expect(PluginRepositoryConfig.tryParse(null), isNull);
+      expect(PluginRepositoryConfig.tryParse('   '), isNull);
+      expect(PluginRepositoryConfig.tryParse('https://gitlab.com/foo/bar'),
+          isNull);
+      expect(PluginRepositoryConfig.tryParse('single-word'), isNull);
+      expect(PluginRepositoryConfig.tryParse('foo/bar/baz'), isNull);
+      expect(PluginRepositoryConfig.tryParse('-invalid-user/repo'), isNull);
+      expect(PluginRepositoryConfig.tryParse('user/..'), isNull);
+      expect(PluginRepositoryConfig.tryParse('user/repo with spaces'), isNull);
+    });
+  });
 }

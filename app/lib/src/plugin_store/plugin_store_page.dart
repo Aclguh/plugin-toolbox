@@ -349,6 +349,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   Widget _buildHeader(PluginStoreCatalog catalog, List<PluginStoreItem> items) {
     final theme = Theme.of(context);
+    final repoConfig = ref.watch(customPluginRepositoryProvider);
+    final sourceLabel = repoConfig.summary;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
@@ -360,7 +362,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           ),
           const SizedBox(height: 4),
           Text(
-            '目录来源: $kPluginStoreOwner/$kPluginStoreRepository · 版本信息取自 plugin-source 清单',
+            '目录来源: $sourceLabel · 版本信息取自 plugin-source 清单',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
