@@ -218,7 +218,17 @@ class PluginInstaller {
       // 容灾: 存储异常不阻断卸载主流程
     }
     if (await targetDir.exists()) {
-      await targetDir.delete(recursive: true);
+      for (var attempt = 0; attempt < 5; attempt++) {
+        try {
+          if (await targetDir.exists()) {
+            await targetDir.delete(recursive: true);
+          }
+          break;
+        } on FileSystemException {
+          if (attempt == 4) rethrow;
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+        }
+      }
     }
   }
 

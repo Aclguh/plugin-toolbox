@@ -228,11 +228,11 @@ flutter build apk --release --split-per-abi
 # 1. 静态代码分析（保持 0 错误 0 警告）
 dart analyze
 
-# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，150 项断言全通过）
+# 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，152 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 413 用例）
-#    packages/core 106 / packages/lua 134 / packages/dui 74 / packages/ui 13 / app 86
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 422 用例）
+#    packages/core 106 / packages/lua 140 / packages/dui 76 / packages/ui 13 / app 87
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
