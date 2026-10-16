@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -292,11 +296,61 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
         ),
       ),
       actions: [
+        if (dynamicPlugin != null)
+          TextButton.icon(
+            key: const Key('export_plugin_button'),
+            icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+            label: const Text('导出 .ptx'),
+            onPressed: () => _exportPlugin(context, dynamicPlugin),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('完成'),
         ),
       ],
     );
+  }
+
+  Future<void> _exportPlugin(
+    BuildContext context,
+    DynamicPlugin dynamicPlugin,
+  ) async {
+    try {
+      final bytes = await PluginInstaller.exportToBytes(dynamicPlugin.rootDir);
+      final filename = '${dynamicPlugin.id}_v${dynamicPlugin.version}.ptx';
+
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: '导出插件安装包',
+        fileName: filename,
+        type: FileType.custom,
+        allowedExtensions: ['ptx', 'zip'],
+        bytes: Uint8List.fromList(bytes),
+      );
+
+      if (outputPath != null && context.mounted) {
+        final file = File(outputPath);
+        if (!await file.exists() || await file.length() == 0) {
+          await file.writeAsBytes(bytes, flush: true);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('插件已导出至: $outputPath'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导出失败: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }

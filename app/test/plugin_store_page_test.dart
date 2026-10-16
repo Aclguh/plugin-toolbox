@@ -354,4 +354,40 @@ void main() {
     expect(find.text('远端插件目录为空'), findsOneWidget);
     expect(find.text('重新加载'), findsOneWidget);
   });
+
+  testWidgets('支持按关键词搜索过滤与分类筛选', (WidgetTester tester) async {
+    final source = FakeStoreSource(
+      entries: [
+        storeEntry(
+          id: 'base64_tool',
+          name: 'Base64 编解码',
+          description: 'Base64 文本编码与解码转换工具',
+        ),
+        storeEntry(
+          id: 'hash_tool',
+          name: '哈希计算工具',
+          description: 'MD5 SHA-256 散列计算',
+        ),
+      ],
+    );
+    final container = await createStoreContainer(source);
+    await pumpStore(tester, container);
+
+    expect(find.text('Base64 编解码'), findsOneWidget);
+    expect(find.text('哈希计算工具'), findsOneWidget);
+
+    // 输入搜索关键词 "哈希"
+    await tester.enterText(find.byType(TextField), '哈希');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Base64 编解码'), findsNothing);
+    expect(find.text('哈希计算工具'), findsOneWidget);
+
+    // 清空搜索
+    await tester.tap(find.byIcon(Icons.clear));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Base64 编解码'), findsOneWidget);
+    expect(find.text('哈希计算工具'), findsOneWidget);
+  });
 }

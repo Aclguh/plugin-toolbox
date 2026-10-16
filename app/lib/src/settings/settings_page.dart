@@ -213,6 +213,57 @@ class SettingsPage extends ConsumerWidget {
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                       ),
                 ),
+                if (ref
+                        .read(customPluginRepositoryProvider.notifier)
+                        .savedConfigs
+                        .length >
+                    1) ...[
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const Text('已订阅的源 (点击快速选择):',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  for (final cfg in ref
+                      .read(customPluginRepositoryProvider.notifier)
+                      .savedConfigs)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        cfg.summary.toLowerCase() ==
+                                currentConfig.summary.toLowerCase()
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 18,
+                        color: cfg.summary.toLowerCase() ==
+                                currentConfig.summary.toLowerCase()
+                            ? Theme.of(ctx).colorScheme.primary
+                            : null,
+                      ),
+                      title: Text(
+                        cfg.summary + (cfg.isDefault ? ' (官方默认)' : ''),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: !cfg.isDefault
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              tooltip: '移除该源',
+                              onPressed: () async {
+                                await ref
+                                    .read(
+                                        customPluginRepositoryProvider.notifier)
+                                    .removeSavedRepository(cfg);
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      onTap: () {
+                        controller.text = cfg.isDefault ? '' : cfg.githubUrl;
+                        setState(() => errorText = null);
+                      },
+                    ),
+                ],
               ],
             ),
           ),

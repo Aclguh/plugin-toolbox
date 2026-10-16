@@ -33,10 +33,51 @@ final pluginStoreResolvedRefProvider = FutureProvider<String>((ref) async {
 
 /// 自定义插件仓库配置 Notifier，负责持久化至 SharedPreferences。
 class PluginRepositoryNotifier extends StateNotifier<PluginRepositoryConfig> {
-  PluginRepositoryNotifier(this._prefs) : super(_load(_prefs));
+  PluginRepositoryNotifier(this._prefs) : super(_load(_prefs)) {
+    _loadSaved();
+  }
 
   final SharedPreferences _prefs;
   static const customRepoKey = 'custom_plugin_store_repository';
+  static const savedReposKey = 'saved_plugin_store_repositories';
+
+  List<PluginRepositoryConfig> _savedConfigs = [
+    PluginRepositoryConfig.defaultConfig
+  ];
+
+  /// 已保存的多仓库源列表（默认包含官方默认源）
+  List<PluginRepositoryConfig> get savedConfigs =>
+      List.unmodifiable(_savedConfigs);
+
+  void _loadSaved() {
+    final raw = safeRead(_prefs, savedReposKey, null, _prefs.getStringList);
+    if (raw != null && raw.isNotEmpty) {
+      final list = <PluginRepositoryConfig>[
+        PluginRepositoryConfig.defaultConfig
+      ];
+      for (final s in raw) {
+        final parsed = PluginRepositoryConfig.tryParse(s);
+        if (parsed != null &&
+            !list.any((e) =>
+                e.owner.toLowerCase() == parsed.owner.toLowerCase() &&
+                e.repository.toLowerCase() ==
+                    parsed.repository.toLowerCase())) {
+          list.add(parsed);
+        }
+      }
+      _savedConfigs = list;
+    }
+  }
+
+  Future<void> _persistSaved() async {
+    try {
+      final urls = _savedConfigs
+          .where((e) => !e.isDefault)
+          .map((e) => e.githubUrl)
+          .toList();
+      await _prefs.setStringList(savedReposKey, urls);
+    } catch (_) {}
+  }
 
   static PluginRepositoryConfig _load(SharedPreferences prefs) {
     final saved = safeRead(prefs, customRepoKey, null, prefs.getString);
@@ -47,7 +88,7 @@ class PluginRepositoryNotifier extends StateNotifier<PluginRepositoryConfig> {
     return PluginRepositoryConfig.defaultConfig;
   }
 
-  /// 设置新的自定义插件仓库。若输入为空则恢复默认。返回解析并设置是否成功。
+  /// 设置并激活新的插件仓库，同时将其记录入已保存列表
   Future<bool> setRepository(String input) async {
     final trimmed = input.trim();
     if (trimmed.isEmpty) {
@@ -58,6 +99,13 @@ class PluginRepositoryNotifier extends StateNotifier<PluginRepositoryConfig> {
     if (parsed == null) return false;
 
     state = parsed;
+    if (!_savedConfigs.any((e) =>
+        e.owner.toLowerCase() == parsed.owner.toLowerCase() &&
+        e.repository.toLowerCase() == parsed.repository.toLowerCase())) {
+      _savedConfigs.add(parsed);
+      await _persistSaved();
+    }
+
     try {
       if (parsed.isDefault) {
         await _prefs.remove(customRepoKey);
@@ -66,6 +114,20 @@ class PluginRepositoryNotifier extends StateNotifier<PluginRepositoryConfig> {
       }
     } catch (_) {}
     return true;
+  }
+
+  /// 从列表中移除某个已保存的非默认源
+  Future<void> removeSavedRepository(PluginRepositoryConfig config) async {
+    if (config.isDefault) return;
+    _savedConfigs.removeWhere((e) =>
+        e.owner.toLowerCase() == config.owner.toLowerCase() &&
+        e.repository.toLowerCase() == config.repository.toLowerCase());
+    await _persistSaved();
+
+    if (state.owner.toLowerCase() == config.owner.toLowerCase() &&
+        state.repository.toLowerCase() == config.repository.toLowerCase()) {
+      await resetToDefault();
+    }
   }
 
   /// 恢复为官方默认插件仓库

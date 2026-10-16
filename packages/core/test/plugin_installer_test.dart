@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -533,6 +534,96 @@ void main() {
       expect(noDirCtx.checkStorageQuota(1024 * 1024 * 1024), isTrue);
 
       await tempDir.delete(recursive: true);
+    });
+
+    test('入口脚本为预编译 Lua 字节码时拒绝安装并抛出 FormatException', () async {
+      final bytecodeEntries = validEntries(id: 'bytecode_attack');
+      // 构造 \x1bLua 预编译字节码头
+      bytecodeEntries['main.lua'] = [0x1B, 0x4C, 0x75, 0x61, 0x51, 0x00, 0x01];
+      final ptx = await writeTempPtx(buildPtx(bytecodeEntries));
+
+      expect(
+        () => PluginInstaller.installFromPtx(ptx),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('安全策略拦截: 插件入口脚本禁止使用预编译 Lua 字节码'),
+        )),
+      );
+
+      expect(PluginInstaller.isLuaBytecode([0x1B, 0x4C, 0x75, 0x61]), isTrue);
+      expect(PluginInstaller.isLuaBytecode([0x1B, 0x4C, 0x75]), isFalse);
+      expect(PluginInstaller.isLuaBytecode(utf8Bytes('print("ok")')), isFalse);
+    });
+
+    test('导出插件为 .ptx 归档包并自动排除运行时数据与隐藏文件', () async {
+      final baseDir = await Directory.systemTemp.createTemp('ptx_export_test_');
+      final pluginDir = Directory('${baseDir.path}/demo_tool');
+      await pluginDir.create(recursive: true);
+
+      // 写入标准插件必要文件
+      await File('${pluginDir.path}/plugin.json').writeAsString(jsonEncode({
+        'id': 'demo_tool',
+        'name': 'Demo Tool',
+        'version': '1.0.0',
+        'description': 'Export Demo',
+        'author': 'Tester',
+        'minAppVersion': '0.2.1',
+        'type': 'lua',
+        'category': 'utility',
+        'permissions': ['clipboard'],
+        'entry': 'main.lua',
+        'ui': 'ui/main.ui.json',
+      }));
+      await File('${pluginDir.path}/main.lua').writeAsString('print("hello")');
+      final uiDir = Directory('${pluginDir.path}/ui');
+      await uiDir.create(recursive: true);
+      await File('${uiDir.path}/main.ui.json').writeAsString(jsonEncode({
+        'type': 'Text',
+        'props': {'text': 'hi'}
+      }));
+
+      // 写入运行期沙箱数据与隐藏文件（导出时应被自动过滤）
+      await File('${pluginDir.path}/storage.json')
+          .writeAsString('{"key": "secret"}');
+      await File('${pluginDir.path}/storage.json.bak')
+          .writeAsString('{"key": "backup"}');
+      await File('${pluginDir.path}/.hidden_config').writeAsString('sensitive');
+      await File('${uiDir.path}/.DS_Store').writeAsString('junk');
+
+      // 1. 测试 exportToBytes
+      final bytes = await PluginInstaller.exportToBytes(pluginDir);
+      expect(bytes, isNotEmpty);
+
+      // 2. 测试 exportToPtx
+      final outPtx = File('${baseDir.path}/exported_demo.ptx');
+      final resultFile = await PluginInstaller.exportToPtx(pluginDir, outPtx);
+      expect(resultFile.path, outPtx.path);
+      expect(await resultFile.exists(), isTrue);
+
+      // 3. 解包校验内容与过滤项
+      final archive = ZipDecoder().decodeBytes(await resultFile.readAsBytes());
+      final filenames = archive.files.map((f) => f.name).toSet();
+
+      expect(filenames.contains('plugin.json'), isTrue);
+      expect(filenames.contains('main.lua'), isTrue);
+      expect(filenames.contains('ui/main.ui.json'), isTrue);
+
+      // 验证持久化与临时隐藏文件被彻底排除
+      expect(filenames.contains('storage.json'), isFalse);
+      expect(filenames.contains('storage.json.bak'), isFalse);
+      expect(filenames.contains('.hidden_config'), isFalse);
+      expect(filenames.contains('ui/.DS_Store'), isFalse);
+
+      // 4. 验证导出的包可以直接被重新成功安装
+      final installed = await PluginInstaller.installFromPtx(
+        resultFile,
+        baseDirectory: Directory('${baseDir.path}/install_target'),
+      );
+      expect(installed.id, 'demo_tool');
+      expect(installed.name, 'Demo Tool');
+
+      await baseDir.delete(recursive: true);
     });
   });
 }

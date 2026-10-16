@@ -229,8 +229,58 @@ void main() {
     await tester.pumpAndSettle();
 
     // 再次点击确定/完成
+    expect(find.text('导出 .ptx'), findsOneWidget);
     expect(find.text('完成'), findsOneWidget);
     await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('PluginDetailsDialog 内置插件不展示导出按钮', (WidgetTester tester) async {
+    final builtin = _MockBuiltinPlugin(
+      id: 'mock_builtin',
+      name: '内置演示工具',
+      description: '内置核心工具',
+      version: '1.0.0',
+      category: PluginCategory.other,
+    );
+
+    await tester.pumpWidget(
+      buildTestApp(
+        PluginDetailsDialog(plugin: builtin),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('内置演示工具'), findsOneWidget);
+    expect(find.text('ID: mock_builtin'), findsOneWidget);
+    expect(find.text('导出 .ptx'), findsNothing);
+    expect(find.text('完成'), findsOneWidget);
+  });
+}
+
+class _MockBuiltinPlugin extends ToolPlugin {
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final String description;
+  @override
+  final String version;
+  @override
+  final PluginCategory category;
+
+  _MockBuiltinPlugin({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.version,
+    required this.category,
+  });
+
+  @override
+  Future<void> initialize(PluginContext context) async {}
+
+  @override
+  Future<void> dispose() async {}
 }

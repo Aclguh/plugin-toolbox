@@ -39,6 +39,10 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   /// 正在下载安装的插件（id -> 显示名），同时用于禁用按钮与渲染进度遮罩
   final Map<String, String> _busyPlugins = {};
 
+  /// 搜索与分类过滤状态
+  String _searchKeyword = '';
+  String? _selectedCategory;
+
   Future<void> _refresh() async {
     ref.invalidate(pluginStoreResolvedRefProvider);
     ref.invalidate(pluginStoreCatalogProvider);
@@ -265,12 +269,12 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         ),
       ),
       data: (catalog) {
-        final items = service.buildItems(
+        final allItems = service.buildItems(
           catalog: catalog,
           installedPlugins: installedPlugins,
           appVersion: kHostAppVersion,
         );
-        if (items.isEmpty) {
+        if (allItems.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
@@ -295,18 +299,131 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           );
         }
 
+        final filteredItems = allItems.where((item) {
+          if (_selectedCategory != null &&
+              item.entry.category != _selectedCategory) {
+            return false;
+          }
+          if (_searchKeyword.isNotEmpty) {
+            final kw = _searchKeyword.toLowerCase();
+            final matchName = item.name.toLowerCase().contains(kw);
+            final matchDesc = item.description.toLowerCase().contains(kw);
+            final matchAuthor = item.entry.author.toLowerCase().contains(kw);
+            final matchId = item.id.toLowerCase().contains(kw);
+            return matchName || matchDesc || matchAuthor || matchId;
+          }
+          return true;
+        }).toList();
+
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView.builder(
             padding: const EdgeInsets.only(bottom: 24),
-            itemCount: items.length + 1,
+            itemCount: filteredItems.isEmpty ? 4 : filteredItems.length + 3,
             itemBuilder: (context, index) {
-              if (index == 0) return _buildHeader(catalog, items);
-              return _buildItemCard(items[index - 1]);
+              if (index == 0) return _buildSearchBar();
+              if (index == 1) return _buildCategoryChips(allItems);
+              if (index == 2) {
+                return _buildHeader(catalog, allItems, filteredItems);
+              }
+              if (filteredItems.isEmpty) return _buildEmptyFilterState();
+              return _buildItemCard(filteredItems[index - 3]);
             },
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: '搜索插件名称、描述或作者...',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: _searchKeyword.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () => setState(() => _searchKeyword = ''),
+                )
+              : null,
+          filled: true,
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: (val) => setState(() => _searchKeyword = val.trim()),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips(List<PluginStoreItem> allItems) {
+    final categories = <String>{};
+    for (final it in allItems) {
+      if (it.entry.category.isNotEmpty) {
+        categories.add(it.entry.category);
+      }
+    }
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    final sortedCats = categories.toList()..sort();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('全部'),
+            selected: _selectedCategory == null,
+            onSelected: (_) => setState(() => _selectedCategory = null),
+          ),
+          const SizedBox(width: 8),
+          for (final cat in sortedCats) ...[
+            FilterChip(
+              label: Text(pluginCategoryLabel(cat)),
+              selected: _selectedCategory == cat,
+              onSelected: (sel) =>
+                  setState(() => _selectedCategory = sel ? cat : null),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              Icons.search_off_outlined,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 12),
+            const Text('未找到匹配的插件'),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _searchKeyword = '';
+                  _selectedCategory = null;
+                });
+              },
+              child: const Text('清除筛选条件'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -347,17 +464,24 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     );
   }
 
-  Widget _buildHeader(PluginStoreCatalog catalog, List<PluginStoreItem> items) {
+  Widget _buildHeader(
+    PluginStoreCatalog catalog,
+    List<PluginStoreItem> allItems,
+    List<PluginStoreItem> filteredItems,
+  ) {
     final theme = Theme.of(context);
     final repoConfig = ref.watch(customPluginRepositoryProvider);
     final sourceLabel = repoConfig.summary;
+    final countLabel = filteredItems.length == allItems.length
+        ? '共 ${allItems.length} 个插件'
+        : '共 ${allItems.length} 个插件 (已筛选出 ${filteredItems.length} 个)';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '共 ${items.length} 个插件',
+            countLabel,
             style: theme.textTheme.titleSmall,
           ),
           const SizedBox(height: 4),
