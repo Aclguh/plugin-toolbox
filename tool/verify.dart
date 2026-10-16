@@ -318,6 +318,38 @@ void main() {
   expect(duiSchemaJson != null && duiSchemaJson['properties'] != null,
       'dui.schema.json 结构完整且为合法 JSON Schema');
 
+  final luaDefFile = File('tool/schemas/plugin_api.def.lua');
+  expect(
+      luaDefFile.existsSync(), '官方 EmmyLua/LuaLS 类型定义文件 plugin_api.def.lua 存在');
+  final luaDefContent =
+      luaDefFile.existsSync() ? luaDefFile.readAsStringSync() : '';
+  expect(
+      luaDefContent.contains('state =') &&
+          luaDefContent.contains('clipboard =') &&
+          luaDefContent.contains('network =') &&
+          luaDefContent.contains('storage =') &&
+          luaDefContent.contains('task =') &&
+          luaDefContent.contains('fs ='),
+      'plugin_api.def.lua 完整定义了全部核心宿主 API 命名空间');
+
+  final ptxCliFile = File('tool/ptx.py');
+  expect(ptxCliFile.existsSync(), '官方插件开发者脚手架 CLI tool/ptx.py 存在');
+
+  final installerFile =
+      File('packages/core/lib/src/installer/plugin_installer.dart');
+  expect(installerFile.existsSync(), 'PluginInstaller 源码存在');
+  final installerCode = installerFile.readAsStringSync();
+  expect(
+    installerCode.contains('exportToBytes') &&
+        installerCode.contains('exportToPtx'),
+    'PluginInstaller 支持已安装插件导出为 .ptx 归档包',
+  );
+  expect(
+    installerCode.contains('_shouldExcludeFromExport') &&
+        installerCode.contains('storage.json'),
+    '导出包自动排除沙箱持久化存储与备份文件',
+  );
+
   // 5. 沙箱路径隔离与 Path Traversal 防御算法 (直接断言 packages/core 生产实现)
   print('\n--- 5. 沙箱存储与防路径穿越安全算法断言 (生产实现) ---');
   const baseBox = 'app_data/plugins/base64_tool';
@@ -358,6 +390,13 @@ void main() {
   expectEq(
       SandboxPath.isSafeRelativeEntry('a/../../evil'), false, '压缩包嵌套穿越条目拦截');
   expectEq(SandboxPath.isSafeRelativeEntry(''), false, '压缩包空条目路径拦截');
+
+  // Lua 预编译字节码拦截
+  expectEq(SandboxPath.isLuaBytecode([0x1B, 0x4C, 0x75, 0x61, 0x01]), true,
+      '预编译 Lua 字节码魔数被成功识别');
+  expectEq(SandboxPath.isLuaBytecode([0x1B, 0x4C, 0x75]), false, '非完整字节码魔数不误判');
+  expectEq(
+      SandboxPath.isLuaBytecode('print("hello")'.codeUnits), false, '源码文本放行通过');
 
   // 6. 双向排序数学一致性算法验证 (直接断言 packages/core 生产实现)
   print('\n--- 6. 双向排序同步算法逻辑断言 (生产实现) ---');

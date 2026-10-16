@@ -233,11 +233,11 @@ flutter build apk --release --split-per-abi
 # 1. Static code analysis (0 warnings, 0 errors)
 dart analyze
 
-# 2. Automated specification and logic verification (141 assertions, pure Dart)
+# 2. Automated specification and logic verification (150 assertions, pure Dart)
 dart run tool/verify.dart
 
-# 3. Layered unit & widget tests (pure software testing, 372 cases, no devices needed)
-#    packages/core 101 / packages/lua 123 / packages/dui 59 / packages/ui 13 / app 76
+# 3. Layered unit & widget tests (pure software testing, 413 cases, no devices needed)
+#    packages/core 106 / packages/lua 134 / packages/dui 74 / packages/ui 13 / app 86
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test
