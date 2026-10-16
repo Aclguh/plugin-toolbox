@@ -7,7 +7,6 @@ import '../dui_utils.dart';
 /// 注册布局与容器类组件工厂 (Column, Row, Stack, Container, etc.)
 void registerLayoutFactories(DuiRenderer renderer) {
   final state = renderer.state;
-  final eventHandler = renderer.eventHandler;
 
   CrossAxisAlignment parseCrossAxis(String? val) {
     switch (val) {
@@ -150,49 +149,6 @@ void registerLayoutFactories(DuiRenderer renderer) {
     );
   });
 
-  final RegExp indexPattern = RegExp(r'\{\{\s*\$index\s*\}\}');
-  final RegExp itemPattern =
-      RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}');
-
-  dynamic resolveScoped(dynamic val, dynamic item, int index) {
-    if (val is String) {
-      if (!val.contains(r'$')) return val;
-      return val
-          .replaceAll(indexPattern, index.toString())
-          .replaceAllMapped(itemPattern, (m) {
-        final field = m.group(1);
-        if (field == null) {
-          return item?.toString() ?? '';
-        }
-        if (item is Map) {
-          return item[field]?.toString() ?? '';
-        }
-        return '';
-      });
-    } else if (val is Map) {
-      var hasScopeVar = false;
-      for (final v in val.values) {
-        if (v is String && v.contains(r'$')) {
-          hasScopeVar = true;
-          break;
-        } else if (v is Map || v is List) {
-          hasScopeVar = true;
-          break;
-        }
-      }
-      if (!hasScopeVar) return val;
-
-      final result = <String, dynamic>{};
-      for (final e in val.entries) {
-        result[e.key.toString()] = resolveScoped(e.value, item, index);
-      }
-      return result;
-    } else if (val is List) {
-      return val.map((v) => resolveScoped(v, item, index)).toList();
-    }
-    return val;
-  }
-
   Widget buildListView(DuiNodeContext node) {
     final rawItems = node.props['items'] ?? node.props['dataSource'];
     // 静态 children 模式保持兼容
@@ -259,11 +215,13 @@ void registerLayoutFactories(DuiRenderer renderer) {
           itemCount: list.length,
           separatorBuilder: (_, __) => SizedBox(height: separatorHeight),
           itemBuilder: (ctx, index) {
-            final scopedAst = resolveScoped(itemTemplate, list[index], index);
-            if (scopedAst is Map<String, dynamic>) {
-              return renderer.buildWidget(node.context, scopedAst);
-            }
-            return const SizedBox.shrink();
+            final itemScope = DuiScopeContext(
+              item: list[index],
+              index: index,
+              parent: node.scope,
+            );
+            return renderer.buildWidget(node.context, itemTemplate,
+                scope: itemScope);
           },
         );
       }
@@ -273,11 +231,13 @@ void registerLayoutFactories(DuiRenderer renderer) {
         padding: padding,
         itemCount: list.length,
         itemBuilder: (ctx, index) {
-          final scopedAst = resolveScoped(itemTemplate, list[index], index);
-          if (scopedAst is Map<String, dynamic>) {
-            return renderer.buildWidget(node.context, scopedAst);
-          }
-          return const SizedBox.shrink();
+          final itemScope = DuiScopeContext(
+            item: list[index],
+            index: index,
+            parent: node.scope,
+          );
+          return renderer.buildWidget(node.context, itemTemplate,
+              scope: itemScope);
         },
       );
     }
@@ -296,14 +256,14 @@ void registerLayoutFactories(DuiRenderer renderer) {
       'ListTile',
       (node) => ListTile(
             title:
-                Text(state.interpolate(node.props['title']?.toString() ?? '')),
+                Text(node.interpolate(node.props['title']?.toString() ?? '')),
             subtitle: node.props['subtitle'] != null
-                ? Text(state.interpolate(node.props['subtitle'].toString()))
+                ? Text(node.interpolate(node.props['subtitle'].toString()))
                 : null,
             leading: node.props['leading'] != null
                 ? Icon(DuiUtils.parseIcon(node.props['leading'].toString()))
                 : null,
-            onTap: () => eventHandler.handleEvent(node.events['onTap']),
+            onTap: () => node.handleEvent(node.events['onTap']),
           ));
 
   renderer.registerFactory(
@@ -321,7 +281,7 @@ void registerLayoutFactories(DuiRenderer renderer) {
             height: DuiUtils.tryDouble(node.props['height']),
             thickness: DuiUtils.tryDouble(node.props['thickness']),
             color: DuiUtils.parseColor(
-                state.interpolate(node.props['color']?.toString() ?? '')),
+                node.interpolate(node.props['color']?.toString() ?? '')),
           ));
 
   renderer.registerFactory('Repeater', (node) {
@@ -379,10 +339,13 @@ void registerLayoutFactories(DuiRenderer renderer) {
               ? SizedBox(width: spacing)
               : SizedBox(height: spacing));
         }
-        final scopedAst = resolveScoped(itemTemplate, list[i], i);
-        if (scopedAst is Map<String, dynamic>) {
-          children.add(renderer.buildWidget(node.context, scopedAst));
-        }
+        final itemScope = DuiScopeContext(
+          item: list[i],
+          index: i,
+          parent: node.scope,
+        );
+        children.add(
+            renderer.buildWidget(node.context, itemTemplate, scope: itemScope));
       }
 
       return isHorizontal

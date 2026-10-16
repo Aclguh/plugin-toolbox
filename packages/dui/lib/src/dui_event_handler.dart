@@ -35,7 +35,7 @@ class DuiEventHandler {
   /// 事件定义接受宽容的 Map 类型并做防御式取值：
   /// 第三方插件 JSON 的嵌套结构可能被解析为 `Map<dynamic, dynamic>`，
   /// 直接强转会抛 TypeError 使插件页面崩溃
-  void handleEvent(Map? eventDef, [dynamic payload]) {
+  void handleEvent(Map? eventDef, [dynamic payload, DuiScopeContext? scope]) {
     if (eventDef == null) return;
     final action = eventDef['action']?.toString();
     if (action == null) return;
@@ -49,12 +49,20 @@ class DuiEventHandler {
             : <dynamic>[];
         List<dynamic> effectiveArgs;
         if (rawArgs.contains(r'$payload')) {
-          effectiveArgs =
-              rawArgs.map((a) => a == r'$payload' ? payload : a).toList();
+          effectiveArgs = rawArgs
+              .map((a) => a == r'$payload'
+                  ? payload
+                  : (scope != null ? scope.resolveDynamic(a) : a))
+              .toList();
         } else if (payload != null) {
-          effectiveArgs = [...rawArgs, payload];
+          effectiveArgs = [
+            ...rawArgs.map((a) => scope != null ? scope.resolveDynamic(a) : a),
+            payload
+          ];
         } else {
-          effectiveArgs = rawArgs;
+          effectiveArgs = rawArgs
+              .map((a) => scope != null ? scope.resolveDynamic(a) : a)
+              .toList();
         }
         executor.callLua(func, effectiveArgs);
         break;
@@ -72,7 +80,7 @@ class DuiEventHandler {
           break;
         }
         final rawText = eventDef['text']?.toString() ?? '';
-        final text = state.interpolate(rawText);
+        final text = state.interpolate(rawText, scope);
         Clipboard.setData(ClipboardData(text: text));
         executor.showToast('已复制到剪贴板');
         break;

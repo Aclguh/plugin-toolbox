@@ -6,11 +6,13 @@ import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
 
 class MockActionExecutor implements DuiActionExecutor {
   final List<String> calledFunctions = [];
+  final Map<String, List<dynamic>> callArgs = {};
   final List<String> toasts = [];
 
   @override
   void callLua(String functionName, [List<dynamic> args = const []]) {
     calledFunctions.add(functionName);
+    callArgs[functionName] = args;
   }
 
   @override
@@ -176,6 +178,129 @@ void main() {
 
       await tester.tap(find.text('Click Me'));
       expect(executor.calledFunctions, contains('onButtonClicked'));
+    });
+
+    testWidgets('renders generic Button as filled and outlined',
+        (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      final node = {
+        'type': 'Column',
+        'children': [
+          {
+            'type': 'Button',
+            'props': {'text': 'Default Button'},
+            'events': {
+              'onPressed': {'action': 'callLua', 'function': 'defaultClicked'}
+            }
+          },
+          {
+            'type': 'Button',
+            'props': {'text': 'Outlined Button', 'type': 'outlined'},
+            'events': {
+              'onPressed': {'action': 'callLua', 'function': 'outlinedClicked'}
+            }
+          }
+        ]
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => renderer.buildWidget(context, node),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Default Button'), findsOneWidget);
+      expect(find.text('Outlined Button'), findsOneWidget);
+      expect(find.byType(FilledButton), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsOneWidget);
+
+      await tester.tap(find.text('Default Button'));
+      expect(executor.calledFunctions, contains('defaultClicked'));
+      await tester.tap(find.text('Outlined Button'));
+      expect(executor.calledFunctions, contains('outlinedClicked'));
+    });
+
+    testWidgets('DuiScopeContext 支持作用域深层字段解析、可见性计算与事件参数传递', (tester) async {
+      final state = DuiState();
+      final executor = MockActionExecutor();
+      final handler = DuiEventHandler(state: state, executor: executor);
+      final renderer = DuiRenderer(state: state, eventHandler: handler);
+
+      const scope = DuiScopeContext(
+        item: {
+          'id': 'item-101',
+          'profile': {'name': 'Alice'},
+          'roles': ['admin', 'viewer'],
+          'enabled': true,
+        },
+        index: 2,
+      );
+
+      // 1. 作用域解析测试
+      expect(scope.resolve(r'$index'), 2);
+      expect(scope.resolve(r'$item.id'), 'item-101');
+      expect(scope.resolve(r'$item.profile.name'), 'Alice');
+      expect(scope.resolve(r'$item.roles.0'), 'admin');
+      expect(scope.resolve(r'$item.roles.1'), 'viewer');
+
+      // 2. 模板插值与可见性
+      expect(
+        state.interpolate(
+            r'Index: {{$index}}, User: {{$item.profile.name}}, Role: {{$item.roles.0}}',
+            scope),
+        'Index: 2, User: Alice, Role: admin',
+      );
+      expect(state.evaluateVisible(r'$item.enabled == true', scope), isTrue);
+
+      // 3. UI 渲染与作用域事件派发
+      final node = {
+        'type': 'Column',
+        'children': [
+          {
+            'type': 'Text',
+            'props': {
+              'text': r'Hello {{$item.profile.name}}',
+            },
+          },
+          {
+            'type': 'FilledButton',
+            'props': {'text': r'Action {{$index}}'},
+            'events': {
+              'onPressed': {
+                'action': 'callLua',
+                'function': 'onItemAction',
+                'args': [r'{{$item.id}}', r'{{$index}}'],
+              }
+            }
+          }
+        ]
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) =>
+                  renderer.buildWidget(context, node, scope: scope),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Hello Alice'), findsOneWidget);
+      expect(find.text('Action 2'), findsOneWidget);
+
+      await tester.tap(find.text('Action 2'));
+      expect(executor.calledFunctions, contains('onItemAction'));
+      expect(executor.callArgs['onItemAction'], ['item-101', '2']);
     });
   });
 

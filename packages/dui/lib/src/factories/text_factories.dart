@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../dui_renderer.dart';
-import '../dui_state.dart';
 import '../dui_utils.dart';
 
 /// 注册文本类组件工厂 (Text, SelectableText)
@@ -10,9 +9,9 @@ void registerTextFactories(DuiRenderer renderer) {
 
   renderer.registerFactory('Text', (node) {
     final rawText = node.props['text']?.toString() ?? '';
-    final keys = DuiState.extractKeys(rawText);
+    final keys = node.textKeys;
     Widget buildText() => Text(
-          state.interpolate(rawText),
+          node.interpolate(rawText),
           style: DuiUtils.parseTextStyle(
               node.context, node.props['style']?.toString()),
           maxLines: DuiUtils.tryInt(node.props['maxLines']),
@@ -29,9 +28,9 @@ void registerTextFactories(DuiRenderer renderer) {
 
   renderer.registerFactory('SelectableText', (node) {
     final rawText = node.props['text']?.toString() ?? '';
-    final keys = DuiState.extractKeys(rawText);
+    final keys = node.textKeys;
     Widget buildText() => SelectableText(
-          state.interpolate(rawText),
+          node.interpolate(rawText),
           style: DuiUtils.parseTextStyle(
               node.context, node.props['style']?.toString()),
         );

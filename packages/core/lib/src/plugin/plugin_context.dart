@@ -30,6 +30,9 @@ class PluginContext {
   /// 插件允许访问的网络域名白名单（为 null 时不限制域名，非空时遵循 CSP 白名单规则）
   final List<String>? allowedDomains;
 
+  /// 可选的沙箱磁盘体积扫描器（用于注入测试或外部自定义文件系统）
+  final Future<int> Function(Directory dir)? diskScanner;
+
   /// 内存中缓存的沙箱已占用字节数（避免每次写入触发全量递归磁盘扫描）
   int? _cachedUsedBytes;
 
@@ -43,6 +46,7 @@ class PluginContext {
     this.rootDir,
     this.storageQuotaMb = 50,
     this.allowedDomains,
+    this.diskScanner,
   });
 
   /// 检查插件是否已被授予指定权限 [perm]
@@ -133,27 +137,13 @@ class PluginContext {
       _cachedUsedBytes = 0;
       return 0;
     }
-    // 在 FakeAsync 测试环境下（如 testWidgets），流式文件 IO 无法被虚拟时钟驱动，
-    // 使用同步列表避免导致 pumpAndSettle 超时挂起
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      _cachedUsedBytes = _calculateDiskUsedBytes();
-      return _cachedUsedBytes!;
+    if (diskScanner != null) {
+      final bytes = await diskScanner!(dir);
+      _cachedUsedBytes = bytes;
+      return bytes;
     }
-    var bytes = 0;
-    try {
-      if (await dir.exists()) {
-        await for (final entity
-            in dir.list(recursive: true, followLinks: false)) {
-          if (entity is File) {
-            try {
-              bytes += await entity.length();
-            } catch (_) {}
-          }
-        }
-      }
-    } catch (_) {}
-    _cachedUsedBytes = bytes;
-    return bytes;
+    _cachedUsedBytes = _calculateDiskUsedBytes();
+    return _cachedUsedBytes!;
   }
 
   /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内

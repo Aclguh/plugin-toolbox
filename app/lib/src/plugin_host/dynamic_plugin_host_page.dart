@@ -88,6 +88,7 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _nativeBridge.stopSensor('all');
+      widget.plugin.context?.storage.flush();
       _runner?.onPause();
     }
   }
@@ -193,6 +194,7 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
         }
       }
     }
+    storage?.flush();
     _nativeBridge.dispose();
     _runner?.dispose();
     _duiState.dispose();

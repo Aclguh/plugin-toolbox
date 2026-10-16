@@ -53,6 +53,9 @@ abstract class PluginStorage {
 
   /// 写入持久化值（[setValue] 的便捷别名）
   Future<bool> set(String key, dynamic value);
+
+  /// 将内存中的脏数据立即同步/落盘至持久化介质
+  Future<bool> flush();
 }
 
 /// 基于插件沙箱目录内独立 `storage.json` 的文件持久化存储实现。
@@ -60,21 +63,27 @@ abstract class PluginStorage {
 /// 相比共享全局 SharedPreferences：
 /// 1. 实现存储物理隔离，各插件存储文件存放在其沙箱根目录下，与沙箱同生共死；
 /// 2. 插件卸载或清理沙箱时随目录一并清除，杜绝全局 Key 污染；
-/// 3. 支持透明迁移旧版存放在 SharedPreferences 中的遗留数据。
+/// 3. 支持透明迁移旧版存放在 SharedPreferences 中的遗留数据；
+/// 4. 支持 50ms 脏写合并防抖（Debounce），避免连续写入引发频繁磁盘 I/O。
 class PluginFileStorageImpl implements PluginStorage {
   final String namespace;
   final Directory rootDir;
   final String fileName;
+  final Duration debounceDuration;
 
   PluginFileStorageImpl({
     required this.namespace,
     required this.rootDir,
     this.fileName = 'storage.json',
+    this.debounceDuration = const Duration(milliseconds: 50),
   });
 
   File get _file => File('${rootDir.path}/$fileName');
   Map<String, dynamic>? _data;
   Future<void> _writeQueue = Future.value();
+  Timer? _debounceTimer;
+  final List<Completer<bool>> _pendingCompleters = [];
+  bool _isDirty = false;
 
   Future<void> _ensureLoaded() async {
     if (_data != null) return;
@@ -127,20 +136,53 @@ class PluginFileStorageImpl implements PluginStorage {
             _data![stripped] = val;
           }
         }
-        await _save();
+        await _save(immediate: true);
       }
     } catch (_) {}
   }
 
-  Future<bool> _save() {
+  Future<bool> _save({bool immediate = false}) {
+    _isDirty = true;
     final completer = Completer<bool>();
+    _pendingCompleters.add(completer);
+
+    if (immediate || debounceDuration == Duration.zero) {
+      _debounceTimer?.cancel();
+      _debounceTimer = null;
+      _dispatchFlush();
+    } else {
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(debounceDuration, _dispatchFlush);
+    }
+    return completer.future;
+  }
+
+  void _dispatchFlush() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    if (!_isDirty && _pendingCompleters.isEmpty) return;
+
+    final completers = List<Completer<bool>>.from(_pendingCompleters);
+    _pendingCompleters.clear();
+    _isDirty = false;
+
     _writeQueue = _writeQueue.then((_) async {
       final ok = await _doSave();
-      completer.complete(ok);
+      for (final c in completers) {
+        if (!c.isCompleted) c.complete(ok);
+      }
     }).catchError((Object _) {
-      completer.complete(false);
+      for (final c in completers) {
+        if (!c.isCompleted) c.complete(false);
+      }
     });
-    return completer.future;
+  }
+
+  @override
+  Future<bool> flush() async {
+    _dispatchFlush();
+    await _writeQueue;
+    return true;
   }
 
   Future<bool> _doSave() async {
@@ -276,6 +318,13 @@ class PluginFileStorageImpl implements PluginStorage {
 
   @override
   Future<bool> clear() async {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _isDirty = false;
+    for (final c in _pendingCompleters) {
+      if (!c.isCompleted) c.complete(false);
+    }
+    _pendingCompleters.clear();
     await _ensureLoaded();
     _data!.clear();
     try {
@@ -313,6 +362,9 @@ class PluginStorageImpl implements PluginStorage {
   String _key(String key) => 'plugin.$namespace.$key';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  @override
+  Future<bool> flush() async => true;
 
   @override
   Future<String?> getString(String key) async =>

@@ -21,6 +21,8 @@ class DuiNodeContext {
   final List<Map<String, dynamic>> children;
   final Map<String, dynamic> events;
   final String? ref;
+  final DuiScopeContext? scope;
+  final Set<String> textKeys;
 
   const DuiNodeContext({
     required this.context,
@@ -29,10 +31,13 @@ class DuiNodeContext {
     required this.children,
     required this.events,
     required this.ref,
+    this.scope,
+    this.textKeys = const {},
   });
 
-  /// 构建第 [index] 个子节点
-  Widget childAt(int index) => renderer.buildWidget(context, children[index]);
+  /// 构建第 [index] 个子节点（继承当前作用域环境）
+  Widget childAt(int index) =>
+      renderer.buildWidget(context, children[index], scope: scope);
 
   /// 首个子节点；无子节点时返回占位
   Widget get firstChild =>
@@ -41,6 +46,17 @@ class DuiNodeContext {
   /// 构建全部子节点
   List<Widget> get childrenWidgets =>
       [for (var i = 0; i < children.length; i++) childAt(i)];
+
+  /// 解析当前作用域或全局状态的文本插值
+  String interpolate(String? template) {
+    if (template == null) return '';
+    return renderer.state.interpolate(template, scope);
+  }
+
+  /// 派发组件事件（继承当前作用域环境变量）
+  void handleEvent(Map? eventDef, [dynamic payload]) {
+    renderer.eventHandler.handleEvent(eventDef, payload, scope);
+  }
 
   // ---- 常用安全属性读取快捷方式 ----
   double? get width => DuiUtils.tryDouble(props['width']);
@@ -54,11 +70,12 @@ typedef DuiWidgetFactory = Widget Function(DuiNodeContext node);
 /// 一份 AST (ui.json 解析产物) 在页面生命周期内是不可变的静态结构，
 /// 但每次 build 都会为每个节点重跑 visible 键正则提取与防御式 Map 转换，
 /// 且任一祖先重建都会沿 childAt 递归放大该开销；因此在首次访问时
-/// 将 type / visible 绑定键 / props / children / events 一次提取并缓存。
+/// 将 type / visible 绑定键 / textKeys / props / children / events 一次提取并缓存。
 class _CompiledNode {
   final String type;
   final dynamic visibleExpr;
   final Set<String> visibleKeys;
+  final Set<String> textKeys;
   final Map<String, dynamic> props;
   final List<Map<String, dynamic>> children;
   final Map<String, dynamic> events;
@@ -68,6 +85,7 @@ class _CompiledNode {
     required this.type,
     required this.visibleExpr,
     required this.visibleKeys,
+    required this.textKeys,
     required this.props,
     required this.children,
     required this.events,
@@ -105,12 +123,14 @@ class DuiRenderer {
   }
 
   /// 构建声明式组件树根节点（下沉局部精准刷新，消除顶层全局全量重建风暴）
-  Widget build(BuildContext context, Map<String, dynamic> rootNode) {
-    return buildWidget(context, rootNode);
+  Widget build(BuildContext context, Map<String, dynamic> rootNode,
+      {DuiScopeContext? scope}) {
+    return buildWidget(context, rootNode, scope: scope);
   }
 
   /// 将 JSON 节点递归转换为 Flutter Widget
-  Widget buildWidget(BuildContext context, Map<String, dynamic> node) {
+  Widget buildWidget(BuildContext context, Map<String, dynamic> node,
+      {DuiScopeContext? scope}) {
     try {
       final compiled = _compile(node);
 
@@ -120,19 +140,19 @@ class DuiRenderer {
         return ListenableBuilder(
           listenable: state.listenableForKeys(compiled.visibleKeys),
           builder: (ctx, _) {
-            if (!state.evaluateVisible(compiled.visibleExpr)) {
+            if (!state.evaluateVisible(compiled.visibleExpr, scope)) {
               return const SizedBox.shrink();
             }
-            return _buildNodeContent(ctx, compiled);
+            return _buildNodeContent(ctx, compiled, scope);
           },
         );
       }
 
-      if (!state.evaluateVisible(compiled.visibleExpr)) {
+      if (!state.evaluateVisible(compiled.visibleExpr, scope)) {
         return const SizedBox.shrink();
       }
 
-      return _buildNodeContent(context, compiled);
+      return _buildNodeContent(context, compiled, scope);
     } catch (e, st) {
       return DuiErrorPlaceholder(
         type: node['type']?.toString() ?? 'Unknown',
@@ -149,13 +169,17 @@ class DuiRenderer {
 
     final visibleExpr = node['visible'];
     final rawChildren = node['children'];
+    final props = _asMap(node['props']);
+    final rawText = props['text']?.toString();
     final compiled = _CompiledNode(
       type: node['type']?.toString() ?? 'Container',
       visibleExpr: visibleExpr,
       visibleKeys: visibleExpr != null
           ? DuiState.extractKeys(visibleExpr.toString())
           : const <String>{},
-      props: _asMap(node['props']),
+      textKeys:
+          rawText != null ? DuiState.extractKeys(rawText) : const <String>{},
+      props: props,
       children: [
         if (rawChildren is List)
           for (final c in rawChildren)
@@ -168,7 +192,8 @@ class DuiRenderer {
     return compiled;
   }
 
-  Widget _buildNodeContent(BuildContext context, _CompiledNode compiled) {
+  Widget _buildNodeContent(
+      BuildContext context, _CompiledNode compiled, DuiScopeContext? scope) {
     final factory = _factories[compiled.type];
     if (factory == null) {
       return const SizedBox.shrink();
@@ -184,6 +209,8 @@ class DuiRenderer {
           children: compiled.children,
           events: compiled.events,
           ref: compiled.ref,
+          scope: scope,
+          textKeys: compiled.textKeys,
         ),
       ),
       fallback: (error, stackTrace) => DuiErrorPlaceholder(
