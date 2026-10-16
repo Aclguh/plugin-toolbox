@@ -41,6 +41,18 @@ abstract class PluginStorage {
 
   /// 清除当前插件命名空间下的所有键值
   Future<bool> clear();
+
+  /// 读取任意支持类型的持久化值
+  Future<dynamic> getValue(String key);
+
+  /// 写入任意支持类型的持久化值
+  Future<bool> setValue(String key, dynamic value);
+
+  /// 读取持久化值（[getValue] 的便捷别名）
+  Future<dynamic> get(String key);
+
+  /// 写入持久化值（[setValue] 的便捷别名）
+  Future<bool> set(String key, dynamic value);
 }
 
 /// 基于插件沙箱目录内独立 `storage.json` 的文件持久化存储实现。
@@ -234,6 +246,25 @@ class PluginFileStorageImpl implements PluginStorage {
   }
 
   @override
+  Future<dynamic> getValue(String key) async {
+    await _ensureLoaded();
+    return _data![key];
+  }
+
+  @override
+  Future<bool> setValue(String key, dynamic value) async {
+    await _ensureLoaded();
+    _data![key] = value;
+    return _save();
+  }
+
+  @override
+  Future<dynamic> get(String key) => getValue(key);
+
+  @override
+  Future<bool> set(String key, dynamic value) => setValue(key, value);
+
+  @override
   Future<bool> remove(String key) async {
     await _ensureLoaded();
     if (_data!.containsKey(key)) {
@@ -323,6 +354,28 @@ class PluginStorageImpl implements PluginStorage {
 
   @override
   Future<bool> remove(String key) async => (await _prefs).remove(_key(key));
+
+  @override
+  Future<dynamic> getValue(String key) async {
+    final prefs = await _prefs;
+    return prefs.get(_key(key));
+  }
+
+  @override
+  Future<bool> setValue(String key, dynamic value) async {
+    if (value is String) return setString(key, value);
+    if (value is bool) return setBool(key, value);
+    if (value is int) return setInt(key, value);
+    if (value is double) return setDouble(key, value);
+    if (value is List<String>) return setStringList(key, value);
+    return setString(key, jsonEncode(value));
+  }
+
+  @override
+  Future<dynamic> get(String key) => getValue(key);
+
+  @override
+  Future<bool> set(String key, dynamic value) => setValue(key, value);
 
   /// 清除该插件命名空间下的所有持久化键值。
   ///

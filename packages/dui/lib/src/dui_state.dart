@@ -5,13 +5,46 @@ class DuiState extends ChangeNotifier {
   final Map<String, dynamic> _values = {};
   final Map<String, _KeyNotifier> _keyNotifiers = {};
 
-  /// 正则在 UI 构建期被高频命中，静态化避免每次调用重新编译
+  /// 正则在 UI 构建期被高频命中，静态化避免每次调用重新编译（支持点号语法嵌套解析）
   static final RegExp _interpolatePattern =
-      RegExp(r'\{\{state\.([a-zA-Z0-9_]+)\}\}');
+      RegExp(r'\{\{state\.([a-zA-Z0-9_\.]+)\}\}');
 
   static final Listenable _emptyListenable = ChangeNotifier();
 
-  dynamic get(String key) => _values[key];
+  /// 声明式持久化状态键集合（若键发生变动，自动通知外部持久化）
+  final Set<String> persistentKeys = {};
+
+  /// 状态持久化通知回调
+  void Function(String key, dynamic value)? onPersist;
+
+  /// 安全读取状态值（优先直取，若未命中则支持深层点号导航解析，例如 "user.profile.name" 或 "items.0.title"）
+  dynamic get(String key) => getPath(key);
+
+  /// 深层点号语法读取（例如 "user.profile.name" 或 "items.0.title"）
+  dynamic getPath(String path) {
+    if (_values.containsKey(path)) return _values[path];
+    if (!path.contains('.')) return _values[path];
+
+    final segments = path.split('.');
+    dynamic current = _values[segments.first];
+    for (var i = 1; i < segments.length; i++) {
+      if (current == null) return null;
+      final seg = segments[i];
+      if (current is Map) {
+        current = current[seg];
+      } else if (current is List) {
+        final index = int.tryParse(seg);
+        if (index != null && index >= 0 && index < current.length) {
+          current = current[index];
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+    return current;
+  }
 
   /// 设置指定键的状态值
   ///
@@ -21,8 +54,21 @@ class DuiState extends ChangeNotifier {
     if (_values[key] != value) {
       _values[key] = value;
       _keyNotifiers[key]?.notify();
+      _notifyPathMatches(key);
       if (notifyGlobal) {
         notifyListeners();
+      }
+      if (persistentKeys.contains(key)) {
+        onPersist?.call(key, value);
+      }
+    }
+  }
+
+  void _notifyPathMatches(String key) {
+    for (final entry in _keyNotifiers.entries) {
+      if (entry.key != key &&
+          (entry.key.startsWith('$key.') || key.startsWith('${entry.key}.'))) {
+        entry.value.notify();
       }
     }
   }
@@ -34,7 +80,11 @@ class DuiState extends ChangeNotifier {
       if (_values[entry.key] != entry.value) {
         _values[entry.key] = entry.value;
         _keyNotifiers[entry.key]?.notify();
+        _notifyPathMatches(entry.key);
         hasChanged = true;
+        if (persistentKeys.contains(entry.key)) {
+          onPersist?.call(entry.key, entry.value);
+        }
       }
     }
     if (hasChanged && notifyGlobal) {
@@ -70,7 +120,7 @@ class DuiState extends ChangeNotifier {
   }
 
   static final RegExp _keyExtractorPattern =
-      RegExp(r'(?:\{\{\s*)?state\.([a-zA-Z0-9_]+)');
+      RegExp(r'(?:\{\{\s*)?state\.([a-zA-Z0-9_\.]+)');
 
   /// 从模板字符串或条件表达式中提取所有引用的状态键名
   static Set<String> extractKeys(String? template) {
@@ -78,18 +128,23 @@ class DuiState extends ChangeNotifier {
     final matches = _keyExtractorPattern.allMatches(template);
     final set = <String>{};
     for (final m in matches) {
-      final key = m.group(1);
-      if (key != null) set.add(key);
+      final path = m.group(1);
+      if (path != null && path.isNotEmpty) {
+        set.add(path);
+        if (path.contains('.')) {
+          set.add(path.split('.').first);
+        }
+      }
     }
     return set;
   }
 
-  /// 解析包含 {{state.key}} 模板语法的文本
+  /// 解析包含 {{state.key}} 或 {{state.a.b}} 模板语法的文本
   String interpolate(String template) {
     return template.replaceAllMapped(_interpolatePattern, (match) {
       final key = match.group(1);
       if (key == null) return '';
-      final val = _values[key];
+      final val = getPath(key);
       return val?.toString() ?? '';
     });
   }
@@ -213,13 +268,41 @@ class DuiExpressionEvaluator {
     // 状态变量引用: state.key 或 key
     if (s.startsWith('state.')) {
       final key = s.substring(6).trim();
-      return values[key];
+      return _resolvePath(key, values);
     }
     if (values.containsKey(s)) {
       return values[s];
     }
+    if (s.contains('.')) {
+      final res = _resolvePath(s, values);
+      if (res != null) return res;
+    }
 
     return s;
+  }
+
+  static dynamic _resolvePath(String path, Map<String, dynamic> values) {
+    if (values.containsKey(path)) return values[path];
+    if (!path.contains('.')) return values[path];
+    final segments = path.split('.');
+    dynamic current = values[segments.first];
+    for (var i = 1; i < segments.length; i++) {
+      if (current == null) return null;
+      final seg = segments[i];
+      if (current is Map) {
+        current = current[seg];
+      } else if (current is List) {
+        final index = int.tryParse(seg);
+        if (index != null && index >= 0 && index < current.length) {
+          current = current[index];
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+    return current;
   }
 
   static bool _compare(dynamic left, dynamic right, String op) {

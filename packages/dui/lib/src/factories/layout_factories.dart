@@ -150,12 +150,16 @@ void registerLayoutFactories(DuiRenderer renderer) {
     );
   });
 
+  final RegExp indexPattern = RegExp(r'\{\{\s*\$index\s*\}\}');
+  final RegExp itemPattern =
+      RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}');
+
   dynamic resolveScoped(dynamic val, dynamic item, int index) {
     if (val is String) {
+      if (!val.contains(r'$')) return val;
       return val
-          .replaceAll(RegExp(r'\{\{\s*\$index\s*\}\}'), index.toString())
-          .replaceAllMapped(
-              RegExp(r'\{\{\s*\$item(?:\.([a-zA-Z0-9_]+))?\s*\}\}'), (m) {
+          .replaceAll(indexPattern, index.toString())
+          .replaceAllMapped(itemPattern, (m) {
         final field = m.group(1);
         if (field == null) {
           return item?.toString() ?? '';
@@ -166,8 +170,23 @@ void registerLayoutFactories(DuiRenderer renderer) {
         return '';
       });
     } else if (val is Map) {
-      return val
-          .map((k, v) => MapEntry(k.toString(), resolveScoped(v, item, index)));
+      var hasScopeVar = false;
+      for (final v in val.values) {
+        if (v is String && v.contains(r'$')) {
+          hasScopeVar = true;
+          break;
+        } else if (v is Map || v is List) {
+          hasScopeVar = true;
+          break;
+        }
+      }
+      if (!hasScopeVar) return val;
+
+      final result = <String, dynamic>{};
+      for (final e in val.entries) {
+        result[e.key.toString()] = resolveScoped(e.value, item, index);
+      }
+      return result;
     } else if (val is List) {
       return val.map((v) => resolveScoped(v, item, index)).toList();
     }

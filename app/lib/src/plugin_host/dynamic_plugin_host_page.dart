@@ -125,6 +125,29 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
       }
       _uiRootNode = decoded;
 
+      // 1.5 声明式状态自动持久化：从插件独立沙箱读取持久化快照并预置进入 DUI 状态
+      final storage = widget.plugin.context?.storage;
+      final persistKeys = <String>{
+        ...widget.plugin.manifest.persistentStates,
+        if (_uiRootNode?['props'] is Map &&
+            _uiRootNode!['props']['persistentStates'] is List)
+          ...(_uiRootNode!['props']['persistentStates'] as List)
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty),
+      };
+      if (persistKeys.isNotEmpty && storage != null) {
+        _duiState.persistentKeys.addAll(persistKeys);
+        for (final k in persistKeys) {
+          final saved = await storage.get(k);
+          if (saved != null) {
+            _duiState.set(k, saved);
+          }
+        }
+        _duiState.onPersist = (k, v) {
+          storage.set(k, v);
+        };
+      }
+
       // 2. 初始化 Lua 运行时
       _runner = LuaPluginRunner(plugin: widget.plugin, delegate: this);
       await _runner!.start();
@@ -161,6 +184,15 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    final storage = widget.plugin.context?.storage;
+    if (storage != null && _duiState.persistentKeys.isNotEmpty) {
+      for (final k in _duiState.persistentKeys) {
+        final val = _duiState.get(k);
+        if (val != null) {
+          storage.set(k, val);
+        }
+      }
+    }
     _nativeBridge.dispose();
     _runner?.dispose();
     _duiState.dispose();

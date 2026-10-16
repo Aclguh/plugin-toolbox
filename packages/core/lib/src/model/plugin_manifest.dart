@@ -19,6 +19,7 @@ class PluginManifest {
   final List<Map<String, dynamic>> settings;
   final int storageQuotaMb;
   final List<String>? allowedDomains;
+  final List<String> persistentStates;
 
   const PluginManifest({
     required this.id,
@@ -36,6 +37,7 @@ class PluginManifest {
     this.settings = const [],
     this.storageQuotaMb = 50,
     this.allowedDomains,
+    this.persistentStates = const [],
   });
 
   /// 安全解析清单。
@@ -70,6 +72,14 @@ class PluginManifest {
         .where((d) => d.isNotEmpty)
         .toList();
 
+    final persistentStatesRaw = json['persistentStates'] is List
+        ? json['persistentStates'] as List<dynamic>
+        : const <dynamic>[];
+    final persistentStates = persistentStatesRaw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
     return PluginManifest(
       id: requiredField('id'),
       name: requiredField('name'),
@@ -91,6 +101,7 @@ class PluginManifest {
           ? (json['storageQuotaMb'] as num).toInt()
           : 50,
       allowedDomains: allowedDomains,
+      persistentStates: persistentStates,
     );
   }
 
@@ -110,6 +121,7 @@ class PluginManifest {
         'settings': settings,
         'storageQuotaMb': storageQuotaMb,
         if (allowedDomains != null) 'allowedDomains': allowedDomains,
+        if (persistentStates.isNotEmpty) 'persistentStates': persistentStates,
       };
 
   static PluginManifest fromJsonString(String source) {

@@ -1206,5 +1206,56 @@ void main() {
       expect(find.text('尾部可用按钮'), findsOneWidget);
       expect(find.text('嵌套正常子项'), findsOneWidget);
     });
+
+    test('DuiState 深层点号路径解析、插值、比较与持久化通知', () {
+      final state = DuiState();
+      state.set('profile', {
+        'name': 'Antigravity',
+        'details': {
+          'age': 25,
+          'city': 'Hangzhou',
+        },
+        'skills': ['Dart', 'Flutter', 'Lua'],
+      });
+
+      // 1. 深层路径读取
+      expect(state.get('profile.name'), 'Antigravity');
+      expect(state.get('profile.details.age'), 25);
+      expect(state.get('profile.skills.0'), 'Dart');
+      expect(state.get('profile.skills.2'), 'Lua');
+      expect(state.get('profile.skills.99'), isNull);
+      expect(state.get('profile.nonexistent'), isNull);
+
+      // 2. 模板插值
+      const template =
+          '用户: {{state.profile.name}}, 城市: {{state.profile.details.city}}, 主语言: {{state.profile.skills.0}}';
+      expect(
+        state.interpolate(template),
+        '用户: Antigravity, 城市: Hangzhou, 主语言: Dart',
+      );
+
+      // 3. 依赖提取（顶级与全路径）
+      final keys = DuiState.extractKeys(template);
+      expect(keys.contains('profile'), isTrue);
+      expect(keys.contains('profile.name'), isTrue);
+      expect(keys.contains('profile.details.city'), isTrue);
+
+      // 4. 可见性条件计算
+      expect(state.evaluateVisible('state.profile.details.age >= 18'), isTrue);
+      expect(state.evaluateVisible('state.profile.details.age < 18'), isFalse);
+      expect(
+          state.evaluateVisible("state.profile.name == 'Antigravity'"), isTrue);
+
+      // 5. 声明式自动持久化通知
+      final persisted = <String, dynamic>{};
+      state.persistentKeys.add('counter');
+      state.onPersist = (k, v) => persisted[k] = v;
+
+      state.set('other', 123);
+      expect(persisted.containsKey('other'), isFalse);
+
+      state.set('counter', 42);
+      expect(persisted['counter'], 42);
+    });
   });
 }
