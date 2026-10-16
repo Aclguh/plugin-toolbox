@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange.svg)](#架构设计)
 [![CI](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Aclguh/plugin-toolbox/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/Release-v0.2.0-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.2.1-brightgreen.svg)](https://github.com/Aclguh/plugin-toolbox/releases/latest)
 
 **简体中文** · [English](README.en.md)
 
@@ -24,7 +24,7 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) 页面获取最新版本 **v0.2.0**，按设备架构选择对应 APK 安装：
+前往 [Releases](https://github.com/Aclguh/plugin-toolbox/releases/latest) 页面获取最新版本 **v0.2.1**，按设备架构选择对应 APK 安装：
 
 | 架构 | 适用设备 | 安装包 |
 |---|---|---|

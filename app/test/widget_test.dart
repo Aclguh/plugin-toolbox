@@ -305,8 +305,8 @@ void main() {
     expect(find.text('动态取色 (Material You)'), findsOneWidget);
     expect(find.text('品牌深色（默认）'), findsOneWidget);
 
-    // 版本号第三处同步断言: 与 pubspec.yaml (0.2.0+2) 保持一致
-    expect(find.textContaining('版本 0.2.0'), findsOneWidget);
+    // 版本号第三处同步断言: 与 pubspec.yaml (0.2.1+3) 保持一致
+    expect(find.textContaining('版本 0.2.1'), findsOneWidget);
   });
 
   testWidgets('SettingsPage 支持自定义插件仓库配置与重置为默认', (WidgetTester tester) async {
@@ -372,7 +372,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 点击关于项
-    await tester.tap(find.textContaining('版本 0.2.0'));
+    await tester.tap(find.textContaining('版本 0.2.1'));
     await tester.pumpAndSettle();
 
     // 验证全量软件信息展示
