@@ -1,22 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
-import 'package:plugin_toolbox_dui/plugin_toolbox_dui.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
 import '../providers/app_providers.dart';
-import 'plugin_native_bridge.dart';
-import 'plugin_dialog_service.dart';
 import 'desktop_simulation_adapter.dart';
-import 'plugin_host_ai_delegate.dart';
-import 'plugin_host_media_delegate.dart';
-import 'plugin_host_system_delegate.dart';
-import 'plugin_permission_prompt.dart';
+import 'plugin_dialog_service.dart';
 import 'plugin_diagnostic_sheet.dart';
+import 'plugin_host_session.dart';
+import 'plugin_permission_prompt.dart';
 
 /// 动态插件宿主页面容器
 class DynamicPluginHostPage extends ConsumerStatefulWidget {
@@ -37,185 +30,43 @@ class DynamicPluginHostPage extends ConsumerStatefulWidget {
 }
 
 class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
-    with
-        WidgetsBindingObserver,
-        PluginHostMediaDelegate,
-        PluginHostSystemDelegate,
-        PluginHostAiDelegate
-    implements LuaHostDelegate, DuiActionExecutor {
-  late final PluginNativeBridge _nativeBridge;
-  late final DuiState _duiState;
-  late final DuiEventHandler _eventHandler;
-  late final DuiRenderer _renderer;
-  LuaPluginRunner? _runner;
-
-  Map<String, dynamic>? _uiRootNode;
-  String? _loadError;
-  bool _isLoading = true;
-
-  @override
-  PluginNativeBridge get nativeBridge => _nativeBridge;
+    with WidgetsBindingObserver
+    implements PluginSessionUiHandler {
+  late final PluginHostSession _session;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _nativeBridge = PluginNativeBridge(
-      pluginRootDir: widget.plugin.rootDir,
-      storageQuotaMb: widget.plugin.manifest.storageQuotaMb,
+    _session = PluginHostSession(
+      plugin: widget.plugin,
+      initialData: widget.initialData,
+      uiHandler: this,
     );
-    _duiState = DuiState();
-    _eventHandler = DuiEventHandler(
-      state: _duiState,
-      executor: this,
-      permissionChecker: (perm) =>
-          widget.plugin.context?.hasPermission(perm) ?? false,
-    );
-    _renderer = DuiRenderer(
-      state: _duiState,
-      eventHandler: _eventHandler,
-      pluginRootDir: widget.plugin.rootDir,
-    );
+    _session.addListener(_onSessionStateChanged);
+    _session.start(registry: ref.read(pluginRegistryProvider));
+  }
 
-    _startPlugin();
+  void _onSessionStateChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _runner?.onResume();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      _nativeBridge.stopSensor('all');
-      widget.plugin.context?.storage.flush();
-      _runner?.onPause();
-    }
-  }
-
-  Future<void> _startPlugin() async {
-    try {
-      // 0. 上下文懒初始化收敛在页面生命周期内（路由 builder 不做副作用），
-      // 深链直达或异步跳转挂载时同样保证上下文就绪
-      final registry = ref.read(pluginRegistryProvider);
-      if (!registry.isInitialized(widget.plugin.id)) {
-        await registry.initializePlugin(widget.plugin.id);
-      }
-      // 注册表初始化失败（或直接挂载未走注册表）时的兜底上下文
-      if (widget.plugin.context == null) {
-        await widget.plugin.initialize(PluginContext(
-          pluginId: widget.plugin.id,
-          storage: const PluginStorageFactory().create(
-            widget.plugin.id,
-            rootDir: widget.plugin.rootDir,
-          ),
-          eventBus: EventBusImpl(),
-          logger: Logger(),
-          grantedPermissions: widget.plugin.manifest.permissions.toSet(),
-          rootDir: widget.plugin.rootDir,
-          storageQuotaMb: widget.plugin.manifest.storageQuotaMb,
-          allowedDomains: widget.plugin.manifest.allowedDomains,
-        ));
-      }
-
-      // 1. 读取并解析 UI JSON 描述（优先复用内存 AST 缓存，避免重复 I/O 与反序列化）
-      _uiRootNode = await widget.plugin.loadUiDefinition();
-
-      // 1.5 声明式状态自动持久化：从插件独立沙箱读取持久化快照并预置进入 DUI 状态
-      final storage = widget.plugin.context?.storage;
-      final persistKeys = <String>{
-        ...widget.plugin.manifest.persistentStates,
-        if (_uiRootNode?['props'] is Map &&
-            _uiRootNode!['props']['persistentStates'] is List)
-          ...(_uiRootNode!['props']['persistentStates'] as List)
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty),
-      };
-      if (persistKeys.isNotEmpty && storage != null) {
-        _duiState.persistentKeys.addAll(persistKeys);
-        for (final k in persistKeys) {
-          final saved = await storage.get(k);
-          if (saved != null) {
-            _duiState.set(k, saved);
-          }
-        }
-        _duiState.onPersist = (k, v) {
-          storage.set(k, v);
-        };
-      }
-
-      // 2. 初始化 Lua 运行时
-      _runner = LuaPluginRunner(plugin: widget.plugin, delegate: this);
-      await _runner!.start();
-
-      // 3. 贯通跨插件调起的初始参数：预置 DUI 状态使 ${state.xxx} 绑定
-      // 可直接渲染，并派发 onLaunch 钩子让 Lua 脚本感知调起来源
-      final launchData = widget.initialData;
-      if (launchData != null && launchData.isNotEmpty) {
-        for (final entry in launchData.entries) {
-          _duiState.set(entry.key, entry.value);
-        }
-        try {
-          _runner!.dispatchAction('onLaunch', [launchData]);
-        } catch (e) {
-          showToast('onLaunch 执行错误: $e');
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
+    _session.handleAppLifecycleState(state);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    final storage = widget.plugin.context?.storage;
-    if (storage != null && _duiState.persistentKeys.isNotEmpty) {
-      for (final k in _duiState.persistentKeys) {
-        final val = _duiState.get(k);
-        if (val != null) {
-          storage.set(k, val);
-        }
-      }
-    }
-    storage?.flush();
-    _nativeBridge.dispose();
-    _runner?.dispose();
-    _duiState.dispose();
+    _session.removeListener(_onSessionStateChanged);
+    _session.dispose();
     super.dispose();
   }
 
-  // --- DuiActionExecutor 协议 ---
-  @override
-  void callLua(String functionName, [List<dynamic> args = const []]) {
-    try {
-      _runner?.dispatchAction(functionName, args);
-    } catch (e) {
-      showToast('执行错误: $e');
-    }
-  }
-
-  // --- LuaHostDelegate: 状态管理 ---
-  @override
-  void onStateChanged(String key, dynamic value) => _duiState.set(key, value);
-
-  @override
-  dynamic getState(String key) => _duiState.get(key);
-
-  @override
-  Map<String, dynamic> getAllStates() => _duiState.getAll();
-
-  // --- LuaHostDelegate: UI 弹窗与用户交互 (委托至 PluginDialogService) ---
+  // --- PluginSessionUiHandler 用户交互与弹窗协议实现 ---
   @override
   void showToast(String message) {
     if (mounted) PluginDialogService.showToast(context, message);
@@ -282,40 +133,6 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     }
   }
 
-  // --- LuaClipboardDelegate 协议实现 ---
-  @override
-  void setClipboardText(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-  }
-
-  @override
-  Future<String?> getClipboardText() async {
-    final data = await Clipboard.getData('text/plain');
-    return data?.text;
-  }
-
-  @override
-  void hapticFeedback(String type) {
-    switch (type) {
-      case 'light':
-        HapticFeedback.lightImpact();
-        break;
-      case 'medium':
-        HapticFeedback.mediumImpact();
-        break;
-      case 'heavy':
-        HapticFeedback.heavyImpact();
-        break;
-      case 'selection':
-        HapticFeedback.selectionClick();
-        break;
-      case 'vibrate':
-      default:
-        HapticFeedback.vibrate();
-        break;
-    }
-  }
-
   @override
   Future<String?> pickDate({
     String? initialDate,
@@ -354,32 +171,28 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
     }
   }
 
-  Future<bool> _ensurePermission(PluginPermission perm) async {
-    final granted = widget.plugin.context?.hasPermission(perm) ?? false;
-    if (granted) return true;
+  @override
+  Future<bool> requestPermission(PluginPermission permission) async {
     if (!mounted) return false;
     return await PluginPermissionPrompt.requestPermission(
       context,
       plugin: widget.plugin,
-      permission: perm,
+      permission: permission,
       ref: ref,
     );
   }
 
   @override
-  Future<String?> scanBarcode({String? prompt}) async {
-    if (!await _ensurePermission(PluginPermission.camera)) return null;
-    final res = await nativeBridge.scanBarcode(prompt: prompt);
-    if (res != null) return res;
+  Future<String?> simulateScanBarcode({String? prompt}) async {
     if (!mounted) return null;
-    return await DesktopSimulationAdapter.simulateScanBarcode(context,
-        prompt: prompt);
+    return await DesktopSimulationAdapter.simulateScanBarcode(
+      context,
+      prompt: prompt,
+    );
   }
 
   @override
-  Future<String?> decodeBarcodeFromImage(String filePath) async {
-    final res = await nativeBridge.decodeBarcodeFromImage(filePath);
-    if (res != null) return res;
+  Future<String?> simulateDecodeBarcode() async {
     if (!mounted) return null;
     return await DesktopSimulationAdapter.simulateDecodeBarcode(context);
   }
@@ -396,28 +209,22 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
             PluginDiagnosticSheet.show(
               context,
               plugin: widget.plugin,
-              runner: _runner,
-              onReload: () {
-                widget.plugin.invalidateUiCache();
-                setState(() {
-                  _isLoading = true;
-                  _loadError = null;
-                });
-                _runner?.dispose();
-                _runner = null;
-                _startPlugin();
-              },
+              runner: _session.runner,
+              onReload: () =>
+                  _session.reload(registry: ref.read(pluginRegistryProvider)),
             );
           },
         ),
       ],
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _loadError != null
-              ? ErrorView(message: '插件运行错误:\n$_loadError')
-              : _uiRootNode != null
-                  ? _renderer.build(context, _uiRootNode!)
-                  : const Center(child: Text('无 UI 描述')),
+      body: switch (_session.status) {
+        PluginSessionStatus.loading =>
+          const Center(child: CircularProgressIndicator()),
+        PluginSessionStatus.error =>
+          ErrorView(message: '插件运行错误:\n${_session.errorMessage}'),
+        PluginSessionStatus.ready => _session.uiRootNode != null
+            ? _session.renderer.build(context, _session.uiRootNode!)
+            : const Center(child: Text('无 UI 描述')),
+      },
     );
   }
 }

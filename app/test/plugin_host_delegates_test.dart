@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox/src/plugin_host/dynamic_plugin_host_page.dart';
 import 'package:plugin_toolbox/src/plugin_host/plugin_host_ai_delegate.dart';
 import 'package:plugin_toolbox/src/plugin_host/plugin_host_media_delegate.dart';
+import 'package:plugin_toolbox/src/plugin_host/plugin_host_session.dart';
 import 'package:plugin_toolbox/src/plugin_host/plugin_host_system_delegate.dart';
 import 'package:plugin_toolbox/src/plugin_host/plugin_native_bridge.dart';
 import 'package:plugin_toolbox/src/providers/app_providers.dart';
@@ -214,5 +215,55 @@ void main() {
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
+  });
+
+  test('PluginHostSession 会话状态流转与生命周期控制', () async {
+    final uiDir = Directory('${tempDir.path}/ui')..createSync(recursive: true);
+    final uiFile = File('${uiDir.path}/main.ui.json');
+    uiFile.writeAsStringSync('{"type": "Center", "props": {"text": "hello"}}');
+    final scriptFile = File('${tempDir.path}/main.lua');
+    scriptFile.writeAsStringSync(
+        'function onInit() end\nfunction onResume() end\nfunction onPause() end');
+
+    final sessionPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'session_test_p',
+        name: '会话测试插件',
+        version: '1.0.0',
+        description: '测试纯 Dart 会话控制器',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.calculator,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'ui/main.ui.json',
+      ),
+      rootDir: tempDir,
+    );
+
+    final session = PluginHostSession(plugin: sessionPlugin);
+    expect(session.status, PluginSessionStatus.loading);
+    expect(session.isLoading, isTrue);
+
+    await session.start();
+    expect(session.status, PluginSessionStatus.ready);
+    expect(session.isReady, isTrue);
+    expect(session.hasError, isFalse);
+    expect(session.uiRootNode?['type'], 'Center');
+
+    // 状态读写委托验证
+    session.onStateChanged('msg', 'world');
+    expect(session.getState('msg'), 'world');
+    expect(session.getAllStates()['msg'], 'world');
+
+    // 生命周期变迁验证
+    session.handleAppLifecycleState(AppLifecycleState.paused);
+    session.handleAppLifecycleState(AppLifecycleState.resumed);
+
+    // 重新加载与销毁验证
+    await session.reload();
+    expect(session.isReady, isTrue);
+
+    session.dispose();
   });
 }
