@@ -263,11 +263,23 @@ class _HtmlParser {
     return TextSpan(children: spans);
   }
 
+  static final _allowedLinkSchemes = {'http', 'https', 'mailto', 'tel'};
+
   InlineSpan _buildSpan(String text, TextStyle style, String? href) {
     if (href != null && onLinkTap != null) {
-      final recognizer = TapGestureRecognizer()..onTap = () => onLinkTap!(href);
-      recognizers?.add(recognizer);
-      return TextSpan(text: text, style: style, recognizer: recognizer);
+      final trimmed = href.trim();
+      final uri = Uri.tryParse(trimmed);
+      final scheme = uri?.scheme.toLowerCase() ?? '';
+      final isSafe = trimmed.startsWith('#') ||
+          (uri != null &&
+              uri.hasScheme &&
+              _allowedLinkSchemes.contains(scheme));
+      if (isSafe) {
+        final recognizer = TapGestureRecognizer()
+          ..onTap = () => onLinkTap!(href);
+        recognizers?.add(recognizer);
+        return TextSpan(text: text, style: style, recognizer: recognizer);
+      }
     }
     return TextSpan(text: text, style: style);
   }

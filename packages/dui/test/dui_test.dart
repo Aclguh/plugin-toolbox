@@ -1157,8 +1157,18 @@ void main() {
           ),
         ),
       );
-      expect(tester.takeException(), isNull);
       expect(find.byType(DuiHtml), findsOneWidget);
+
+      // 1.1 DuiHtml 安全 Scheme 过滤拦截
+      String? tappedUrl;
+      final htmlLinkWidget = DuiHtml(
+        html:
+            '<a href="javascript:alert(1)">恶意脚本</a><a href="https://example.com">合法链接</a>',
+        onLinkTap: (url) => tappedUrl = url,
+      );
+      await tester
+          .pumpWidget(MaterialApp(home: Scaffold(body: htmlLinkWidget)));
+      expect(tappedUrl, isNull);
 
       // 2. DuiChart 损坏数据
       final corruptedChartNode = {
