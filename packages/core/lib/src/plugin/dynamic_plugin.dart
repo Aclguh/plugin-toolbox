@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import '../model/plugin_manifest.dart';
 import '../model/plugin_category.dart';
@@ -9,6 +10,7 @@ class DynamicPlugin extends ToolPlugin {
   final PluginManifest manifest;
   final Directory rootDir;
   PluginContext? _context;
+  Map<String, dynamic>? _cachedUiAst;
 
   DynamicPlugin({
     required this.manifest,
@@ -46,6 +48,25 @@ class DynamicPlugin extends ToolPlugin {
 
   PluginContext? get context => _context;
 
+  /// 获取或读取并缓存 UI 声明式描述 AST，避免二次打开插件时重复执行磁盘 I/O 与 JSON 解析
+  Future<Map<String, dynamic>> loadUiDefinition({bool reload = false}) async {
+    if (!reload && _cachedUiAst != null) {
+      return _cachedUiAst!;
+    }
+    final content = await uiDefinitionFile.readAsString();
+    final decoded = json.decode(content);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('UI 描述文件必须是 JSON 对象');
+    }
+    _cachedUiAst = decoded;
+    return _cachedUiAst!;
+  }
+
+  /// 清除 UI AST 内存缓存（插件更新或热重载时调用）
+  void invalidateUiCache() {
+    _cachedUiAst = null;
+  }
+
   @override
   Future<void> initialize(PluginContext context) async {
     _context = context;
@@ -55,5 +76,6 @@ class DynamicPlugin extends ToolPlugin {
   @override
   Future<void> dispose() async {
     _context = null;
+    _cachedUiAst = null;
   }
 }

@@ -213,6 +213,40 @@ void main() {
       expect(events.whereType<PluginStateChangedEvent>().length, 2);
       expect(events.whereType<PluginUninstalledEvent>().length, 1);
 
+      // 验证 DynamicPlugin.loadUiDefinition 内存 AST 缓存与失效
+      final tempUiDir = await Directory.systemTemp.createTemp('ptx_ui_ast_');
+      final uiFile = File('${tempUiDir.path}/ui.json');
+      await uiFile
+          .writeAsString('{"type": "Text", "props": {"text": "hello"}}');
+      const testManifest = PluginManifest(
+        id: 'ui_cache_test',
+        name: 'UI Cache Test',
+        version: '1.0.0',
+        description: 'Test',
+        author: 'Test',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      );
+      final cachePlugin = DynamicPlugin(
+        manifest: testManifest,
+        rootDir: tempUiDir,
+      );
+      final ast1 = await cachePlugin.loadUiDefinition();
+      expect(ast1['type'], 'Text');
+      // 修改文件内容，未刷新时读取仍命中内存缓存（引用完全同一）
+      await uiFile
+          .writeAsString('{"type": "Button", "props": {"text": "modified"}}');
+      final astCached = await cachePlugin.loadUiDefinition();
+      expect(identical(ast1, astCached), isTrue);
+      // 清空缓存后重新读取，拿到最新 AST
+      cachePlugin.invalidateUiCache();
+      final astFresh = await cachePlugin.loadUiDefinition();
+      expect(astFresh['type'], 'Button');
+      await tempUiDir.delete(recursive: true);
+
       await sub.cancel();
       eventBus.dispose();
     });

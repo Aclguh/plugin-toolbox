@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -118,13 +117,8 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
         ));
       }
 
-      // 1. 读取并解析 UI JSON 描述（异步读取，避免阻塞 UI 线程）
-      final uiJsonStr = await widget.plugin.uiDefinitionFile.readAsString();
-      final decoded = json.decode(uiJsonStr);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('UI 描述文件必须是 JSON 对象');
-      }
-      _uiRootNode = decoded;
+      // 1. 读取并解析 UI JSON 描述（优先复用内存 AST 缓存，避免重复 I/O 与反序列化）
+      _uiRootNode = await widget.plugin.loadUiDefinition();
 
       // 1.5 声明式状态自动持久化：从插件独立沙箱读取持久化快照并预置进入 DUI 状态
       final storage = widget.plugin.context?.storage;
@@ -404,6 +398,7 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
               plugin: widget.plugin,
               runner: _runner,
               onReload: () {
+                widget.plugin.invalidateUiCache();
                 setState(() {
                   _isLoading = true;
                   _loadError = null;
