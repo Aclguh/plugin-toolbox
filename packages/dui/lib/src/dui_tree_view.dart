@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dui_localizations.dart';
 
 /// 动态 UI (DUI) 树形折叠组件。
 ///
@@ -84,7 +85,7 @@ class _DuiTreeViewState extends State<DuiTreeView> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            '无树形数据',
+            DuiLocalizations.of(context).noTreeData,
             style: TextStyle(color: theme.colorScheme.outline),
           ),
         ),

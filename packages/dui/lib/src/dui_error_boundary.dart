@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dui_localizations.dart';
 
 /// 声明式 UI 节点级局部错误边界组件
 ///
@@ -61,7 +62,9 @@ class DuiErrorPlaceholder extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              '组件 [$type] 加载异常: $error',
+              DuiLocalizations.of(context).isZh
+                  ? '组件 [$type] 加载异常: $error'
+                  : 'Component [$type] render error: $error',
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.redAccent,

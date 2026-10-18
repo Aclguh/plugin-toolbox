@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'dui_localizations.dart';
 
 /// 动态 UI (DUI) 逐行差异比对组件。
 ///
@@ -154,7 +155,7 @@ class DuiDiffView extends StatelessWidget {
                 const Icon(Icons.compare_arrows, size: 16),
                 const SizedBox(width: 8),
                 Text(
-                  '文本比对',
+                  DuiLocalizations.of(context).diffView,
                   style: theme.textTheme.labelMedium
                       ?.copyWith(fontWeight: FontWeight.bold),
                 ),

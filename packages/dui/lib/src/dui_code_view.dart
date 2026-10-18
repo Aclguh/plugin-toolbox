@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dui_localizations.dart';
 
 /// 动态 UI (DUI) 代码展示组件。
 ///
@@ -147,15 +148,16 @@ class DuiCodeView extends StatelessWidget {
                 color: Colors.transparent,
                 child: IconButton(
                   icon: const Icon(Icons.copy, size: 16),
-                  tooltip: '复制代码',
+                  tooltip: DuiLocalizations.of(context).copy,
                   splashRadius: 16,
                   color: lineNumberColor,
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: text));
                     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      const SnackBar(
-                        content: Text('已复制到剪贴板'),
-                        duration: Duration(milliseconds: 1500),
+                      SnackBar(
+                        content: Text(
+                            DuiLocalizations.of(context).copiedToClipboard),
+                        duration: const Duration(milliseconds: 1500),
                       ),
                     );
                     onCopy?.call();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'dui_localizations.dart';
 import 'dui_utils.dart';
 
 /// 动态 UI (DUI) 颜色拾取组件。
@@ -231,7 +232,7 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             child: Text(
-              '预设调色盘',
+              DuiLocalizations.of(context).presetColors,
               style: theme.textTheme.labelMedium
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
@@ -254,7 +255,7 @@ class _DuiColorPickerState extends State<DuiColorPicker> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             child: Text(
-              '色彩通道微调',
+              DuiLocalizations.of(context).customColor,
               style: theme.textTheme.labelMedium
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),

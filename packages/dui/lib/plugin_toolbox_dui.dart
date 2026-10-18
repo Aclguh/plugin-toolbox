@@ -15,3 +15,4 @@ export 'src/dui_code_view.dart';
 export 'src/dui_diff_view.dart';
 export 'src/dui_tree_view.dart';
 export 'src/dui_color_picker.dart';
+export 'src/dui_localizations.dart';
