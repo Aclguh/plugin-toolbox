@@ -1,55 +1,43 @@
 name: plugin_toolbox_workspace
-repository: https://github.com/user/plugin-toolbox
 
 packages:
   - app
   - packages/*
 
 command:
-  bootstrap:
-    usePubspecOverrides: true
+  version:
+    linkToCommits: true
+    workspaceChangelog: true
 
 scripts:
   analyze:
-    exec: dart analyze --fatal-infos
-    description: 静态分析
-    packageFilters:
-      dirExists: lib
-
-  test:
-    exec: flutter test
-    description: 运行测试
-    packageFilters:
-      dirExists: test
-
-  test:coverage:
-    exec: flutter test --coverage
-    description: 运行各包测试并采集代码覆盖率 (生成 coverage/lcov.info)
-    packageFilters:
-      dirExists: test
-
-  check:coverage:
-    run: dart run tool/check_coverage.dart
-    description: 汇总各包覆盖率并验证门禁是否达标
+    run: dart analyze
+    description: 运行全仓静态代码分析
 
   format:
-    exec: dart format .
-    description: 格式化
+    run: dart format app packages/core packages/lua packages/dui packages/ui tool
+    description: 代码风格统一格式化
 
-  build_runner:
-    exec: dart run build_runner build --delete-conflicting-outputs
-    description: 代码生成
-    packageFilters:
-      dependsOn: build_runner
+  format:check:
+    run: dart format --output=none --set-exit-if-changed app packages/core packages/lua packages/dui packages/ui tool
+    description: 校验格式化是否符合门禁标准 (CI Format Gate)
 
   verify:
     run: dart run tool/verify.dart
-    description: 运行独立规范与逻辑自动化验证套件 (须在仓库根目录)
+    description: 运行独立架构规范与自动化逻辑校验套件
+
+  test:
+    run: melos exec --dir-exists="test" -- "flutter test"
+    description: 运行各包单元测试与组件测试
+
+  test:coverage:
+    run: dart run tool/coverage.dart
+    description: 自动化运行各包测试并汇总生成全仓 coverage/lcov.info
 
   pack:plugins:
     run: python sample_plugins/pack.py
-    description: 打包全部示例动态插件为 .ptx
+    description: 批量打包示例动态插件为 .ptx 归档文件
 
   build:apk:
-    run: cd app && flutter build apk --release --split-per-abi
-    description: 按架构拆分构建发布 APK
+    run: cd app && flutter build apk --split-per-abi
+    description: 构建 Android 发布版 APK 安装包
