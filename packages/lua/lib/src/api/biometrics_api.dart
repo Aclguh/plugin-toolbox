@@ -6,6 +6,8 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
 
+import 'api_guard.dart';
+
 /// `biometrics` — 设备生物认证 API (指纹 / 面容识别)。
 ///
 /// 严格受限于 `biometrics` 权限，提供系统生物核验可用性查询与身份认证。
@@ -18,15 +20,9 @@ class BiometricsApi {
   ) {
     ls.newTable();
 
-    void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.biometrics)) {
-        ls.error2('权限不足: 插件未声明 biometrics 权限');
-      }
-    }
-
     // biometrics.isAvailable([callback]) -> bool
     ls.pushDartFunction((ls) {
-      checkPermission(ls);
+      ApiGuard.checkPermission(ls, context, PluginPermission.biometrics);
       final cbRef = callbacks.ref(1);
 
       unawaited(
@@ -50,7 +46,7 @@ class BiometricsApi {
 
     // biometrics.authenticate([reason | callback, callback])
     ls.pushDartFunction((ls) {
-      checkPermission(ls);
+      ApiGuard.checkPermission(ls, context, PluginPermission.biometrics);
       String? reason;
       int? cbRef;
 

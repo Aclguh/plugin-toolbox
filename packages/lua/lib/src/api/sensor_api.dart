@@ -4,6 +4,8 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import '../lua_callback_invoker.dart';
 import '../lua_engine.dart';
 
+import 'api_guard.dart';
+
 /// `sensor` — 硬件传感器 API (加速度计 / 陀螺仪 / 磁力计 / 罗盘)。
 class SensorApi {
   final Map<String, Timer> _pollingTimers = {};
@@ -20,9 +22,7 @@ class SensorApi {
     ls.newTable();
 
     void checkSensorPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.sensor)) {
-        ls.error2('权限不足: 插件未声明 sensor 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.sensor);
     }
 
     void pushMapAsTable(LuaState ls, Map<String, dynamic>? data) {

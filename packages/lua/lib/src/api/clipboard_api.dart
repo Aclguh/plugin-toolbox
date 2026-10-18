@@ -5,6 +5,7 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
 import '../delegates/domain_delegates.dart';
 import '../lua_callback_invoker.dart';
+import 'api_guard.dart';
 
 class ClipboardApi {
   /// [writeState] 即 LuaHostDelegate.onStateChanged：未提供回调时，
@@ -20,10 +21,7 @@ class ClipboardApi {
 
     // clipboard.set(text)
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.clipboard)) {
-        ls.error2('权限不足: 插件未声明 clipboard 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.clipboard);
       final text = ls.checkString(1) ?? '';
       clipboard.setClipboardText(text);
       return 0;
@@ -35,10 +33,7 @@ class ClipboardApi {
     // 传入回调函数则异步携带剪贴板文本（可能为 nil）回调，
     // 否则结果写入状态 __clipboard_value
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.clipboard)) {
-        ls.error2('权限不足: 插件未声明 clipboard 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.clipboard);
       // 与 storage.get 不同，clipboard.get 无必选首参：回调固定位于栈索引 1
       final cbRef = callbacks.ref(1);
       unawaited(

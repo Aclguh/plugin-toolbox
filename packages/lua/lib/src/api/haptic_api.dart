@@ -1,5 +1,6 @@
 import 'package:lua_dardo/lua.dart';
 import '../lua_engine.dart';
+import 'api_guard.dart';
 
 /// `haptic` — 设备触觉震动反馈 API。
 ///
@@ -8,19 +9,19 @@ class HapticApi {
   static void bind(LuaState ls, LuaHostDelegate delegate) {
     ls.newTable();
 
-    void bindMethod(String name, String type) {
+    void bindMethod(String name, HapticType type) {
       ls.pushDartFunction((ls) {
-        delegate.hapticFeedback(type);
+        delegate.hapticFeedback(type.name);
         return 0;
       });
       ls.setField(-2, name);
     }
 
-    bindMethod('light', 'light');
-    bindMethod('medium', 'medium');
-    bindMethod('heavy', 'heavy');
-    bindMethod('selection', 'selection');
-    bindMethod('vibrate', 'vibrate');
+    bindMethod('light', HapticType.light);
+    bindMethod('medium', HapticType.medium);
+    bindMethod('heavy', HapticType.heavy);
+    bindMethod('selection', HapticType.selection);
+    bindMethod('vibrate', HapticType.vibrate);
 
     ls.setGlobal('haptic');
   }
