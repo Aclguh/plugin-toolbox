@@ -47,6 +47,10 @@ class PluginNativeBridge extends NativeBridgeBase
   /// 核对沙箱在追加 [additionalBytes] 后是否仍处于存储配额内
   bool hasQuotaFor(int additionalBytes) => hasSandboxQuotaFor(additionalBytes);
 
+  /// 异步核对沙箱在追加 [additionalBytes] 后是否仍处于存储配额内（流式异步 I/O，不阻塞主线程）
+  Future<bool> hasQuotaForAsync(int additionalBytes) =>
+      hasSandboxQuotaForAsync(additionalBytes);
+
   /// 集中释放设备与硬件占用的活跃状态
   void dispose() {
     disposeDeviceBridge();

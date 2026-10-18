@@ -462,6 +462,24 @@ void main() {
       // 当前内存缓存为 800 + 200 = 1000KB，尝试再写入 100KB 超出 1MB 配额 (1000 + 100 = 1100 > 1024)
       expect(ctx.checkStorageQuota(100 * 1024), isFalse);
 
+      // 验证并发写入配额预扣除与回滚（防范 TOCTOU 竞态）
+      ctx.invalidateStorageQuotaCache();
+      expect(ctx.currentUsedBytes, 800 * 1024);
+      // 预扣除 150KB (800 + 150 = 950 <= 1024) 成功
+      expect(ctx.reserveStorageQuota(150 * 1024), isTrue);
+      expect(ctx.reservedBytes, 150 * 1024);
+      // 预扣后，再检查 100KB 应当被拦截 (800 + 150 + 100 = 1050 > 1024)
+      expect(ctx.checkStorageQuota(100 * 1024), isFalse);
+      // 回滚 150KB 后恢复放行
+      ctx.rollbackStorageQuota(150 * 1024);
+      expect(ctx.reservedBytes, 0);
+      expect(ctx.checkStorageQuota(100 * 1024), isTrue);
+      // 预扣并提交实际落盘
+      expect(ctx.reserveStorageQuota(100 * 1024), isTrue);
+      ctx.commitStorageQuota(100 * 1024, actualDelta: 100 * 1024);
+      expect(ctx.reservedBytes, 0);
+      expect(ctx.currentUsedBytes, 900 * 1024);
+
       await tempDir.delete(recursive: true);
     });
 

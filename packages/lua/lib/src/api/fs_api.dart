@@ -133,17 +133,12 @@ class FsApi {
         return 0;
       }
 
-      if (!context.checkStorageQuota(content.length)) {
-        if (cbRef != null) {
+      if (cbRef != null) {
+        if (!context.reserveStorageQuota(content.length)) {
           callbacks.invokeAndRelease(cbRef,
               [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
           return 0;
         }
-        ls.error2('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
-        return 0;
-      }
-
-      if (cbRef != null) {
         final callbackRef = cbRef;
         unawaited(() async {
           try {
@@ -156,12 +151,19 @@ class FsApi {
               flush: true,
             );
             final newSize = await file.length();
-            context.updateUsedBytes(newSize - oldSize);
+            context.commitStorageQuota(content.length,
+                actualDelta: newSize - oldSize);
             callbacks.invokeAndRelease(callbackRef, [true, null]);
           } catch (e) {
+            context.rollbackStorageQuota(content.length);
             callbacks.invokeAndRelease(callbackRef, [false, e.toString()]);
           }
         }());
+        return 0;
+      }
+
+      if (!context.checkStorageQuota(content.length)) {
+        ls.error2('存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)');
         return 0;
       }
 
@@ -207,7 +209,7 @@ class FsApi {
         return 0;
       }
 
-      if (!context.checkStorageQuota(content.length)) {
+      if (!context.reserveStorageQuota(content.length)) {
         callbacks.invokeAndRelease(callbackRef,
             [false, '存储配额超限: 写入将超出插件沙箱配额 (${context.storageQuotaMb}MB)']);
         return 0;
@@ -225,9 +227,11 @@ class FsApi {
             flush: true,
           );
           final newSize = await file.length();
-          context.updateUsedBytes(newSize - oldSize);
+          context.commitStorageQuota(content.length,
+              actualDelta: newSize - oldSize);
           callbacks.invokeAndRelease(callbackRef, [true, null]);
         } catch (e) {
+          context.rollbackStorageQuota(content.length);
           callbacks.invokeAndRelease(callbackRef, [false, e.toString()]);
         }
       }());
@@ -706,16 +710,11 @@ class FsApi {
       }
       try {
         final bytes = base64Decode(b64.replaceAll(RegExp(r'\s+'), ''));
-        if (!context.checkStorageQuota(bytes.length)) {
-          if (cbRef != null) {
+        if (cbRef != null) {
+          if (!context.reserveStorageQuota(bytes.length)) {
             callbacks.invokeAndRelease(cbRef, [false, '存储配额超限: 写入将超出插件沙箱配额']);
             return 0;
           }
-          ls.pushBoolean(false);
-          ls.pushString('存储配额超限: 写入将超出插件沙箱配额');
-          return 2;
-        }
-        if (cbRef != null) {
           unawaited(() async {
             try {
               final file = File(fullPath);
@@ -723,13 +722,20 @@ class FsApi {
               await file.parent.create(recursive: true);
               await file.writeAsBytes(bytes, flush: true);
               final newSize = await file.length();
-              context.updateUsedBytes(newSize - oldSize);
+              context.commitStorageQuota(bytes.length,
+                  actualDelta: newSize - oldSize);
               callbacks.invokeAndRelease(cbRef, [true, null]);
             } catch (e) {
+              context.rollbackStorageQuota(bytes.length);
               callbacks.invokeAndRelease(cbRef, [false, e.toString()]);
             }
           }());
           return 0;
+        }
+        if (!context.checkStorageQuota(bytes.length)) {
+          ls.pushBoolean(false);
+          ls.pushString('存储配额超限: 写入将超出插件沙箱配额');
+          return 2;
         }
         final file = File(fullPath);
         final oldSize = file.existsSync() ? file.lengthSync() : 0;

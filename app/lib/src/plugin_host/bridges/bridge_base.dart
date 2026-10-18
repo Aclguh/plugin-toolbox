@@ -86,13 +86,27 @@ abstract class NativeBridgeBase {
     }
   }
 
-  /// 核对沙箱在追加 [additionalBytes] 后是否仍处于存储配额内
-  bool hasSandboxQuotaFor(int additionalBytes) {
-    final maxBytes = storageQuotaMb * 1024 * 1024;
-    return sandboxUsedBytes() + additionalBytes <= maxBytes;
+  int? _cachedSandboxUsedBytes;
+
+  /// 异步精确计算当前沙箱占用字节数（流式异步 I/O，不阻塞主线程）
+  Future<int> calculateSandboxUsedBytes() async {
+    if (_cachedSandboxUsedBytes != null) return _cachedSandboxUsedBytes!;
+    var bytes = 0;
+    try {
+      if (await pluginRootDir.exists()) {
+        await for (final entity
+            in pluginRootDir.list(recursive: true, followLinks: false)) {
+          if (entity is File) bytes += await entity.length();
+        }
+      }
+    } catch (_) {}
+    _cachedSandboxUsedBytes = bytes;
+    return bytes;
   }
 
+  /// 同步获取或回退读取当前沙箱占用字节数（优先命中缓存，避免频繁同步递归扫描）
   int sandboxUsedBytes() {
+    if (_cachedSandboxUsedBytes != null) return _cachedSandboxUsedBytes!;
     var bytes = 0;
     try {
       if (pluginRootDir.existsSync()) {
@@ -102,7 +116,29 @@ abstract class NativeBridgeBase {
         }
       }
     } catch (_) {}
+    _cachedSandboxUsedBytes = bytes;
     return bytes;
+  }
+
+  /// 增量更新沙箱缓存字节数
+  void updateSandboxUsedBytes(int delta) {
+    if (_cachedSandboxUsedBytes != null) {
+      _cachedSandboxUsedBytes = (_cachedSandboxUsedBytes! + delta);
+      if (_cachedSandboxUsedBytes! < 0) _cachedSandboxUsedBytes = 0;
+    }
+  }
+
+  /// 异步核对沙箱在追加 [additionalBytes] 后是否仍处于存储配额内
+  Future<bool> hasSandboxQuotaForAsync(int additionalBytes) async {
+    final maxBytes = storageQuotaMb * 1024 * 1024;
+    final used = await calculateSandboxUsedBytes();
+    return used + additionalBytes <= maxBytes;
+  }
+
+  /// 核对沙箱在追加 [additionalBytes] 后是否仍处于存储配额内
+  bool hasSandboxQuotaFor(int additionalBytes) {
+    final maxBytes = storageQuotaMb * 1024 * 1024;
+    return sandboxUsedBytes() + additionalBytes <= maxBytes;
   }
 
   Future<String?> pickAndCopyIntoSandbox({
@@ -130,7 +166,7 @@ abstract class NativeBridgeBase {
 
       final srcFile = File(srcPath);
       final srcBytes = await srcFile.length();
-      if (!hasSandboxQuotaFor(srcBytes)) {
+      if (!await hasSandboxQuotaForAsync(srcBytes)) {
         logger?.w(
             'PluginNativeBridge: $op 超出沙箱配额 ($storageQuotaMb MB)，拒绝写入 $fileName ($srcBytes 字节)');
         return null;
@@ -138,6 +174,7 @@ abstract class NativeBridgeBase {
 
       final uniqueName = uniqueSandboxFileName(destDir, fileName);
       await srcFile.copy('${destDir.path}/$uniqueName');
+      updateSandboxUsedBytes(srcBytes);
       return 'data/$uniqueName';
     } catch (e, st) {
       logError(op, e, st);

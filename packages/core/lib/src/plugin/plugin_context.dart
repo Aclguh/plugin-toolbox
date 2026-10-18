@@ -129,7 +129,6 @@ class PluginContext {
 
   /// 异步递归扫描沙箱已占用字节数并刷新内存缓存。
   ///
-  /// 与同步兜底路径语义一致，但全程使用异步流式 IO，不阻塞主线程；
   /// 调用后可安全地经 [currentUsedBytes] / [checkStorageQuota] 读取结果。
   Future<int> scanUsedBytes() async {
     final dir = rootDir;
@@ -146,11 +145,49 @@ class PluginContext {
     return _cachedUsedBytes!;
   }
 
-  /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内
+  /// 内存中已预扣除但尚未落盘确认的字节数（防范异步并发写入引发的 TOCTOU 配额竞态）
+  int _reservedBytes = 0;
+
+  /// 获取当前已预扣但尚未实际落盘提交的字节数
+  int get reservedBytes => _reservedBytes;
+
+  /// 检查当前沙箱是否在容纳 [additionalBytes] 后依然处于存储配额限制内（含已预扣字节）
   bool checkStorageQuota(int additionalBytes) {
     if (rootDir == null) return true;
     final maxBytes = storageQuotaMb * 1024 * 1024;
-    return (currentUsedBytes + additionalBytes) <= maxBytes;
+    return (currentUsedBytes + _reservedBytes + additionalBytes) <= maxBytes;
+  }
+
+  /// 原子性预扣除沙箱存储配额（用于异步并发写入或下载前防范 TOCTOU 竞态突破上限）。
+  /// 若预扣除后超出总配额，则返回 false 且不改变预扣状态。
+  bool reserveStorageQuota(int bytes) {
+    if (rootDir == null) return true;
+    if (bytes <= 0) return true;
+    final maxBytes = storageQuotaMb * 1024 * 1024;
+    if ((currentUsedBytes + _reservedBytes + bytes) > maxBytes) {
+      return false;
+    }
+    _reservedBytes += bytes;
+    return true;
+  }
+
+  /// 提交并实际确认已预扣的存储配额（写入落盘成功时调用）。
+  /// [reservedBytes] 为最初预扣的字节数，[actualDelta] 为实际产生的存储增量（若未提供则默认等于 reservedBytes）。
+  void commitStorageQuota(int reservedBytes, {int? actualDelta}) {
+    if (reservedBytes > 0) {
+      _reservedBytes -= reservedBytes;
+      if (_reservedBytes < 0) _reservedBytes = 0;
+    }
+    final delta = actualDelta ?? reservedBytes;
+    updateUsedBytes(delta);
+  }
+
+  /// 回滚撤销已预扣的存储配额（写入取消或发生异常时调用）
+  void rollbackStorageQuota(int reservedBytes) {
+    if (reservedBytes > 0) {
+      _reservedBytes -= reservedBytes;
+      if (_reservedBytes < 0) _reservedBytes = 0;
+    }
   }
 
   /// 更新沙箱缓存字节增量（写入或删除文件时调用）
@@ -164,6 +201,7 @@ class PluginContext {
   /// 清除缓存，下次检查时重新扫描全盘
   void invalidateStorageQuotaCache() {
     _cachedUsedBytes = null;
+    _reservedBytes = 0;
   }
 
   /// 诊断控制台内存日志条目队列（最多保留 200 条，用于运行期诊断面板）
