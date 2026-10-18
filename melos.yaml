@@ -1,4 +1,5 @@
 name: plugin_toolbox_workspace
+repository: https://github.com/Aclguh/plugin-toolbox
 
 packages:
   - app
