@@ -73,10 +73,13 @@ class PluginHostSession extends ChangeNotifier
   PluginSessionStatus _status = PluginSessionStatus.loading;
   String? _errorMessage;
 
+  final PluginDatabaseFactory? databaseFactory;
+
   PluginHostSession({
     required this.plugin,
     this.initialData,
     this.uiHandler,
+    this.databaseFactory,
     PluginNativeBridge? nativeBridge,
     DuiState? duiState,
   }) {
@@ -166,7 +169,11 @@ class PluginHostSession extends ChangeNotifier
       }
 
       // 2. 初始化 Lua 运行时
-      _runner = LuaPluginRunner(plugin: plugin, delegate: this);
+      _runner = LuaPluginRunner(
+        plugin: plugin,
+        delegate: this,
+        databaseFactory: databaseFactory,
+      );
       await _runner!.start();
 
       // 3. 贯通跨插件调起的初始参数

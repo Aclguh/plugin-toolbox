@@ -1,3 +1,4 @@
+import '../config/toolbox_constants.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -12,12 +13,13 @@ import '../sandbox/sandbox_path.dart';
 import '../storage/plugin_storage.dart';
 
 class PluginInstaller {
-  static const int maxPackageSizeBytes = 10 * 1024 * 1024; // 10MB
-  static const int maxUncompressedSizeBytes = 50 * 1024 * 1024; // 50MB
-  static const int maxInflationRatio = 20; // 膨胀比上限
+  static const int maxPackageSizeBytes = ToolboxConstants.maxPackageSizeBytes;
+  static const int maxUncompressedSizeBytes =
+      ToolboxConstants.maxUncompressedSizeBytes;
+  static const int maxInflationRatio = ToolboxConstants.maxInflationRatio;
   static const int inflationCheckThresholdBytes =
-      5 * 1024 * 1024; // 5MB 以上开始校验膨胀比
-  static const int maxEntryCount = 1000; // 包内条目数上限，防止数万空条目拖垮文件系统
+      ToolboxConstants.inflationCheckThresholdBytes;
+  static const int maxEntryCount = ToolboxConstants.maxEntryCount;
   static final RegExp _validIdPattern = RegExp(r'^[a-z0-9_]{3,50}$');
 
   /// 校验字节序列是否为预编译的 Lua 二进制字节码（以 \x1bLua 魔数开头）
@@ -68,6 +70,9 @@ class PluginInstaller {
   }) async {
     final ptxFile = File(ptxPath);
     final bytes = await ptxFile.readAsBytes();
+    if (!SandboxPath.isZipArchive(bytes)) {
+      throw const FormatException('安装包不是有效的 ZIP/PTX 格式 (缺少文件签名魔数)');
+    }
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes);

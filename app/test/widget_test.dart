@@ -1,3 +1,7 @@
+import 'package:plugin_toolbox/src/plugin_manager/plugin_manager_dialogs.dart';
+import 'package:logger/logger.dart';
+import 'package:plugin_toolbox/l10n/app_localizations_en.dart';
+import 'package:plugin_toolbox/l10n/app_localizations_zh.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -49,6 +53,25 @@ ToolPlugin createMockPlugin(String id, String name) {
     ),
     rootDir: _mockRootDir,
   );
+}
+
+class _MockBuiltinPlugin extends ToolPlugin {
+  @override
+  String get id => 'builtin_p';
+  @override
+  String get name => '内置测试插件';
+  @override
+  String get description => '内置插件不可删除';
+  @override
+  String get version => '1.0.0';
+  @override
+  PluginCategory get category => PluginCategory.other;
+  @override
+  bool get isDynamic => false;
+  @override
+  Future<void> initialize(PluginContext context) async {}
+  @override
+  Future<void> dispose() async {}
 }
 
 void main() {
@@ -331,6 +354,14 @@ void main() {
 
     expect(find.text('GitHub 仓库链接'), findsOneWidget);
 
+    // 点击取消
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    // 再次打开
+    await tester.tap(find.text('自定义插件仓库'));
+    await tester.pumpAndSettle();
+
     // 输入非法内容保存，应提示错误
     await tester.enterText(find.byType(TextField), 'invalid_single_token');
     await tester.tap(find.text('保存'));
@@ -338,7 +369,18 @@ void main() {
 
     expect(find.text('请输入有效的 GitHub 仓库链接，例如：owner/repo'), findsOneWidget);
 
-    // 输入合法链接并保存
+    // 点击清除按钮
+    await tester.tap(find.byIcon(Icons.clear));
+    await tester.pumpAndSettle();
+
+    // 保存空内容恢复默认
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    // 再次打开并输入合法链接保存
+    await tester.tap(find.text('自定义插件仓库'));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
         find.byType(TextField), 'https://github.com/custom-team/cool-plugins');
     await tester.tap(find.text('保存'));
@@ -346,8 +388,16 @@ void main() {
 
     expect(find.text('当前: custom-team/cool-plugins'), findsOneWidget);
 
-    // 再次点击打开，点击恢复默认
+    // 再次点击打开，验证多源列表并点击快速切换
     await tester.tap(find.text('自定义插件仓库'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('已订阅的源'), findsOneWidget);
+    await tester.tap(find.textContaining('官方默认').last);
+    await tester.pumpAndSettle();
+
+    // 移除源
+    await tester.tap(find.byIcon(Icons.close).last);
     await tester.pumpAndSettle();
 
     expect(find.text('恢复默认'), findsOneWidget);
@@ -384,11 +434,19 @@ void main() {
     expect(find.text('开发团队'), findsOneWidget);
     expect(find.text('复制信息'), findsOneWidget);
 
+    // 点击复制信息
+    await tester.tap(find.text('复制信息'));
+    await tester.pumpAndSettle();
+
     // 点击查看协议
     await tester.tap(find.text('查看协议'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Permission is hereby granted'), findsOneWidget);
+
+    // 点击复制协议
+    await tester.tap(find.text('复制协议'));
+    await tester.pumpAndSettle();
 
     // 关闭协议弹窗 (顶层对话框)
     await tester.tap(find.text('关闭').last);
@@ -690,5 +748,318 @@ void main() {
     expect(find.text('No enabled tools yet'), findsOneWidget);
     expect(find.text('Install from Store'), findsOneWidget);
     expect(find.text('Import local .ptx'), findsOneWidget);
+  });
+
+  test('AppLocalizations 多语言实体属性完整性', () {
+    final zh = AppLocalizationsZh();
+    expect(zh.appTitle, isNotEmpty);
+    expect(zh.myTools, isNotEmpty);
+    expect(zh.pluginStore, isNotEmpty);
+    expect(zh.pluginManager, isNotEmpty);
+    expect(zh.settings, isNotEmpty);
+    expect(zh.appearanceAndDisplay, isNotEmpty);
+    expect(zh.themeMode, isNotEmpty);
+    expect(zh.themeDark, isNotEmpty);
+    expect(zh.themeLight, isNotEmpty);
+    expect(zh.themeSystem, isNotEmpty);
+    expect(zh.dynamicColor, isNotEmpty);
+    expect(zh.dynamicColorDesc, isNotEmpty);
+    expect(zh.autoRotateScreen, isNotEmpty);
+    expect(zh.autoRotateScreenDesc, isNotEmpty);
+    expect(zh.about, isNotEmpty);
+    expect(zh.aboutApp, isNotEmpty);
+    expect(zh.aboutDesc, isNotEmpty);
+    expect(zh.author, isNotEmpty);
+    expect(zh.openSourceLicense, isNotEmpty);
+    expect(zh.openSourceLicenseDesc, isNotEmpty);
+    expect(zh.install, isNotEmpty);
+    expect(zh.update, isNotEmpty);
+    expect(zh.uninstall, isNotEmpty);
+    expect(zh.cancel, isNotEmpty);
+    expect(zh.confirm, isNotEmpty);
+    expect(zh.searchHint, isNotEmpty);
+    expect(zh.emptyToolsPrompt, isNotEmpty);
+    expect(zh.goToStoreToInstall, isNotEmpty);
+    expect(zh.importLocalPtx, isNotEmpty);
+
+    final en = AppLocalizationsEn();
+    expect(en.appTitle, isNotEmpty);
+    expect(en.myTools, isNotEmpty);
+    expect(en.pluginStore, isNotEmpty);
+    expect(en.pluginManager, isNotEmpty);
+    expect(en.settings, isNotEmpty);
+    expect(en.appearanceAndDisplay, isNotEmpty);
+    expect(en.themeMode, isNotEmpty);
+    expect(en.themeDark, isNotEmpty);
+    expect(en.themeLight, isNotEmpty);
+    expect(en.themeSystem, isNotEmpty);
+    expect(en.dynamicColor, isNotEmpty);
+    expect(en.dynamicColorDesc, isNotEmpty);
+    expect(en.autoRotateScreen, isNotEmpty);
+    expect(en.autoRotateScreenDesc, isNotEmpty);
+    expect(en.about, isNotEmpty);
+    expect(en.aboutApp, isNotEmpty);
+    expect(en.aboutDesc, isNotEmpty);
+    expect(en.author, isNotEmpty);
+    expect(en.openSourceLicense, isNotEmpty);
+    expect(en.openSourceLicenseDesc, isNotEmpty);
+    expect(en.install, isNotEmpty);
+    expect(en.update, isNotEmpty);
+    expect(en.uninstall, isNotEmpty);
+    expect(en.cancel, isNotEmpty);
+    expect(en.confirm, isNotEmpty);
+    expect(en.searchHint, isNotEmpty);
+    expect(en.emptyToolsPrompt, isNotEmpty);
+    expect(en.goToStoreToInstall, isNotEmpty);
+    expect(en.importLocalPtx, isNotEmpty);
+  });
+
+  testWidgets('PluginManagerPage 渲染插件列表、启禁用开关与删除二次确认流程', (tester) async {
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final registry = container.read(pluginRegistryProvider);
+    final mockPlugin = createMockPlugin('mgr_p1', '管理测试插件');
+    final builtinPlugin = _MockBuiltinPlugin();
+    registry.register(mockPlugin);
+    registry.register(builtinPlugin);
+    container.read(pluginRegistryProvider.notifier).refresh();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: PluginManagerPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('插件管理中心'), findsOneWidget);
+    expect(find.text('管理测试插件'), findsOneWidget);
+
+    final switchFinder = find.byType(Switch);
+    expect(switchFinder, findsNWidgets(2));
+    await tester.tap(switchFinder.first);
+    await tester.pumpAndSettle();
+    expect(registry.isEnabled('mgr_p1'), isFalse);
+
+    await tester.tap(switchFinder.first);
+    await tester.pumpAndSettle();
+    expect(registry.isEnabled('mgr_p1'), isTrue);
+
+    await tester.longPress(find.text('管理测试插件'));
+    await tester.pumpAndSettle();
+    expect(find.text('卸载插件'), findsOneWidget);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('卸载插件'), findsNothing);
+    expect(registry.getPlugin('mgr_p1'), isNotNull);
+
+    await tester.longPress(find.text('管理测试插件'));
+    await tester.pumpAndSettle();
+    expect(find.text('卸载插件'), findsOneWidget);
+    // 对话框内的卸载按钮
+    await tester.tap(find.widgetWithText(FilledButton, '卸载'));
+    await tester.pumpAndSettle();
+    expect(registry.getPlugin('mgr_p1'), isNull);
+
+    // 点击卡片打开详情弹窗并关闭
+    await tester.tap(find.text('内置测试插件'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PluginDetailsDialog), findsOneWidget);
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PluginDetailsDialog), findsNothing);
+
+    // 长按内置插件提示不可删除
+    ScaffoldMessenger.of(tester.element(find.byType(PluginManagerPage)))
+        .clearSnackBars();
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('内置测试插件'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('内置插件无法删除'), findsOneWidget);
+
+    // 卸载全部插件后展示空态提示
+    await registry.unregister('builtin_p');
+    container.read(pluginRegistryProvider.notifier).refresh();
+    await tester.pumpAndSettle();
+    expect(find.text('暂无插件，点击右下角按钮导入'), findsOneWidget);
+  });
+
+  testWidgets('DynamicPluginHostPage 页面容器与诊断控制台弹窗挂载', (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('host_page_test_');
+    addTearDown(() {
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    final entryFile = File('${tempDir.path}/entry.lua');
+    entryFile.writeAsStringSync('function onInit() end');
+    final uiFile = File('${tempDir.path}/ui.json');
+    uiFile.writeAsStringSync('{"type": "Text", "text": "插件运行中"}');
+
+    final dynamicPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'host_test_p',
+        name: '宿主容器测试插件',
+        version: '1.0.0',
+        description: '',
+        author: '',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'entry.lua',
+        ui: 'ui.json',
+      ),
+      rootDir: tempDir,
+    );
+
+    final container = await createContainer(overrides: [
+      appInitFutureProvider.overrideWith((ref) async {}),
+    ]);
+    final registry = container.read(pluginRegistryProvider);
+    registry.register(dynamicPlugin);
+    await dynamicPlugin.initialize(PluginContext(
+      pluginId: 'host_test_p',
+      storage:
+          PluginFileStorageImpl(namespace: 'host_test_p', rootDir: tempDir),
+      eventBus: EventBusImpl(),
+      logger: Logger(),
+      grantedPermissions: {},
+      rootDir: tempDir,
+    ));
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: dynamicPlugin),
+        ),
+      ),
+    );
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.text('宿主容器测试插件'), findsOneWidget);
+    expect(find.byIcon(Icons.bug_report_outlined), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.bug_report_outlined));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('插件诊断与控制台'), findsOneWidget);
+  });
+
+  testWidgets('PluginManager 弹窗组件族交互与状态渲染', (WidgetTester tester) async {
+    // 1. ImportSummaryDialog
+    final outcome = PtxImportOutcome(
+      installed: [],
+      succeeded: ['plugin_a', 'plugin_b'],
+      failed: ['plugin_c: 损坏的压缩包'],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ImportSummaryDialog(outcome: outcome),
+        ),
+      ),
+    );
+    expect(find.text('导入结果'), findsOneWidget);
+    expect(find.textContaining('成功 2 个:'), findsOneWidget);
+    expect(find.textContaining('失败 1 个:'), findsOneWidget);
+
+    // 2. InstallErrorDialog
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: InstallErrorDialog(message: '包签名损坏'),
+        ),
+      ),
+    );
+    expect(find.text('安装失败'), findsOneWidget);
+    expect(find.text('包签名损坏'), findsOneWidget);
+
+    // 3. SensitivePermissionConfirmDialog
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SensitivePermissionConfirmDialog(
+            pluginName: '网络探针',
+            pluginVersion: '2.0.0',
+            sensitivePermissions: [PluginPermission.network],
+          ),
+        ),
+      ),
+    );
+    expect(find.text('敏感权限授权确认'), findsOneWidget);
+    expect(find.textContaining('网络探针 v2.0.0'), findsOneWidget);
+    expect(find.text('拒绝并取消'), findsOneWidget);
+    expect(find.text('同意并安装'), findsOneWidget);
+
+    // 4. PluginDetailsDialog 包含声明权限与敏感权限，且可切换 Switch
+    final container = await createContainer();
+    final tempDir = Directory.systemTemp.createTempSync('details_dialog_test_');
+    addTearDown(() {
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    final dynPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'sens_plugin',
+        name: '敏感插件',
+        version: '1.2.0',
+        description: '测试权限切换',
+        author: 'SecurityTester',
+        type: 'lua',
+        category: PluginCategory.network,
+        permissions: [PluginPermission.network, PluginPermission.storage],
+        entry: 'entry.lua',
+        ui: 'ui.json',
+      ),
+      rootDir: tempDir,
+    );
+    final pluginContext = PluginContext(
+      pluginId: 'sens_plugin',
+      storage:
+          PluginFileStorageImpl(namespace: 'sens_plugin', rootDir: tempDir),
+      eventBus: EventBusImpl(),
+      logger: Logger(),
+      grantedPermissions: {PluginPermission.network},
+      rootDir: tempDir,
+    );
+    await dynPlugin.initialize(pluginContext);
+    container.read(pluginRegistryProvider).register(dynPlugin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: PluginDetailsDialog(plugin: dynPlugin),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('敏感插件'), findsOneWidget);
+    expect(find.text('权限管理'), findsOneWidget);
+    expect(find.text('敏感'), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNWidgets(2));
+
+    // 切换权限开关
+    await tester.tap(find.byType(SwitchListTile).first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(SwitchListTile).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('完成'), findsOneWidget);
   });
 }

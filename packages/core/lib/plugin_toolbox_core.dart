@@ -37,3 +37,6 @@ export 'src/backup/toolbox_backup_service.dart';
 
 // 工具类
 export 'src/util/type_converter.dart';
+
+// 常量与安全配置
+export 'src/config/toolbox_constants.dart';

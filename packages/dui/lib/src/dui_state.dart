@@ -50,8 +50,9 @@ class DuiState extends ChangeNotifier {
   ///
   /// 仅通知监听该键的局部订阅者（精确局部刷新，杜绝无差别全量穿透）；
   /// 若需要显式触发全局监听器（如重置或整体置换），可将 [notifyGlobal] 设为 true。
-  void set(String key, dynamic value, {bool notifyGlobal = false}) {
-    if (_values[key] != value) {
+  void set(String key, dynamic value,
+      {bool notifyGlobal = false, bool force = false}) {
+    if (force || _values[key] != value || value is List || value is Map) {
       _values[key] = value;
       _keyNotifiers[key]?.notify();
       _notifyPathMatches(key);
@@ -105,6 +106,12 @@ class DuiState extends ChangeNotifier {
   }
 
   Map<String, dynamic> getAll() => Map.unmodifiable(_values);
+
+  /// 显式通知特定键的局部监听者（适用于对复杂对象就地修改后的精确刷新）
+  void notifyKey(String key) {
+    _keyNotifiers[key]?.notify();
+    _notifyPathMatches(key);
+  }
 
   /// 获取指定键的局部监听对象（用于针对单一字段的局部精准刷新）
   Listenable listenableForKey(String key) {
@@ -203,6 +210,7 @@ class DuiState extends ChangeNotifier {
       notifier.dispose();
     }
     _keyNotifiers.clear();
+    _values.clear();
     super.dispose();
   }
 }

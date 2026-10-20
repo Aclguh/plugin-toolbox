@@ -6,6 +6,7 @@ import '../event/app_event.dart';
 import '../storage/plugin_storage.dart';
 import '../model/plugin_category.dart';
 import '../model/plugin_permission.dart';
+import '../permission/permission_manager.dart';
 import 'tool_plugin.dart';
 import 'dynamic_plugin.dart';
 import 'plugin_context.dart';
@@ -15,17 +16,22 @@ class PluginRegistry {
   PluginRegistry({
     required this.eventBus,
     required this.storageFactory,
+    PermissionManager? permissionManager,
     Logger? logger,
-  }) : _logger = logger ?? Logger();
+  })  : _permissionManager = permissionManager ?? PermissionManager(),
+        _logger = logger ?? Logger();
 
   final EventBus eventBus;
   final PluginStorageFactory storageFactory;
+  final PermissionManager _permissionManager;
   final Logger _logger;
 
   final Map<String, ToolPlugin> _plugins = {};
   final Set<String> _disabledPlugins = {};
   final Set<String> _initializedPlugins = {};
-  final Map<String, Set<PluginPermission>> _customPermissions = {};
+
+  /// 集中权限管理器
+  PermissionManager get permissionManager => _permissionManager;
 
   /// 排序与排列细节委托给独立控制器，注册中心只保留生命周期职责
   final PluginListController _orderController = PluginListController();
@@ -56,20 +62,19 @@ class PluginRegistry {
 
   void loadCustomPermissions(
       Map<String, Set<PluginPermission>> permissionsMap) {
-    _customPermissions.clear();
-    for (final entry in permissionsMap.entries) {
-      _customPermissions[entry.key] = Set.from(entry.value);
-    }
+    _permissionManager.loadFromMap(permissionsMap);
   }
 
   Set<PluginPermission>? getCustomPermissions(String pluginId) {
-    final perms = _customPermissions[pluginId];
-    return perms != null ? Set.unmodifiable(perms) : null;
+    if (!_permissionManager.hasCustomPermissions(pluginId)) {
+      return null;
+    }
+    return _permissionManager.getPermissions(pluginId);
   }
 
   void setCustomPermissions(
       String pluginId, Set<PluginPermission> permissions) {
-    _customPermissions[pluginId] = Set.from(permissions);
+    _permissionManager.setPermissions(pluginId, permissions);
     final plugin = _plugins[pluginId];
     if (plugin is DynamicPlugin && plugin.context != null) {
       plugin.context!.setGrantedPermissions(permissions);
@@ -123,7 +128,7 @@ class PluginRegistry {
         _initializedPlugins.remove(pluginId);
       }
       _disabledPlugins.remove(pluginId);
-      _customPermissions.remove(pluginId);
+      _permissionManager.clearForPlugin(pluginId);
       _invalidateCaches();
       if (plugin is DynamicPlugin) {
         // 注册中心不直接触碰文件系统：发出卸载请求，由安装器监听执行沙箱清理
@@ -161,19 +166,13 @@ class PluginRegistry {
   Future<void> _initPlugin(ToolPlugin plugin) async {
     try {
       final Set<PluginPermission> initialPermissions;
-      if (_customPermissions.containsKey(plugin.id)) {
-        final custom =
-            Set<PluginPermission>.from(_customPermissions[plugin.id]!);
+      if (_permissionManager.hasCustomPermissions(plugin.id)) {
         if (plugin is DynamicPlugin) {
           // 插件更新升级场景：将新版本 Manifest 中声明的非敏感权限自动合并并入授权集合
-          for (final perm in plugin.manifest.permissions) {
-            if (!perm.isSensitive) {
-              custom.add(perm);
-            }
-          }
-          _customPermissions[plugin.id] = custom;
+          _permissionManager.mergeNonSensitive(
+              plugin.id, plugin.manifest.permissions);
         }
-        initialPermissions = custom;
+        initialPermissions = _permissionManager.getPermissions(plugin.id);
       } else if (plugin is DynamicPlugin) {
         initialPermissions = plugin.manifest.permissions.toSet();
       } else {

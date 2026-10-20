@@ -97,4 +97,12 @@ class SandboxPath {
         bytes[2] == 0x75 &&
         bytes[3] == 0x61;
   }
+
+  /// 校验字节序列是否为标准 ZIP 归档魔数 (PK\x03\x04 等)
+  static bool isZipArchive(List<int> bytes) {
+    if (bytes.length < 4) return false;
+    return bytes[0] == 0x50 &&
+        bytes[1] == 0x4B &&
+        (bytes[2] == 0x03 || bytes[2] == 0x05 || bytes[2] == 0x07);
+  }
 }

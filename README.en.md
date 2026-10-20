@@ -236,8 +236,8 @@ dart analyze
 # 2. Automated specification and logic verification (150 assertions, pure Dart)
 dart run tool/verify.dart
 
-# 3. Layered unit & widget tests (pure software testing, 413 cases, no devices needed)
-#    packages/core 106 / packages/lua 134 / packages/dui 74 / packages/ui 13 / app 86
+# 3. Layered unit & widget tests (pure software testing, 463 cases, no devices needed)
+#    packages/core 111 / packages/lua 154 / packages/dui 85 / packages/ui 13 / app 100
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test

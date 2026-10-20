@@ -15,14 +15,14 @@ import '../lua_callback_invoker.dart';
 /// 独立回调支持与超时控制；同时向后兼容旧版写入全局状态与全局函数机制。
 class NetworkApi {
   /// 单次请求默认超时（各 I/O 阶段独立计时）
-  static const int defaultTimeoutMs = 15000;
+  static const int defaultTimeoutMs = ToolboxConstants.defaultNetworkTimeoutMs;
 
   /// 302 等重定向的最大跟随跳数；每跳目标 host 都重新走白名单校验，
   /// 防止白名单域被利用作跳板跳转至任意外域
-  static const int maxRedirectHops = 5;
+  static const int maxRedirectHops = ToolboxConstants.maxRedirectHops;
 
   /// 响应体大小上限（10MB），恶意服务端无限输出不得耗尽宿主内存
-  static const int maxResponseBytes = 10 * 1024 * 1024;
+  static const int maxResponseBytes = ToolboxConstants.maxResponseBytes;
 
   /// 判断指定主机名或 IP 是否属于回环或私有局域网地址
   static bool isPrivateOrLocalHost(String host) {
@@ -159,7 +159,9 @@ class NetworkApi {
     LuaCallbackInvoker callbacks,
     void Function(String key, dynamic value) writeState, [
     LuaHostDelegate? delegate,
+    http.Client? httpClient,
   ]) {
+    final sharedClient = httpClient;
     ls.newTable();
 
     void checkPermission(LuaState ls) {
@@ -259,7 +261,8 @@ class NetworkApi {
       var currentMethod = method.toUpperCase();
       var currentHeaders = Map<String, String>.of(headers);
       String? currentBody = body;
-      final client = http.Client();
+      final client = sharedClient ?? http.Client();
+      final shouldCloseClient = sharedClient == null;
       try {
         for (var hop = 0;; hop++) {
           final isDnsSafe =
@@ -334,7 +337,9 @@ class NetworkApi {
           );
         }
       } finally {
-        client.close();
+        if (shouldCloseClient) {
+          client.close();
+        }
       }
     }
 

@@ -234,8 +234,15 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
       }
 
-      // 6. 验证持久化状态已真正落盘至插件沙箱存储
+      // 6. 验证持久化状态已真正落盘至插件沙箱存储（轮询避免 CI/调度重负载抖动）
       final storageFile = File('${outcome.plugin.rootDir.path}/storage.json');
+      for (var i = 0; i < 40; i++) {
+        if (storageFile.existsSync()) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump(const Duration(milliseconds: 25));
+      }
       expect(storageFile.existsSync(), isTrue);
       final savedJson =
           json.decode(storageFile.readAsStringSync()) as Map<String, dynamic>;

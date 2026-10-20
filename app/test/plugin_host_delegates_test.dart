@@ -264,6 +264,73 @@ void main() {
     await session.reload();
     expect(session.isReady, isTrue);
 
+    // 交互与剪贴板/震动覆盖
+    session.callLua('onInit');
+    session.setClipboardText('clipboard_data');
+    await session.getClipboardText();
+    session.hapticFeedback('light');
+    session.hapticFeedback('medium');
+    session.hapticFeedback('heavy');
+    session.hapticFeedback('selection');
+    session.hapticFeedback('vibrate');
+
+    session.showToast('toast');
+    await session.showAlert('title', 'msg');
+    expect(await session.showConfirm('t', 'm'), isFalse);
+    expect(await session.showPrompt(title: 't'), isNull);
+    expect(await session.showPickItem(title: 't', items: ['a']), isNull);
+    expect(await session.showBottomSheet(title: 't', items: ['a']), isNull);
+    expect(await session.pickDate(), isNull);
+    expect(await session.pickTime(), isNull);
+    expect(await session.openPlugin('other'), isFalse);
+    expect(await session.scanBarcode(), isNull);
+    expect(await session.decodeBarcodeFromImage('img.png'), isNull);
+    session.hideKeyboard();
+
     session.dispose();
+  });
+
+  testWidgets('DynamicPluginHostPage UI 交互协议契约', (tester) async {
+    final entryFile = File('${tempDir.path}/entry.lua');
+    entryFile.writeAsStringSync('function onInit() end');
+    final uiFile = File('${tempDir.path}/ui.json');
+    uiFile.writeAsStringSync('{"type": "Center", "props": {"text": "hello"}}');
+
+    final dynamicPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'ui_handler_test',
+        name: 'UI协议测试',
+        version: '1.0.0',
+        description: '',
+        author: '',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'entry.lua',
+        ui: 'ui.json',
+      ),
+      rootDir: tempDir,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: dynamicPlugin),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(DynamicPluginHostPage), findsOneWidget);
+    final dynamic state = tester.state(find.byType(DynamicPluginHostPage));
+    state.showToast('hello toast');
+    await tester.pump();
+    state.hideKeyboard();
+    await tester.pump();
   });
 }

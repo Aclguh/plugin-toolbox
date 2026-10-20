@@ -1,5 +1,6 @@
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:http/http.dart' as http;
 import 'api/state_api.dart';
 import 'api/clipboard_api.dart';
 import 'api/storage_api.dart';
@@ -58,11 +59,12 @@ class LuaEngine {
 
   /// 单次 Lua 闭包执行允许的最大虚拟机指令条数，防止 `while true do end`
   /// 类死循环永久冻结宿主主线程；超限抛出异常并由 pCall 降级为执行错误。
-  static const int defaultInstructionBudget = 5000000;
+  static const int defaultInstructionBudget =
+      ToolboxConstants.defaultInstructionBudget;
 
   /// 单个 Lua 虚拟机实例允许的最大堆内存预算（字节），防止巨型 Table 或长字符串
   /// 耗尽宿主内存造成 OOM 强杀。默认 32MB。
-  static const int defaultMemoryBudget = 32 * 1024 * 1024;
+  static const int defaultMemoryBudget = ToolboxConstants.defaultMemoryBudget;
 
   final int instructionBudget;
   final int memoryBudget;
@@ -182,7 +184,10 @@ class LuaEngine {
     StateApi.bind(_ls, delegate);
     ClipboardApi.bind(_ls, context, delegate, _callbacks!, writeState);
     StorageApi.bind(_ls, context, _callbacks!, writeState);
-    NetworkApi.bind(_ls, context, _callbacks!, writeState, delegate);
+    final networkClient = http.Client();
+    NetworkApi.bind(
+        _ls, context, _callbacks!, writeState, delegate, networkClient);
+    _disposableTracker.addCallback(() => networkClient.close());
     DialogApi.bind(_ls, delegate, _callbacks!);
     CodecApi.bind(_ls);
     JsonApi.bind(_ls);

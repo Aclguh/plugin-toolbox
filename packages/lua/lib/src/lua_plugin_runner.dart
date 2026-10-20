@@ -6,12 +6,14 @@ import 'lua_engine.dart';
 class LuaPluginRunner {
   final DynamicPlugin plugin;
   final LuaHostDelegate delegate;
+  final PluginDatabaseFactory? databaseFactory;
   late final LuaEngine _engine;
   LuaEngine get engine => _engine;
 
   LuaPluginRunner({
     required this.plugin,
     required this.delegate,
+    this.databaseFactory,
   }) {
     // 只允许使用宿主 PluginRegistry 初始化时注入的上下文：
     // 自行构造默认上下文会绕过宿主权限管理与统一事件总线。
@@ -25,6 +27,7 @@ class LuaPluginRunner {
     _engine = LuaEngine(
       context: ctx,
       delegate: delegate,
+      databaseFactory: databaseFactory,
     );
   }
 

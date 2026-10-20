@@ -117,5 +117,31 @@ void main() {
           PluginPermission.microphone);
       expect(PluginPermission.fromString('unknown_perm'), isNull);
     });
+
+    test('PermissionManager 支持覆盖设置、导入导出与非敏感权限合并', () {
+      manager.setPermissions('plugin_b', [PluginPermission.camera]);
+      expect(manager.hasCustomPermissions('plugin_b'), isTrue);
+      expect(manager.hasCustomPermissions('plugin_c'), isFalse);
+
+      manager.mergeNonSensitive('plugin_b', [
+        PluginPermission.clipboard, // 非敏感
+        PluginPermission.location, // 敏感
+      ]);
+      expect(manager.hasPermission('plugin_b', PluginPermission.clipboard),
+          isTrue);
+      expect(manager.hasPermission('plugin_b', PluginPermission.location),
+          isFalse);
+
+      final exported = manager.toMap();
+      expect(exported['plugin_b'], contains(PluginPermission.camera));
+      expect(exported['plugin_b'], contains(PluginPermission.clipboard));
+
+      final manager2 = PermissionManager();
+      manager2.loadFromMap(exported);
+      expect(
+          manager2.hasPermission('plugin_b', PluginPermission.camera), isTrue);
+      expect(manager2.hasPermission('plugin_b', PluginPermission.clipboard),
+          isTrue);
+    });
   });
 }
