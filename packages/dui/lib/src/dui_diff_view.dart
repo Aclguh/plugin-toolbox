@@ -13,6 +13,7 @@ class DuiDiffView extends StatelessWidget {
   final double fontSize;
   final bool showSummary;
   final double? height;
+  final int maxCharacters;
 
   const DuiDiffView({
     super.key,
@@ -22,6 +23,7 @@ class DuiDiffView extends StatelessWidget {
     this.fontSize = 12.0,
     this.showSummary = true,
     this.height,
+    this.maxCharacters = 200000,
   });
 
   @override
@@ -49,7 +51,16 @@ class DuiDiffView extends StatelessWidget {
     final delTextColor =
         isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C);
 
-    final diffLines = _computeDiff(oldText, newText);
+    final isTruncated =
+        oldText.length > maxCharacters || newText.length > maxCharacters;
+    final effectiveOld = oldText.length > maxCharacters
+        ? oldText.substring(0, maxCharacters)
+        : oldText;
+    final effectiveNew = newText.length > maxCharacters
+        ? newText.substring(0, maxCharacters)
+        : newText;
+
+    final diffLines = _computeDiff(effectiveOld, effectiveNew);
 
     var addCount = 0;
     var delCount = 0;
@@ -139,10 +150,47 @@ class DuiDiffView extends StatelessWidget {
       },
     );
 
+    Widget? truncateBanner;
+    if (isTruncated) {
+      final loc = DuiLocalizations.of(context);
+      truncateBanner = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0x28F59E0B),
+          border: Border(
+            bottom: BorderSide(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              size: 14,
+              color: Color(0xFFF59E0B),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                loc.diffTruncatedNotice(maxCharacters),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFFF59E0B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final Widget content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (truncateBanner != null) truncateBanner,
         if (showSummary)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

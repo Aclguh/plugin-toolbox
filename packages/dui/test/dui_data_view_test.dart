@@ -76,6 +76,23 @@ void main() {
 
       expect(copied, isTrue);
     });
+
+    testWidgets('文本超过 maxCharacters 时截断并展示警告提示', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: DuiCodeView(
+              text: '01234567890123456789',
+              maxCharacters: 10,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiCodeView), findsOneWidget);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      expect(find.textContaining('文本过长已截断显示'), findsOneWidget);
+    });
   });
 
   group('DuiDiffView 组件', () {
@@ -114,6 +131,24 @@ void main() {
       expect(find.byType(DuiDiffView), findsOneWidget);
       expect(find.text('+0'), findsOneWidget);
       expect(find.text('-0'), findsOneWidget);
+    });
+
+    testWidgets('文本超过 maxCharacters 时截断并展示警告提示', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: DuiDiffView(
+              oldText: 'AAAAABBBBBCCCCCDDDDD',
+              newText: 'AAAAABBBBBEEEEEFFFFF',
+              maxCharacters: 10,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DuiDiffView), findsOneWidget);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      expect(find.textContaining('文本过长已截断比对'), findsOneWidget);
     });
   });
 

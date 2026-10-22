@@ -48,6 +48,12 @@ class DuiLocalizations {
   String get confirm => isZh ? '确认' : 'Confirm';
   String get cancel => isZh ? '取消' : 'Cancel';
   String get searchPlaceholder => isZh ? '搜索...' : 'Search...';
+  String textTruncatedNotice(int displayed, int total) => isZh
+      ? '文本过长已截断显示（展示前 $displayed / $total 字符），可通过复制获取全文'
+      : 'Text truncated (showing $displayed / $total chars), copy to get full text';
+  String diffTruncatedNotice(int maxChars) => isZh
+      ? '文本过长已截断比对（仅对比前 $maxChars 字符）'
+      : 'Text truncated for diff (comparing first $maxChars chars only)';
 }
 
 class _DuiLocalizationsDelegate

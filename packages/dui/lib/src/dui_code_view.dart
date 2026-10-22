@@ -14,6 +14,7 @@ class DuiCodeView extends StatelessWidget {
   final double fontSize;
   final bool showCopyButton;
   final double? height;
+  final int maxCharacters;
   final VoidCallback? onCopy;
 
   const DuiCodeView({
@@ -25,6 +26,7 @@ class DuiCodeView extends StatelessWidget {
     this.fontSize = 12.5,
     this.showCopyButton = true,
     this.height,
+    this.maxCharacters = 200000,
     this.onCopy,
   });
 
@@ -46,7 +48,10 @@ class DuiCodeView extends StatelessWidget {
     final borderColor =
         isDark ? const Color(0xFF2D3748) : const Color(0xFFE2E8F0);
 
-    final lines = text.split('\n');
+    final isTruncated = text.length > maxCharacters;
+    final effectiveText = isTruncated ? text.substring(0, maxCharacters) : text;
+
+    final lines = effectiveText.split('\n');
     final totalLines = lines.length;
     final maxLineNumberDigits = totalLines.toString().length;
 
@@ -66,7 +71,7 @@ class DuiCodeView extends StatelessWidget {
       }
 
       final highlightedSpans =
-          _highlightCode(text, language, monoStyle, isDark);
+          _highlightCode(effectiveText, language, monoStyle, isDark);
 
       final codeWidget = SelectableText.rich(
         TextSpan(style: monoStyle, children: highlightedSpans),
@@ -114,7 +119,7 @@ class DuiCodeView extends StatelessWidget {
       );
     } else {
       final highlightedSpans =
-          _highlightCode(text, language, monoStyle, isDark);
+          _highlightCode(effectiveText, language, monoStyle, isDark);
       final codeWidget = SelectableText.rich(
         TextSpan(style: monoStyle, children: highlightedSpans),
       );
@@ -130,6 +135,49 @@ class DuiCodeView extends StatelessWidget {
       );
     }
 
+    Widget bodyContent = content;
+    if (isTruncated) {
+      final loc = DuiLocalizations.of(context);
+      bodyContent = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0x28F59E0B),
+              border: Border(
+                bottom: BorderSide(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 14,
+                  color: Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    loc.textTruncatedNotice(maxCharacters, text.length),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFF59E0B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(fit: FlexFit.loose, child: content),
+        ],
+      );
+    }
+
     Widget root = Container(
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -139,7 +187,7 @@ class DuiCodeView extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          content,
+          bodyContent,
           if (showCopyButton && text.isNotEmpty)
             Positioned(
               top: 4,

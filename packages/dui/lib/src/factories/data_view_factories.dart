@@ -24,6 +24,8 @@ void registerDataViewFactories(DuiRenderer renderer) {
     final fontSize = DuiUtils.tryDouble(node.props['fontSize']) ?? 12.5;
     final showCopyButton = node.props['showCopyButton'] != false;
     final height = node.height;
+    final maxCharacters =
+        DuiUtils.tryInt(node.props['maxCharacters']) ?? 200000;
 
     final keys = DuiState.extractKeys(rawText);
 
@@ -37,6 +39,7 @@ void registerDataViewFactories(DuiRenderer renderer) {
         fontSize: fontSize,
         showCopyButton: showCopyButton,
         height: height,
+        maxCharacters: maxCharacters,
         onCopy: () {
           final onCopyEvent = node.events['onCopy'];
           if (onCopyEvent is Map) {
@@ -61,6 +64,8 @@ void registerDataViewFactories(DuiRenderer renderer) {
     final fontSize = DuiUtils.tryDouble(node.props['fontSize']) ?? 12.0;
     final showSummary = node.props['showSummary'] != false;
     final height = node.height;
+    final maxCharacters =
+        DuiUtils.tryInt(node.props['maxCharacters']) ?? 200000;
 
     final keys = {
       ...DuiState.extractKeys(rawOld),
@@ -77,6 +82,7 @@ void registerDataViewFactories(DuiRenderer renderer) {
         fontSize: fontSize,
         showSummary: showSummary,
         height: height,
+        maxCharacters: maxCharacters,
       );
     }
 
