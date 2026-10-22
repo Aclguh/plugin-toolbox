@@ -66,9 +66,11 @@ class ApiGuard {
   static void checkPermission(
     LuaState ls,
     PluginContext context,
-    PluginPermission permission,
-  ) {
-    if (!context.hasPermission(permission)) {
+    PluginPermission permission, [
+    String action = 'api_call',
+  ]) {
+    final granted = context.hasPermission(permission, auditAction: action);
+    if (!granted) {
       ls.error2('权限不足: 插件未声明 ${permission.name} 权限');
     }
   }
@@ -77,9 +79,17 @@ class ApiGuard {
   static void checkAnyPermission(
     LuaState ls,
     PluginContext context,
-    List<PluginPermission> permissions,
-  ) {
-    if (!permissions.any((p) => context.hasPermission(p))) {
+    List<PluginPermission> permissions, [
+    String action = 'api_call',
+  ]) {
+    final granted = permissions.any((p) => context.hasPermission(p));
+    context.recordAuditTrail(
+      permissions.first,
+      action,
+      granted: granted,
+      detail: permissions.map((p) => p.name).join('/'),
+    );
+    if (!granted) {
       final names = permissions.map((p) => p.name).join('/');
       ls.error2('权限不足: 插件未声明 $names 权限');
     }

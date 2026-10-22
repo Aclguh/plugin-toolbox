@@ -193,4 +193,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noLogsMessage => '(Calls to print() in Lua will appear here)';
+
+  @override
+  String get auditTrailTitle => 'Security Access Audit Trail';
+
+  @override
+  String get noAuditTrail => 'No sensitive access records';
 }

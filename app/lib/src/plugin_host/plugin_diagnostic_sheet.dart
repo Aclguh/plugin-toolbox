@@ -159,6 +159,8 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                       const SizedBox(height: AppSpacing.md),
                       _buildPermissionsCard(theme, ctx, l10n),
                       const SizedBox(height: AppSpacing.md),
+                      _buildAuditTrailCard(theme, ctx, l10n),
+                      const SizedBox(height: AppSpacing.md),
                       _buildActionsCard(theme, ctx, l10n),
                     ],
                   ),
@@ -380,6 +382,69 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                     ),
                   )
                   .toList(),
+            ),
+    );
+  }
+
+  Widget _buildAuditTrailCard(
+    ThemeData theme,
+    PluginContext? ctx,
+    AppLocalizations? l10n,
+  ) {
+    final trail = ctx?.auditTrail ?? const <PermissionAuditRecord>[];
+    return _buildSection(
+      theme: theme,
+      icon: Icons.security_rounded,
+      title: l10n?.auditTrailTitle ?? '敏感权限访问审计',
+      child: trail.isEmpty
+          ? Text(
+              l10n?.noAuditTrail ?? '暂无敏感权限访问记录',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          : Column(
+              children: [
+                for (final record in trail.reversed.take(10))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Row(
+                      children: [
+                        AppBadge(
+                          label: record.granted ? 'ALLOW' : 'DENY',
+                          tone: record.granted
+                              ? AppBadgeTone.success
+                              : AppBadgeTone.danger,
+                          dense: true,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          record.timestamp.toIso8601String().substring(11, 19),
+                          style: TextStyle(
+                            fontFamily: AppTypography.monospace,
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        AppBadge(
+                          label: record.permission.name,
+                          tone: AppBadgeTone.neutral,
+                          dense: true,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            record.action,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
     );
   }

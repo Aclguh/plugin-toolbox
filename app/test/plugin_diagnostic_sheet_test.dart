@@ -142,4 +142,47 @@ void main() {
     expect(find.text('Copy All'), findsOneWidget);
     expect(find.text('Clear'), findsOneWidget);
   });
+
+  testWidgets('PluginDiagnosticSheet 渲染权限审计记录与空态提示', (tester) async {
+    mockPlugin.context?.recordAuditTrail(
+      PluginPermission.storage,
+      'read_config',
+      granted: true,
+    );
+    mockPlugin.context?.recordAuditTrail(
+      PluginPermission.network,
+      'http_get',
+      granted: false,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () {
+                PluginDiagnosticSheet.show(
+                  ctx,
+                  plugin: mockPlugin,
+                );
+              },
+              child: const Text('打开'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('敏感权限访问审计'), findsOneWidget);
+    expect(find.text('ALLOW'), findsOneWidget);
+    expect(find.text('DENY'), findsOneWidget);
+    expect(find.text('read_config'), findsOneWidget);
+    expect(find.text('http_get'), findsOneWidget);
+  });
 }

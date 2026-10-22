@@ -188,4 +188,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noLogsMessage => '(Lua 中调用 print() 会在此处显示)';
+
+  @override
+  String get auditTrailTitle => '敏感权限访问审计';
+
+  @override
+  String get noAuditTrail => '暂无敏感权限访问记录';
 }

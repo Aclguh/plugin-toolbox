@@ -1,3 +1,4 @@
+import 'package:logger/logger.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
@@ -142,6 +143,56 @@ void main() {
           manager2.hasPermission('plugin_b', PluginPermission.camera), isTrue);
       expect(manager2.hasPermission('plugin_b', PluginPermission.clipboard),
           isTrue);
+    });
+    test('PluginContext.recordAuditTrail 记录权限安全审计事件与队列上限控制', () {
+      final context = PluginContext(
+        pluginId: 'audit_plugin',
+        storage: const PluginStorageFactory().create('audit_plugin'),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.storage},
+      );
+
+      // 查询已授权权限并附带 auditAction
+      expect(
+        context.hasPermission(PluginPermission.storage,
+            auditAction: 'read_file'),
+        isTrue,
+      );
+      expect(context.auditTrail.length, 1);
+      final r1 = context.auditTrail.first;
+      expect(r1.permission, PluginPermission.storage);
+      expect(r1.action, 'read_file');
+      expect(r1.granted, isTrue);
+      expect(r1.toString(), contains('[ALLOW] [storage] read_file'));
+
+      // 查询未授权权限并附带 auditAction
+      expect(
+        context.hasPermission(PluginPermission.network,
+            auditAction: 'http_get', detail: 'https://evil.com'),
+        isFalse,
+      );
+      expect(context.auditTrail.length, 2);
+      final r2 = context.auditTrail[1];
+      expect(r2.permission, PluginPermission.network);
+      expect(r2.granted, isFalse);
+      expect(r2.detail, 'https://evil.com');
+      expect(r2.toString(),
+          contains('[DENY] [network] http_get (https://evil.com)'));
+
+      // 诊断日志同步接收审计条目
+      expect(context.diagnosticLogs.any((l) => l.contains('[AUDIT]')), isTrue);
+
+      // 验证队列上限为 100 条
+      for (var i = 0; i < 120; i++) {
+        context.recordAuditTrail(PluginPermission.clipboard, 'copy_$i');
+      }
+      expect(context.auditTrail.length, 100);
+      expect(context.auditTrail.last.action, 'copy_119');
+
+      // 清空
+      context.clearAuditTrail();
+      expect(context.auditTrail, isEmpty);
     });
   });
 }

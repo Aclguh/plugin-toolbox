@@ -72,5 +72,7 @@
   "logsCopied": "Logs copied to clipboard",
   "clear": "Clear",
   "noLogsTitle": "No Console Logs",
-  "noLogsMessage": "(Calls to print() in Lua will appear here)"
+  "noLogsMessage": "(Calls to print() in Lua will appear here)",
+  "auditTrailTitle": "Security Access Audit Trail",
+  "noAuditTrail": "No sensitive access records"
 }

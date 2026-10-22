@@ -72,5 +72,7 @@
   "logsCopied": "已复制日志到剪贴板",
   "clear": "清空",
   "noLogsTitle": "暂无控制台日志输出",
-  "noLogsMessage": "(Lua 中调用 print() 会在此处显示)"
+  "noLogsMessage": "(Lua 中调用 print() 会在此处显示)",
+  "auditTrailTitle": "敏感权限访问审计",
+  "noAuditTrail": "暂无敏感权限访问记录"
 }

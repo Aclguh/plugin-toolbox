@@ -451,6 +451,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'(Lua 中调用 print() 会在此处显示)'**
   String get noLogsMessage;
+
+  /// No description provided for @auditTrailTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'敏感权限访问审计'**
+  String get auditTrailTitle;
+
+  /// No description provided for @noAuditTrail.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无敏感权限访问记录'**
+  String get noAuditTrail;
 }
 
 class _AppLocalizationsDelegate

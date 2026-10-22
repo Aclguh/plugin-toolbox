@@ -4,6 +4,31 @@ import '../event/event_bus.dart';
 import '../storage/plugin_storage.dart';
 import '../model/plugin_permission.dart';
 
+/// 敏感权限调用运行时安全审计事件实体
+class PermissionAuditRecord {
+  final DateTime timestamp;
+  final PluginPermission permission;
+  final String action;
+  final bool granted;
+  final String? detail;
+
+  const PermissionAuditRecord({
+    required this.timestamp,
+    required this.permission,
+    required this.action,
+    this.granted = true,
+    this.detail,
+  });
+
+  @override
+  String toString() {
+    final time = timestamp.toIso8601String().substring(11, 19);
+    final status = granted ? 'ALLOW' : 'DENY';
+    final extra = detail != null && detail!.isNotEmpty ? ' ($detail)' : '';
+    return '[$time] [$status] [${permission.name}] $action$extra';
+  }
+}
+
 /// 运行时注入给插件的上下文环境，封装了沙箱隔离的存储、事件总线、日志与授权信息
 class PluginContext {
   /// 插件全局唯一标识符
@@ -49,9 +74,15 @@ class PluginContext {
     this.diskScanner,
   });
 
-  /// 检查插件是否已被授予指定权限 [perm]
-  bool hasPermission(PluginPermission perm) =>
-      grantedPermissions.contains(perm);
+  /// 检查插件是否已被授予指定权限 [perm]，并可选择性记录运行时审计轨迹
+  bool hasPermission(PluginPermission perm,
+      {String? auditAction, String? detail}) {
+    final granted = grantedPermissions.contains(perm);
+    if (auditAction != null) {
+      recordAuditTrail(perm, auditAction, granted: granted, detail: detail);
+    }
+    return granted;
+  }
 
   /// 动态更新插件已被授予的权限集合
   void setGrantedPermissions(Set<PluginPermission> permissions) {
@@ -222,5 +253,37 @@ class PluginContext {
   /// 清空诊断日志
   void clearDiagnosticLogs() {
     _diagnosticLogs.clear();
+  }
+
+  /// 权限审计轨迹队列（最多保留 100 条）
+  final List<PermissionAuditRecord> _auditTrail = [];
+
+  /// 获取不可变权限审计轨迹视图
+  List<PermissionAuditRecord> get auditTrail => List.unmodifiable(_auditTrail);
+
+  /// 记录一条权限审计轨迹
+  void recordAuditTrail(
+    PluginPermission permission,
+    String action, {
+    bool granted = true,
+    String? detail,
+  }) {
+    if (_auditTrail.length >= 100) {
+      _auditTrail.removeAt(0);
+    }
+    final record = PermissionAuditRecord(
+      timestamp: DateTime.now(),
+      permission: permission,
+      action: action,
+      granted: granted,
+      detail: detail,
+    );
+    _auditTrail.add(record);
+    recordLog('🔒 [AUDIT] ${record.toString().substring(11)}');
+  }
+
+  /// 清空权限审计轨迹
+  void clearAuditTrail() {
+    _auditTrail.clear();
   }
 }
