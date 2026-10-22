@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:http/http.dart' as http;
@@ -173,6 +175,105 @@ class LuaEngine {
       return 0;
     });
     _ls.setGlobal('print');
+
+    // 初始化沙箱模块缓存表 (模拟 package.loaded)
+    _ls.newTable();
+    _ls.setGlobal('__loaded_modules');
+
+    // 注入沙箱受限的虚拟 require 模块加载器
+    _ls.pushDartFunction((ls) {
+      final moduleName = ls.checkString(1);
+      if (moduleName == null || moduleName.trim().isEmpty) {
+        ls.error2('require 缺少有效的模块名参数');
+        return 0;
+      }
+
+      final rawName = moduleName.trim();
+      if (rawName.contains('..') || SandboxPath.isAbsolutePath(rawName)) {
+        ls.error2('安全策略拦截: 非法的模块路径 [$moduleName]');
+        return 0;
+      }
+
+      final rootDir = context.rootDir;
+      if (rootDir == null) {
+        ls.error2('模块加载失败: 当前插件无本地沙箱根目录');
+        return 0;
+      }
+
+      var relPath = moduleName.trim();
+      if (!relPath.endsWith('.lua')) {
+        relPath = '${relPath.replaceAll('.', '/')}.lua';
+      }
+      relPath = relPath.replaceAll(r'\', '/');
+      while (relPath.startsWith('/')) {
+        relPath = relPath.substring(1);
+      }
+      final canonicalKey = relPath.substring(0, relPath.length - '.lua'.length);
+
+      // 路径穿越与越权拦截：严格限定于沙箱内部
+      if (!SandboxPath.isSafeSubpath(rootDir.path, relPath)) {
+        ls.error2('安全策略拦截: 非法的模块路径 [$moduleName]');
+        return 0;
+      }
+
+      // 检查缓存 (以规范化路径为统一 key)
+      ls.getGlobal('__loaded_modules');
+      ls.getField(-1, canonicalKey);
+      if (!ls.isNil(-1)) {
+        ls.remove(-2);
+        return 1;
+      }
+      ls.pop(1);
+
+      final targetFile = File('${rootDir.path}/$relPath');
+      if (!targetFile.existsSync()) {
+        ls.pop(1);
+        ls.error2('模块未找到: [$moduleName] (文件不存在: $relPath)');
+        return 0;
+      }
+
+      final bytes = targetFile.readAsBytesSync();
+      if (SandboxPath.isLuaBytecode(bytes)) {
+        ls.pop(1);
+        ls.error2('安全策略拦截: 模块禁止使用预编译 Lua 字节码 [$moduleName]');
+        return 0;
+      }
+
+      final script = utf8.decode(bytes);
+
+      // 预先写入 true 防范循环依赖死递归
+      ls.pushBoolean(true);
+      ls.setField(-2, canonicalKey);
+
+      ls.setInstructionBudget(instructionBudget);
+      final loadStatus = ls.loadString(script);
+      if (loadStatus != ThreadStatus.luaOk) {
+        final err = ls.toStr(-1) ?? 'Syntax error';
+        ls.pop(2);
+        ls.error2('模块编译失败 [$moduleName]: $err');
+        return 0;
+      }
+
+      final pcallStatus = ls.pCall(0, 1, 0);
+      if (pcallStatus != ThreadStatus.luaOk) {
+        final err = ls.toStr(-1) ?? 'Runtime error';
+        ls.pop(2);
+        ls.error2('模块执行错误 [$moduleName]: $err');
+        return 0;
+      }
+
+      if (!ls.isNil(-1)) {
+        ls.pushValue(-1);
+        ls.setField(-3, canonicalKey);
+      } else {
+        ls.pop(1);
+        ls.pushBoolean(true);
+      }
+
+      ls.remove(-2);
+      return 1;
+    });
+    _ls.setGlobal('require');
 
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);

@@ -1,3 +1,4 @@
+import 'dart:io';
 export 'helpers/lua_test_helpers.dart';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -187,7 +188,7 @@ void main() {
       engine.close();
     });
 
-    test('危险标准库全局全部被置空', () {
+    test('危险标准库全局全部被置空且 require 受沙箱安全管控', () {
       engine.loadAndExecute('''
         state.set("os_type", type(os))
         state.set("io_type", type(io))
@@ -202,9 +203,109 @@ void main() {
       expect(delegate.getState('io_type'), 'nil');
       expect(delegate.getState('debug_type'), 'nil');
       expect(delegate.getState('package_type'), 'nil');
-      expect(delegate.getState('require_type'), 'nil');
+      expect(delegate.getState('require_type'), 'function');
       expect(delegate.getState('dofile_type'), 'nil');
       expect(delegate.getState('loadfile_type'), 'nil');
+    });
+
+    group('沙箱受限 require 模块化测试', () {
+      late Directory tempPluginDir;
+
+      setUp(() async {
+        tempPluginDir =
+            await Directory.systemTemp.createTemp('ptx_require_test_');
+      });
+
+      tearDown(() async {
+        if (await tempPluginDir.exists()) {
+          await tempPluginDir.delete(recursive: true);
+        }
+      });
+
+      test('支持加载沙箱内子模块、点号语法与返回值单例缓存', () async {
+        final utilsDir = Directory('${tempPluginDir.path}/utils');
+        await utilsDir.create(recursive: true);
+        final calcFile = File('${utilsDir.path}/calc.lua');
+        await calcFile.writeAsString('''
+          local M = {}
+          M.tag = "calc_v1"
+          function M.add(a, b) return a + b end
+          return M
+        ''');
+
+        final ctx = PluginContext(
+          pluginId: 'mod_test',
+          storage: PluginStorageImpl(namespace: 'mod_test'),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {},
+          rootDir: tempPluginDir,
+        );
+        final eng = LuaEngine(context: ctx, delegate: delegate);
+
+        eng.loadAndExecute('''
+          local calc1 = require("utils.calc")
+          local calc2 = require("utils/calc")
+          state.set("sum", calc1.add(10, 25))
+          state.set("tag", calc2.tag)
+          state.set("is_same", calc1 == calc2)
+        ''');
+
+        expect(delegate.getState('sum'), 35);
+        expect(delegate.getState('tag'), 'calc_v1');
+        expect(delegate.getState('is_same'), isTrue);
+
+        eng.close();
+      });
+
+      test('拦截越权路径穿越 require 尝试', () async {
+        final ctx = PluginContext(
+          pluginId: 'mod_test',
+          storage: PluginStorageImpl(namespace: 'mod_test'),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {},
+          rootDir: tempPluginDir,
+        );
+        final eng = LuaEngine(context: ctx, delegate: delegate);
+
+        expect(
+          () => eng.loadAndExecute('require("../secret")'),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('安全策略拦截'),
+          )),
+        );
+
+        eng.close();
+      });
+
+      test('拦截预编译字节码模块加载', () async {
+        final bytecodeFile = File('${tempPluginDir.path}/evil.lua');
+        await bytecodeFile.writeAsBytes([0x1B, 0x4C, 0x75, 0x61, 0x01, 0x02]);
+
+        final ctx = PluginContext(
+          pluginId: 'mod_test',
+          storage: PluginStorageImpl(namespace: 'mod_test'),
+          eventBus: EventBusImpl(),
+          logger: Logger(),
+          grantedPermissions: {},
+          rootDir: tempPluginDir,
+        );
+        final eng = LuaEngine(context: ctx, delegate: delegate);
+
+        expect(
+          () => eng.loadAndExecute('require("evil")'),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('安全策略拦截: 模块禁止使用预编译 Lua 字节码'),
+          )),
+        );
+
+        eng.close();
+      });
     });
 
     test('安全基础库 (table/string/math) 保持可用', () {
