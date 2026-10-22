@@ -1,3 +1,4 @@
+import 'package:crypto/crypto.dart';
 import '../config/toolbox_constants.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -33,6 +34,7 @@ class PluginInstaller {
   static Future<DynamicPlugin> installFromPtx(
     File ptxFile, {
     Directory? baseDirectory,
+    String? expectedSha256,
   }) async {
     final length = await ptxFile.length();
     if (length > maxPackageSizeBytes) {
@@ -52,6 +54,7 @@ class PluginInstaller {
           ptxPath: ptxPath,
           pluginsBasePath: pluginsBasePath,
           length: length,
+          expectedSha256: expectedSha256,
         ));
 
     final manifest = PluginManifest.fromJsonString(installData['manifest']!);
@@ -67,9 +70,20 @@ class PluginInstaller {
     required String ptxPath,
     required String pluginsBasePath,
     required int length,
+    String? expectedSha256,
   }) async {
     final ptxFile = File(ptxPath);
     final bytes = await ptxFile.readAsBytes();
+    if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
+      final expectedClean = expectedSha256.trim();
+      final digest = sha256.convert(bytes);
+      final hexDigest = digest.toString().toLowerCase();
+      final base64Digest = base64.encode(digest.bytes);
+      if (expectedClean.toLowerCase() != hexDigest &&
+          expectedClean != base64Digest) {
+        throw const FormatException('安装包 SHA-256 完整性哈希校验失败，疑似文件已损坏或被篡改');
+      }
+    }
     if (!SandboxPath.isZipArchive(bytes)) {
       throw const FormatException('安装包不是有效的 ZIP/PTX 格式 (缺少文件签名魔数)');
     }

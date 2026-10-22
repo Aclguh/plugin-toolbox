@@ -1,3 +1,4 @@
+import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -481,6 +482,50 @@ void main() {
       expect(ctx.currentUsedBytes, 900 * 1024);
 
       await tempDir.delete(recursive: true);
+    });
+
+    test('PluginInstaller 校验 SHA-256 完整性哈希：合法放行，篡改或不匹配时拦截', () async {
+      final customBaseDir = await tempDirFactory.createTemp('custom_sha_');
+      final ptxBytes = buildPtx(validEntries(id: 'sha_test'));
+      final ptxFile = await writeTempPtx(ptxBytes);
+
+      final realSha256 = calculatePackageSha256(ptxBytes);
+      expect(verifyPackageSha256(ptxBytes, realSha256), isTrue);
+
+      // 1. 错误哈希拦截
+      expect(
+        () => PluginInstaller.installFromPtx(
+          ptxFile,
+          baseDirectory: customBaseDir,
+          expectedSha256: 'deadbeef' * 8,
+        ),
+        throwsA(isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          contains('SHA-256 完整性哈希校验失败'),
+        )),
+      );
+
+      // 2. 正确十六进制哈希放行
+      final p1 = await PluginInstaller.installFromPtx(
+        ptxFile,
+        baseDirectory: customBaseDir,
+        expectedSha256: realSha256,
+      );
+      expect(p1.id, 'sha_test');
+
+      // 3. 正确 base64 形式哈希放行
+      final base64Sha = base64.encode(sha256.convert(ptxBytes).bytes);
+      expect(verifyPackageSha256(ptxBytes, base64Sha), isTrue);
+      final p2 = await PluginInstaller.installFromPtx(
+        ptxFile,
+        baseDirectory: customBaseDir,
+        expectedSha256: base64Sha,
+      );
+      expect(p2.id, 'sha_test');
+
+      await PluginInstaller.uninstall('sha_test', baseDirectory: customBaseDir);
+      await customBaseDir.delete(recursive: true);
     });
 
     test('PluginInstaller 支持注入 baseDirectory 独立安装与卸载', () async {

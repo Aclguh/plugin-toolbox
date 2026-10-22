@@ -1,3 +1,4 @@
+import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -68,4 +69,17 @@ PluginPackageContract inspectPluginPackage(Uint8List bytes) {
     missingEntryScript: !names.contains(manifest.entry),
     missingUiDefinition: !names.contains(manifest.ui),
   );
+}
+
+/// 计算指定安装包字节序列的 SHA-256 哈希值 (小写十六进制字符串)
+String calculatePackageSha256(List<int> bytes) =>
+    sha256.convert(bytes).toString().toLowerCase();
+
+/// 核对指定安装包字节序列是否与期望的 [expectedHash] (十六进制或 base64) 匹配
+bool verifyPackageSha256(List<int> bytes, String expectedHash) {
+  final clean = expectedHash.trim();
+  if (clean.isEmpty) return false;
+  final digest = sha256.convert(bytes);
+  return clean.toLowerCase() == digest.toString().toLowerCase() ||
+      clean == base64.encode(digest.bytes);
 }
