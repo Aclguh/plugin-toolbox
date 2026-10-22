@@ -333,4 +333,94 @@ void main() {
     state.hideKeyboard();
     await tester.pump();
   });
+
+  testWidgets('DynamicPluginHostPage 交互协议与生命周期调度', (tester) async {
+    final entryFile = File('${tempDir.path}/entry2.lua');
+    entryFile.writeAsStringSync('function onInit() end');
+    final uiFile = File('${tempDir.path}/ui2.json');
+    uiFile.writeAsStringSync('{"type": "Center", "props": {"text": "hello"}}');
+
+    final dynamicPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'ui_branch_test',
+        name: 'UI分支测试',
+        version: '1.0.0',
+        description: '',
+        author: '',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'entry2.lua',
+        ui: 'ui2.json',
+      ),
+      rootDir: tempDir,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: dynamicPlugin),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final dynamic state = tester.state(find.byType(DynamicPluginHostPage));
+
+    // 测试生命周期派发
+    state.didChangeAppLifecycleState(AppLifecycleState.paused);
+    state.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+    // 测试 openPlugin 容错
+    expect(await state.openPlugin('non_exist_target'), isFalse);
+  });
+
+  testWidgets('DynamicPluginHostPage 异常态 ErrorView 点击重试触发重新加载', (tester) async {
+    final brokenPlugin = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'broken_plugin_retry',
+        name: '崩溃测试插件',
+        version: '1.0.0',
+        description: '',
+        author: '',
+        type: 'lua',
+        category: PluginCategory.other,
+        permissions: [],
+        entry: 'missing_entry.lua',
+        ui: 'ui/non_existent.json',
+      ),
+      rootDir: tempDir,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: brokenPlugin),
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('插件运行错误'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+
+    await tester.tap(find.text('重试'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('插件运行错误'), findsOneWidget);
+  });
 }

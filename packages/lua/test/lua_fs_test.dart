@@ -406,5 +406,99 @@ void main() {
       eng.close();
       await tempDir.delete(recursive: true);
     });
+
+    test('FsExternalHandler: saveToGallery 权限、格式校验与宿主保存委派', () async {
+      final tempDir =
+          await Directory.systemTemp.createTemp('ptx_fs_gallery_test_');
+      final ctx = PluginContext(
+        pluginId: 'gallery_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.storage},
+      );
+      final eng = LuaEngine(context: ctx, delegate: delegate);
+
+      final pngFile = File('${tempDir.path}/pic.png');
+      await pngFile.writeAsBytes([137, 80, 78, 71]);
+      final txtFile = File('${tempDir.path}/doc.txt');
+      await txtFile.writeAsString('not image');
+
+      // 1. 非图片文件拦截
+      expect(
+        () => eng.loadAndExecute('fs.saveToGallery("doc.txt")'),
+        throwsException,
+      );
+
+      // 2. 不存在的文件拦截
+      expect(
+        () => eng.loadAndExecute('fs.saveToGallery("not_found.png")'),
+        throwsException,
+      );
+
+      // 3. 正常图片保存
+      eng.loadAndExecute('''
+        fs.saveToGallery("pic.png", function(ok, err)
+          state.set("gallery_saved", ok)
+        end)
+      ''');
+
+      await _waitFor(() => delegate.getState('gallery_saved') != null);
+      expect(delegate.getState('gallery_saved'), isTrue);
+      expect(delegate.savedGalleryPath, pngFile.path);
+
+      eng.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('FsExternalHandler: exportFile 与 pickFile 宿主通信交互', () async {
+      final tempDir =
+          await Directory.systemTemp.createTemp('ptx_fs_export_test_');
+      final ctx = PluginContext(
+        pluginId: 'export_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.storage},
+      );
+      final eng = LuaEngine(context: ctx, delegate: delegate);
+
+      final docFile = File('${tempDir.path}/my_doc.pdf');
+      await docFile.writeAsString('pdf content');
+
+      // 1. exportFile 不存在文件报错
+      expect(
+        () => eng.loadAndExecute('fs.exportFile("missing.pdf")'),
+        throwsException,
+      );
+
+      // 2. 正常 exportFile
+      eng.loadAndExecute('''
+        fs.exportFile("my_doc.pdf", "custom_name.pdf", function(ok)
+          state.set("export_ok", ok)
+        end)
+      ''');
+
+      await _waitFor(() => delegate.getState('export_ok') != null);
+      expect(delegate.getState('export_ok'), isTrue);
+      expect(delegate.exportedFilePath, docFile.path);
+      expect(delegate.exportedFileDefaultName, 'custom_name.pdf');
+
+      // 3. pickFile 委派宿主
+      delegate.pickedFileResult = 'selected.txt';
+      eng.loadAndExecute('''
+        fs.pickFile({ allowedExtensions = {"txt", "pdf"} }, function(path)
+          state.set("picked_path", path)
+        end)
+      ''');
+
+      await _waitFor(() => delegate.getState('picked_path') != null);
+      expect(delegate.getState('picked_path'), 'selected.txt');
+
+      eng.close();
+      await tempDir.delete(recursive: true);
+    });
   });
 }

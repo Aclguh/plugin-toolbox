@@ -480,5 +480,106 @@ void main() {
       expect(delegate.getState('stop_speak_ok'), isTrue);
       expect(delegate.speechStopped, isTrue);
     });
+
+    test('SocketApi: 无 network 权限拦截与无效连接安全兜底', () {
+      final noPermCtx = PluginContext(
+        pluginId: 'no_net_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      final noPermEng = LuaEngine(context: noPermCtx, delegate: delegate);
+
+      // 1. 无 network 权限调用 tcpConnect / tcpSend / tcpClose 报错
+      expect(
+          () => noPermEng.loadAndExecute('socket.tcpConnect("127.0.0.1", 80)'),
+          throwsException);
+      expect(() => noPermEng.loadAndExecute('socket.tcpSend("tcp_1", "hi")'),
+          throwsException);
+      expect(() => noPermEng.loadAndExecute('socket.tcpClose("tcp_1")'),
+          throwsException);
+
+      // 2. 无 network 权限调用 udpBind / udpSend / udpClose 报错
+      expect(() => noPermEng.loadAndExecute('socket.udpBind(0, {})'),
+          throwsException);
+      expect(
+          () => noPermEng
+              .loadAndExecute('socket.udpSend("udp_1", "127.0.0.1", 80, "hi")'),
+          throwsException);
+      expect(() => noPermEng.loadAndExecute('socket.udpClose("udp_1")'),
+          throwsException);
+
+      noPermEng.close();
+    });
+
+    test('SocketApi: 活跃连接管理与不存在的套接字安全返回 false', () {
+      final netCtx = PluginContext(
+        pluginId: 'net_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEng = LuaEngine(context: netCtx, delegate: delegate);
+
+      // tcpSend / tcpClose 不存在的 socketId 返回 false
+      netEng.loadAndExecute('''
+        state.set("tcp_send_fake", socket.tcpSend("non_exist_id", "data"))
+        state.set("tcp_close_fake", socket.tcpClose("non_exist_id"))
+        state.set("udp_send_fake", socket.udpSend("non_exist_id", "1.1.1.1", 53, "data"))
+        state.set("udp_close_fake", socket.udpClose("non_exist_id"))
+      ''');
+
+      expect(delegate.getState('tcp_send_fake'), isFalse);
+      expect(delegate.getState('tcp_close_fake'), isFalse);
+      expect(delegate.getState('udp_send_fake'), isFalse);
+      expect(delegate.getState('udp_close_fake'), isFalse);
+
+      netEng.close();
+    });
+
+    test('WebSocketApi: 无权限拦截与格式错误/未知连接安全防御', () {
+      final noPermCtx = PluginContext(
+        pluginId: 'no_ws_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {},
+      );
+      final noPermEng = LuaEngine(context: noPermCtx, delegate: delegate);
+
+      // 1. 无 network 权限调用 websocket 接口报错
+      expect(
+          () => noPermEng
+              .loadAndExecute('websocket.connect("ws://echo.websocket.org")'),
+          throwsException);
+      expect(() => noPermEng.loadAndExecute('websocket.send("ws_1", "hi")'),
+          throwsException);
+      expect(() => noPermEng.loadAndExecute('websocket.close("ws_1")'),
+          throwsException);
+
+      noPermEng.close();
+
+      // 2. 有权限时对格式错误与未知 wsId 安全处理
+      final netCtx = PluginContext(
+        pluginId: 'ws_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEng = LuaEngine(context: netCtx, delegate: delegate);
+
+      netEng.loadAndExecute('''
+        state.set("ws_send_fake", websocket.send("ws_unknown", "data"))
+        state.set("ws_close_fake", websocket.close("ws_unknown"))
+      ''');
+
+      expect(delegate.getState('ws_send_fake'), isFalse);
+      expect(delegate.getState('ws_close_fake'), isFalse);
+
+      netEng.close();
+    });
   });
 }
