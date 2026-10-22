@@ -74,7 +74,7 @@ double contrastRatio(int hex1, int hex2) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-void main() {
+void main(List<String> args) {
   print('================================================================');
   print('        PluginToolbox 本地规范与逻辑自动化验证套件 (verify.dart)');
   print('================================================================\n');
@@ -809,6 +809,22 @@ void main() {
 
   final readmeFile = File('README.md');
   expect(readmeFile.existsSync(), 'README.md 存在');
+
+  if (args.contains('--sync-readme') && readmeFile.existsSync()) {
+    final totalRegex = RegExp(r'共\s*\d+\s*用例');
+    final breakdownRegex = RegExp(
+      r'packages/core\s+\d+\s*/\s*packages/lua\s+\d+\s*/\s*packages/dui\s+\d+\s*/\s*packages/ui\s+\d+\s*/\s*app\s+\d+',
+    );
+    final newTotalStr = '共 $totalCases 用例';
+    final newBreakdownStr =
+        'packages/core ${perModuleCases['packages/core']} / packages/lua ${perModuleCases['packages/lua']} / packages/dui ${perModuleCases['packages/dui']} / packages/ui ${perModuleCases['packages/ui']} / app ${perModuleCases['app']}';
+    var content = readmeFile.readAsStringSync();
+    content = content.replaceFirst(totalRegex, newTotalStr);
+    content = content.replaceFirst(breakdownRegex, newBreakdownStr);
+    readmeFile.writeAsStringSync(content, flush: true);
+    print('    [--sync-readme] 已自动同步更新 README.md 测试用例统计声明');
+  }
+
   final readmeContent = readmeFile.readAsStringSync();
 
   final declaredTotal = RegExp(r'共\s*(\d+)\s*用例').firstMatch(readmeContent);

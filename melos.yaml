@@ -27,6 +27,10 @@ scripts:
     run: dart run tool/verify.dart
     description: 运行独立架构规范与自动化逻辑校验套件
 
+  sync:docs:
+    run: dart run tool/sync_docs.dart
+    description: 自动同步 README.md 中的测试用例数量统计
+
   test:
     run: melos exec --dir-exists="test" -- "flutter test"
     description: 运行各包单元测试与组件测试
