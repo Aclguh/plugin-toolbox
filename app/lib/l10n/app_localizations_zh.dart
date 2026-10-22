@@ -94,4 +94,98 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importLocalPtx => '导入本地 .ptx';
+
+  @override
+  String get permissionPromptTitle => '权限申请提示';
+
+  @override
+  String permissionPromptHeader(String pluginName) {
+    return '插件「$pluginName」正在请求使用以下能力：';
+  }
+
+  @override
+  String get permissionPromptExplanation => '此操作需要向该插件授予对应权限。您是否同意授权？';
+
+  @override
+  String get deny => '拒绝';
+
+  @override
+  String get allow => '允许';
+
+  @override
+  String get pluginDiagnosticsTitle => '插件诊断与控制台';
+
+  @override
+  String get tabStatus => '运行状态';
+
+  @override
+  String get tabLogs => '控制台日志';
+
+  @override
+  String get close => '关闭';
+
+  @override
+  String get basicInfoAndResources => '基础信息与资源占用';
+
+  @override
+  String get pluginId => '插件标识 (ID)';
+
+  @override
+  String get version => '版本号';
+
+  @override
+  String get category => '分类';
+
+  @override
+  String get luaHeapAllocation => 'Lua 虚拟机堆分配';
+
+  @override
+  String get sandboxStorageUsage => '沙箱存储占用';
+
+  @override
+  String get scanning => '扫描中...';
+
+  @override
+  String get grantedPermissionsTitle => '运行期已获授权';
+
+  @override
+  String get noSensitivePermissions => '未授予任何敏感权限';
+
+  @override
+  String get operationsAndDiagnostics => '运维与诊断操作';
+
+  @override
+  String get cleanTempCache => '清理沙箱临时缓存';
+
+  @override
+  String get cleanTempCacheDesc => '安全清理 data/temp 目录下的非持久化缓存文件';
+
+  @override
+  String get cleanedTempCacheSuccess => '已清理沙箱临时缓存';
+
+  @override
+  String get reloadPlugin => '重新加载插件';
+
+  @override
+  String get reloadPluginDesc => '重置 UI 状态与 Lua 运行时实例';
+
+  @override
+  String logCount(int count) {
+    return '共 $count 条记录';
+  }
+
+  @override
+  String get copyAll => '复制全部';
+
+  @override
+  String get logsCopied => '已复制日志到剪贴板';
+
+  @override
+  String get clear => '清空';
+
+  @override
+  String get noLogsTitle => '暂无控制台日志输出';
+
+  @override
+  String get noLogsMessage => '(Lua 中调用 print() 会在此处显示)';
 }

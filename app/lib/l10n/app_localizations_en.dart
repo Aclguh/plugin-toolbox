@@ -97,4 +97,100 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importLocalPtx => 'Import local .ptx';
+
+  @override
+  String get permissionPromptTitle => 'Permission Request';
+
+  @override
+  String permissionPromptHeader(String pluginName) {
+    return 'Plugin \"$pluginName\" requests the following capability:';
+  }
+
+  @override
+  String get permissionPromptExplanation =>
+      'This operation requires granting permission to the plugin. Do you allow it?';
+
+  @override
+  String get deny => 'Deny';
+
+  @override
+  String get allow => 'Allow';
+
+  @override
+  String get pluginDiagnosticsTitle => 'Plugin Diagnostics & Console';
+
+  @override
+  String get tabStatus => 'Status';
+
+  @override
+  String get tabLogs => 'Console Logs';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get basicInfoAndResources => 'Basic Info & Resource Usage';
+
+  @override
+  String get pluginId => 'Plugin ID';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get category => 'Category';
+
+  @override
+  String get luaHeapAllocation => 'Lua VM Heap Allocation';
+
+  @override
+  String get sandboxStorageUsage => 'Sandbox Storage Usage';
+
+  @override
+  String get scanning => 'Scanning...';
+
+  @override
+  String get grantedPermissionsTitle => 'Granted Permissions';
+
+  @override
+  String get noSensitivePermissions => 'No sensitive permissions granted';
+
+  @override
+  String get operationsAndDiagnostics => 'Maintenance & Diagnostic Actions';
+
+  @override
+  String get cleanTempCache => 'Clean Temp Cache';
+
+  @override
+  String get cleanTempCacheDesc =>
+      'Safely delete non-persistent temporary files under data/temp';
+
+  @override
+  String get cleanedTempCacheSuccess => 'Temporary cache cleaned successfully';
+
+  @override
+  String get reloadPlugin => 'Reload Plugin';
+
+  @override
+  String get reloadPluginDesc => 'Reset UI state and Lua runtime instance';
+
+  @override
+  String logCount(int count) {
+    return '$count records total';
+  }
+
+  @override
+  String get copyAll => 'Copy All';
+
+  @override
+  String get logsCopied => 'Logs copied to clipboard';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get noLogsTitle => 'No Console Logs';
+
+  @override
+  String get noLogsMessage => '(Calls to print() in Lua will appear here)';
 }

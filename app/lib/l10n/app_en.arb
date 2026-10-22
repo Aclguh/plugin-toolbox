@@ -28,5 +28,49 @@
   "searchHint": "Search tools...",
   "emptyToolsPrompt": "No enabled tools yet",
   "goToStoreToInstall": "Install from Store",
-  "importLocalPtx": "Import local .ptx"
+  "importLocalPtx": "Import local .ptx",
+  "permissionPromptTitle": "Permission Request",
+  "permissionPromptHeader": "Plugin \"{pluginName}\" requests the following capability:",
+  "@permissionPromptHeader": {
+    "placeholders": {
+      "pluginName": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionPromptExplanation": "This operation requires granting permission to the plugin. Do you allow it?",
+  "deny": "Deny",
+  "allow": "Allow",
+  "pluginDiagnosticsTitle": "Plugin Diagnostics & Console",
+  "tabStatus": "Status",
+  "tabLogs": "Console Logs",
+  "close": "Close",
+  "basicInfoAndResources": "Basic Info & Resource Usage",
+  "pluginId": "Plugin ID",
+  "version": "Version",
+  "category": "Category",
+  "luaHeapAllocation": "Lua VM Heap Allocation",
+  "sandboxStorageUsage": "Sandbox Storage Usage",
+  "scanning": "Scanning...",
+  "grantedPermissionsTitle": "Granted Permissions",
+  "noSensitivePermissions": "No sensitive permissions granted",
+  "operationsAndDiagnostics": "Maintenance & Diagnostic Actions",
+  "cleanTempCache": "Clean Temp Cache",
+  "cleanTempCacheDesc": "Safely delete non-persistent temporary files under data/temp",
+  "cleanedTempCacheSuccess": "Temporary cache cleaned successfully",
+  "reloadPlugin": "Reload Plugin",
+  "reloadPluginDesc": "Reset UI state and Lua runtime instance",
+  "logCount": "{count} records total",
+  "@logCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "copyAll": "Copy All",
+  "logsCopied": "Logs copied to clipboard",
+  "clear": "Clear",
+  "noLogsTitle": "No Console Logs",
+  "noLogsMessage": "(Calls to print() in Lua will appear here)"
 }

@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -29,15 +30,18 @@ class PluginPermissionPrompt {
       builder: (ctx) {
         final theme = Theme.of(ctx);
         final scheme = theme.colorScheme;
+        final l10n = AppLocalizations.of(ctx);
         return AppDialog(
           icon: Icons.shield_outlined,
-          title: '权限申请提示',
+          title: l10n?.permissionPromptTitle ?? '权限申请提示',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '插件「${plugin.name}」正在请求使用以下能力：',
+                l10n != null
+                    ? l10n.permissionPromptHeader(plugin.name)
+                    : '插件「${plugin.name}」正在请求使用以下能力：',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurface,
@@ -95,7 +99,7 @@ class PluginPermissionPrompt {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                '此操作需要向该插件授予对应权限。您是否同意授权？',
+                l10n?.permissionPromptExplanation ?? '此操作需要向该插件授予对应权限。您是否同意授权？',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -105,11 +109,11 @@ class PluginPermissionPrompt {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('拒绝'),
+              child: Text(l10n?.deny ?? '拒绝'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('允许'),
+              child: Text(l10n?.allow ?? '允许'),
             ),
           ],
         );

@@ -1,3 +1,4 @@
+import 'package:plugin_toolbox/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -186,5 +187,52 @@ void main() {
     // 检查持久化落盘
     final saved = prefs.getStringList('plugin_toolbox_permissions_camera_tool');
     expect(saved, contains('camera'));
+  });
+  testWidgets('PluginPermissionPrompt 支持英文国际化渲染', (tester) async {
+    bool? result;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) {
+                ref.read(pluginRegistryProvider).register(mockPlugin);
+                return ElevatedButton(
+                  onPressed: () async {
+                    result = await PluginPermissionPrompt.requestPermission(
+                      context,
+                      plugin: mockPlugin,
+                      permission: PluginPermission.camera,
+                      ref: ref,
+                    );
+                  },
+                  child: const Text('Request Camera'),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Request Camera'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Permission Request'), findsOneWidget);
+    expect(find.text('Deny'), findsOneWidget);
+    expect(find.text('Allow'), findsOneWidget);
+
+    await tester.tap(find.text('Allow'));
+    await tester.pumpAndSettle();
+
+    expect(result, isTrue);
   });
 }

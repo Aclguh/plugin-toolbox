@@ -1,3 +1,4 @@
+import 'package:plugin_toolbox/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,5 +105,41 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('暂无控制台日志输出'), findsOneWidget);
+  });
+  testWidgets('PluginDiagnosticSheet 支持英文国际化渲染', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () {
+                PluginDiagnosticSheet.show(
+                  ctx,
+                  plugin: mockPlugin,
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Plugin Diagnostics & Console'), findsOneWidget);
+    expect(find.text('Basic Info & Resource Usage'), findsOneWidget);
+    expect(find.text('Granted Permissions'), findsOneWidget);
+
+    await tester.tap(find.text('Console Logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 records total'), findsOneWidget);
+    expect(find.text('Copy All'), findsOneWidget);
+    expect(find.text('Clear'), findsOneWidget);
   });
 }

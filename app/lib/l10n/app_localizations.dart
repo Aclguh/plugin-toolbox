@@ -271,6 +271,186 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'导入本地 .ptx'**
   String get importLocalPtx;
+
+  /// No description provided for @permissionPromptTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'权限申请提示'**
+  String get permissionPromptTitle;
+
+  /// No description provided for @permissionPromptHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件「{pluginName}」正在请求使用以下能力：'**
+  String permissionPromptHeader(String pluginName);
+
+  /// No description provided for @permissionPromptExplanation.
+  ///
+  /// In zh, this message translates to:
+  /// **'此操作需要向该插件授予对应权限。您是否同意授权？'**
+  String get permissionPromptExplanation;
+
+  /// No description provided for @deny.
+  ///
+  /// In zh, this message translates to:
+  /// **'拒绝'**
+  String get deny;
+
+  /// No description provided for @allow.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许'**
+  String get allow;
+
+  /// No description provided for @pluginDiagnosticsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件诊断与控制台'**
+  String get pluginDiagnosticsTitle;
+
+  /// No description provided for @tabStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行状态'**
+  String get tabStatus;
+
+  /// No description provided for @tabLogs.
+  ///
+  /// In zh, this message translates to:
+  /// **'控制台日志'**
+  String get tabLogs;
+
+  /// No description provided for @close.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get close;
+
+  /// No description provided for @basicInfoAndResources.
+  ///
+  /// In zh, this message translates to:
+  /// **'基础信息与资源占用'**
+  String get basicInfoAndResources;
+
+  /// No description provided for @pluginId.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件标识 (ID)'**
+  String get pluginId;
+
+  /// No description provided for @version.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本号'**
+  String get version;
+
+  /// No description provided for @category.
+  ///
+  /// In zh, this message translates to:
+  /// **'分类'**
+  String get category;
+
+  /// No description provided for @luaHeapAllocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'Lua 虚拟机堆分配'**
+  String get luaHeapAllocation;
+
+  /// No description provided for @sandboxStorageUsage.
+  ///
+  /// In zh, this message translates to:
+  /// **'沙箱存储占用'**
+  String get sandboxStorageUsage;
+
+  /// No description provided for @scanning.
+  ///
+  /// In zh, this message translates to:
+  /// **'扫描中...'**
+  String get scanning;
+
+  /// No description provided for @grantedPermissionsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行期已获授权'**
+  String get grantedPermissionsTitle;
+
+  /// No description provided for @noSensitivePermissions.
+  ///
+  /// In zh, this message translates to:
+  /// **'未授予任何敏感权限'**
+  String get noSensitivePermissions;
+
+  /// No description provided for @operationsAndDiagnostics.
+  ///
+  /// In zh, this message translates to:
+  /// **'运维与诊断操作'**
+  String get operationsAndDiagnostics;
+
+  /// No description provided for @cleanTempCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理沙箱临时缓存'**
+  String get cleanTempCache;
+
+  /// No description provided for @cleanTempCacheDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'安全清理 data/temp 目录下的非持久化缓存文件'**
+  String get cleanTempCacheDesc;
+
+  /// No description provided for @cleanedTempCacheSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'已清理沙箱临时缓存'**
+  String get cleanedTempCacheSuccess;
+
+  /// No description provided for @reloadPlugin.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新加载插件'**
+  String get reloadPlugin;
+
+  /// No description provided for @reloadPluginDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'重置 UI 状态与 Lua 运行时实例'**
+  String get reloadPluginDesc;
+
+  /// No description provided for @logCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'共 {count} 条记录'**
+  String logCount(int count);
+
+  /// No description provided for @copyAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制全部'**
+  String get copyAll;
+
+  /// No description provided for @logsCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制日志到剪贴板'**
+  String get logsCopied;
+
+  /// No description provided for @clear.
+  ///
+  /// In zh, this message translates to:
+  /// **'清空'**
+  String get clear;
+
+  /// No description provided for @noLogsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无控制台日志输出'**
+  String get noLogsTitle;
+
+  /// No description provided for @noLogsMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'(Lua 中调用 print() 会在此处显示)'**
+  String get noLogsMessage;
 }
 
 class _AppLocalizationsDelegate
