@@ -219,6 +219,7 @@ class PluginInstaller {
     final targetDir = Directory('${pluginsBaseDir.path}/$pluginId');
     try {
       await storageFactory.create(pluginId, rootDir: targetDir).clear();
+      await PluginStorageFactory.evict(pluginId, rootDir: targetDir);
     } catch (_) {
       // 容灾: 存储异常不阻断卸载主流程
     }

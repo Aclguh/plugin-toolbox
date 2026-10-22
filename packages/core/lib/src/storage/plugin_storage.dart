@@ -449,19 +449,49 @@ class PluginStorageImpl implements PluginStorage {
   }
 }
 
-/// 插件持久化存储工厂，负责按插件 ID 实例化隔离的 [PluginStorage]
+/// 插件持久化存储工厂，负责按插件 ID 实例化隔离的 [PluginStorage] 并维护进程内实例池
 class PluginStorageFactory {
   /// 创建存储工厂实例
   const PluginStorageFactory();
 
-  /// 为指定插件 [pluginId] 创建命名空间隔离的持久化存储对象。
+  /// 进程内实例缓存池（key 为 "file:${rootDir.path}" 或 "prefs:$pluginId"）
+  static final Map<String, PluginStorage> _instances = {};
+
+  static String _cacheKey(String pluginId, Directory? rootDir) {
+    if (rootDir != null) {
+      return 'file:${rootDir.path.replaceAll(r'\', '/')}';
+    }
+    return 'prefs:$pluginId';
+  }
+
+  /// 为指定插件 [pluginId] 创建或获取命名空间隔离的持久化存储对象。
   ///
   /// 若提供沙箱根目录 [rootDir]，则使用插件沙箱内的独立 `storage.json` 文件进行持久化存储；
   /// 未提供时回退至共享的 `SharedPreferences` 命名空间存储。
+  ///
+  /// 【实例池化保障】：同一命名空间及沙箱路径在进程生命周期内共享同一单例实例，
+  /// 彻底消除多处创建 Storage 导致的内存 `_data` 脏写覆盖与异步写入竞争。
   PluginStorage create(String pluginId, {Directory? rootDir}) {
-    if (rootDir != null) {
-      return PluginFileStorageImpl(namespace: pluginId, rootDir: rootDir);
+    final key = _cacheKey(pluginId, rootDir);
+    return _instances.putIfAbsent(key, () {
+      if (rootDir != null) {
+        return PluginFileStorageImpl(namespace: pluginId, rootDir: rootDir);
+      }
+      return PluginStorageImpl(namespace: pluginId);
+    });
+  }
+
+  /// 从实例缓存池中显式注销并清理指定插件的 Storage 实例引用（供插件卸载或注销时调用）
+  static Future<void> evict(String pluginId, {Directory? rootDir}) async {
+    final key = _cacheKey(pluginId, rootDir);
+    final storage = _instances.remove(key);
+    if (storage != null) {
+      await storage.flush();
     }
-    return PluginStorageImpl(namespace: pluginId);
+  }
+
+  /// 清空所有池化实例缓存（主要供测试重置环境使用）
+  static void clearPool() {
+    _instances.clear();
   }
 }

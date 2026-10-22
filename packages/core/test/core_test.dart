@@ -638,6 +638,23 @@ void main() {
       expect(fileStorage, isA<PluginFileStorageImpl>());
     });
 
+    test('PluginStorageFactory 维护实例池：相同路径返回同一单例且支持 evict', () async {
+      PluginStorageFactory.clearPool();
+      const factory = PluginStorageFactory();
+      final s1 = factory.create('pool_p', rootDir: tempDir);
+      final s2 = factory.create('pool_p', rootDir: tempDir);
+      expect(identical(s1, s2), isTrue, reason: '相同沙箱目录多次调用 create 必须返回同一单例实例');
+
+      await s1.setString('shared_k', 'shared_val');
+      expect(await s2.getString('shared_k'), 'shared_val');
+
+      await PluginStorageFactory.evict('pool_p', rootDir: tempDir);
+      final s3 = factory.create('pool_p', rootDir: tempDir);
+      expect(identical(s1, s3), isFalse, reason: 'evict 后应重新生成新实例');
+      expect(await s3.getString('shared_k'), 'shared_val');
+      PluginStorageFactory.clearPool();
+    });
+
     test('PluginFileStorageImpl 支持多种数据类型读写与持久化至 storage.json', () async {
       final storage =
           PluginFileStorageImpl(namespace: 'test_ns', rootDir: tempDir);
