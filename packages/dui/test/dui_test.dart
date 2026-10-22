@@ -95,6 +95,23 @@ void main() {
           'state.count > 0 && state.isReady || {{state.isVip}}');
       expect(keys, containsAll(['count', 'isReady', 'isVip']));
     });
+
+    test('DuiExpressionEvaluator compile 预编译 AST 结构与缓存复用', () {
+      const expr = 'state.score >= 60 && state.passed == true';
+      final ast1 = DuiExpressionEvaluator.compile(expr);
+      final ast2 = DuiExpressionEvaluator.compile(expr);
+      expect(identical(ast1, ast2), isTrue, reason: '相同表达式二次编译应直接命中静态 AST 缓存');
+
+      final values = {'score': 75, 'passed': true};
+      expect(ast1.evaluate(values), isTrue);
+
+      values['score'] = 50;
+      expect(ast1.evaluate(values), isFalse);
+
+      // 非法与空表达式安全降级
+      expect(DuiExpressionEvaluator.compile('').evaluate({}), isTrue);
+      expect(DuiExpressionEvaluator.compile('   ').evaluate({}), isTrue);
+    });
   });
 
   group('DuiUtils 颜色解析', () {

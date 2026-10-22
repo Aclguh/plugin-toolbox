@@ -74,6 +74,7 @@ typedef DuiWidgetFactory = Widget Function(DuiNodeContext node);
 class _CompiledNode {
   final String type;
   final dynamic visibleExpr;
+  final DuiParsedExpression? visibleAst;
   final Set<String> visibleKeys;
   final Set<String> textKeys;
   final Map<String, dynamic> props;
@@ -84,6 +85,7 @@ class _CompiledNode {
   const _CompiledNode({
     required this.type,
     required this.visibleExpr,
+    this.visibleAst,
     required this.visibleKeys,
     required this.textKeys,
     required this.props,
@@ -174,6 +176,9 @@ class DuiRenderer {
     final compiled = _CompiledNode(
       type: node['type']?.toString() ?? 'Container',
       visibleExpr: visibleExpr,
+      visibleAst: visibleExpr != null
+          ? DuiExpressionEvaluator.compile(visibleExpr.toString())
+          : null,
       visibleKeys: visibleExpr != null
           ? DuiState.extractKeys(visibleExpr.toString())
           : const <String>{},
