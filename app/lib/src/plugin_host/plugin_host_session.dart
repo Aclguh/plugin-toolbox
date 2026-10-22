@@ -87,6 +87,7 @@ class PluginHostSession extends ChangeNotifier
         PluginNativeBridge(
           pluginRootDir: plugin.rootDir,
           storageQuotaMb: plugin.manifest.storageQuotaMb,
+          initialSandboxUsedBytes: plugin.context?.currentUsedBytes,
         );
     _duiState = duiState ?? DuiState();
     _eventHandler = DuiEventHandler(
@@ -140,6 +141,9 @@ class PluginHostSession extends ChangeNotifier
           storageQuotaMb: plugin.manifest.storageQuotaMb,
           allowedDomains: plugin.manifest.allowedDomains,
         ));
+      }
+      if (plugin.context != null) {
+        _nativeBridge.setSandboxUsedBytes(plugin.context!.currentUsedBytes);
       }
 
       // 1. 读取并解析 UI JSON 描述 (优先使用 AST 内存缓存)

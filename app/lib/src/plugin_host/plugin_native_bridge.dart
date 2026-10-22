@@ -32,6 +32,7 @@ class PluginNativeBridge extends NativeBridgeBase
   PluginNativeBridge({
     required super.pluginRootDir,
     super.storageQuotaMb = 50,
+    super.initialSandboxUsedBytes,
     super.nativeChannel,
     super.logger,
   });

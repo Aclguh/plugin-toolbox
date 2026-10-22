@@ -12,6 +12,7 @@ class TestBridge extends NativeBridgeBase {
   TestBridge({
     required super.pluginRootDir,
     super.storageQuotaMb = 50,
+    super.initialSandboxUsedBytes,
     super.nativeChannel,
     super.logger,
   });
@@ -96,6 +97,18 @@ void main() {
       expect(newBridge.sandboxUsedBytes(), 150);
       newBridge.updateSandboxUsedBytes(-300);
       expect(newBridge.sandboxUsedBytes(), 0);
+
+      // 显式赋值与初始用量继承
+      newBridge.setSandboxUsedBytes(320);
+      expect(newBridge.sandboxUsedBytes(), 320);
+      newBridge.setSandboxUsedBytes(-10);
+      expect(newBridge.sandboxUsedBytes(), 0);
+
+      final seededBridge = TestBridge(
+        pluginRootDir: tempDir,
+        initialSandboxUsedBytes: 400,
+      );
+      expect(seededBridge.sandboxUsedBytes(), 400);
 
       // 配额校验
       expect(newBridge.hasSandboxQuotaFor(500), isTrue);

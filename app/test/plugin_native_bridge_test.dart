@@ -268,6 +268,7 @@ void main() {
         storageQuotaMb: 1,
         nativeChannel: customChannel,
       );
+      await bridge.calculateSandboxUsedBytes();
 
       // 剩余约 424 KB：400 KB 放行，500 KB 拒绝
       expect(bridge.hasQuotaFor(400 * 1024), isTrue);

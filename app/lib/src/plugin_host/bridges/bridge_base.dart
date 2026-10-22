@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
@@ -16,9 +17,12 @@ abstract class NativeBridgeBase {
   NativeBridgeBase({
     required this.pluginRootDir,
     this.storageQuotaMb = 50,
+    int? initialSandboxUsedBytes,
     MethodChannel? nativeChannel,
     this.logger,
-  }) : nativeChannel = nativeChannel ?? const MethodChannel(defaultChannelName);
+  })  : nativeChannel =
+            nativeChannel ?? const MethodChannel(defaultChannelName),
+        _cachedSandboxUsedBytes = initialSandboxUsedBytes;
 
   void logError(String op, Object e, [StackTrace? st]) {
     logger?.w('PluginNativeBridge: $op 调用失败: $e', error: e, stackTrace: st);
@@ -104,20 +108,16 @@ abstract class NativeBridgeBase {
     return bytes;
   }
 
-  /// 同步获取或回退读取当前沙箱占用字节数（优先命中缓存，避免频繁同步递归扫描）
+  /// 获取当前沙箱已占用字节数（优先常驻内存缓存与增量追踪；若未预热则异步流式预热并快速兜底，淘汰主线程同步扫描）
   int sandboxUsedBytes() {
     if (_cachedSandboxUsedBytes != null) return _cachedSandboxUsedBytes!;
-    var bytes = 0;
-    try {
-      if (pluginRootDir.existsSync()) {
-        for (final entity
-            in pluginRootDir.listSync(recursive: true, followLinks: false)) {
-          if (entity is File) bytes += entity.lengthSync();
-        }
-      }
-    } catch (_) {}
-    _cachedSandboxUsedBytes = bytes;
-    return bytes;
+    unawaited(calculateSandboxUsedBytes());
+    return 0;
+  }
+
+  /// 显式设置或同步沙箱缓存字节数
+  void setSandboxUsedBytes(int bytes) {
+    _cachedSandboxUsedBytes = bytes < 0 ? 0 : bytes;
   }
 
   /// 增量更新沙箱缓存字节数
