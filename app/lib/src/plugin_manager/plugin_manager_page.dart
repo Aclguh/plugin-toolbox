@@ -74,12 +74,7 @@ class PluginManagerPage extends ConsumerWidget {
 
       if (!context.mounted) return;
       if (outcome.failed.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('成功导入 ${outcome.succeeded.length} 个插件'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnack.success(context, '成功导入 ${outcome.succeeded.length} 个插件');
       } else {
         // 结果汇总弹窗为纯展示，无需等待其关闭
         unawaited(showDialog(
@@ -115,12 +110,7 @@ class PluginManagerPage extends ConsumerWidget {
     ToolPlugin plugin,
   ) async {
     if (!plugin.isDynamic) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('内置插件无法删除'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      AppSnack.info(context, '内置插件无法删除');
       return;
     }
 
@@ -140,23 +130,20 @@ class PluginManagerPage extends ConsumerWidget {
       ref.read(pluginRegistryProvider.notifier).refresh();
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('插件「${plugin.name}」已卸载'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnack.success(context, '插件「${plugin.name}」已卸载');
       }
     }
   }
 
   Widget _buildPluginIcon(BuildContext context, ToolPlugin plugin) {
+    final scheme = Theme.of(context).colorScheme;
     // 多态图标：经基类 iconProvider 获取图片源，避免对动态插件类型硬检查；
     // 图片解码失败或文件缺失时回退矢量图标，不在 build 中做同步磁盘检查
     final imageProvider = plugin.iconProvider;
+    final Widget child;
     if (imageProvider != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
+      child = ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xs),
         child: Image(
           image: ResizeImage(imageProvider, width: 128),
           width: 32,
@@ -164,16 +151,31 @@ class PluginManagerPage extends ConsumerWidget {
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Icon(
             plugin.icon,
-            size: 30,
-            color: Theme.of(context).colorScheme.primary,
+            size: 26,
+            color: scheme.primary,
           ),
         ),
       );
+    } else {
+      child = Icon(plugin.icon, size: 26, color: scheme.primary);
     }
-    return Icon(
-      plugin.icon,
-      size: 30,
-      color: Theme.of(context).colorScheme.primary,
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary.withValues(alpha: 0.18),
+            scheme.secondary.withValues(alpha: 0.08),
+          ],
+        ),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Center(child: child),
     );
   }
 
@@ -185,186 +187,249 @@ class PluginManagerPage extends ConsumerWidget {
 
     return PluginPageScaffold(
       title: '插件管理中心',
+      subtitle: allPlugins.isEmpty
+          ? '导入 .ptx 插件包以扩展工具箱能力'
+          : '${allPlugins.length} 个插件 · 长按卡片可卸载',
+      maxContentWidth: AppLayout.maxContentWidth,
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('导入 .ptx 插件'),
         onPressed: () => _pickAndInstall(context, ref),
       ),
       body: allPlugins.isEmpty
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text('暂无插件，点击右下角按钮导入'),
+          ? AppEmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: '暂无插件，点击右下角按钮导入',
+              message: '支持一次选择多个 .ptx / .zip 安装包，安装完成后将自动启用。',
+              action: FilledButton.tonalIcon(
+                onPressed: () => _pickAndInstall(context, ref),
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: const Text('从本地选择文件'),
               ),
             )
-          : ReorderableListView.builder(
-              buildDefaultDragHandles: false,
-              padding: const EdgeInsets.only(bottom: 80),
-              header: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Text(
-                  '长按卡片可删除插件，长按左侧图标可拖动排序',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+          : Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.xs,
+                  ),
+                  child: AppBanner(
+                    message: '长按卡片可删除插件，长按左侧图标可拖动排序',
+                    icon: Icons.touch_app_outlined,
+                  ),
+                ),
+                Expanded(
+                  child: ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
+                    padding: const EdgeInsets.only(
+                      bottom: AppLayout.listBottomInset,
+                    ),
+                    itemCount: allPlugins.length,
+                    onReorderItem: (oldIndex, newIndex) async {
+                      await ref
+                          .read(pluginRegistryProvider.notifier)
+                          .reorder(oldIndex, newIndex);
+                    },
+                    proxyDecorator:
+                        (Widget child, int index, Animation<double> animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (BuildContext context, Widget? child) {
+                          final double animValue =
+                              Curves.easeInOut.transform(animation.value);
+                          final double elevation =
+                              lerpDouble(2, 8, animValue) ?? 6;
+                          return Material(
+                            color: Colors.transparent,
+                            elevation: 0,
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                cardTheme: Theme.of(context).cardTheme.copyWith(
+                                      elevation: elevation,
+                                      shadowColor:
+                                          Colors.black.withValues(alpha: 0.6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.xl,
+                                        ),
+                                        side: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.8),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                              ),
+                              child: child!,
+                            ),
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final plugin = allPlugins[index];
+                      // 列表实例变化（含启禁用触发的缓存失效）即驱动整页重建，
+                      // 此处直接读取注册表最新启禁用态即可保持一致
+                      final isEnabled =
+                          ref.read(pluginRegistryProvider).isEnabled(plugin.id);
+                      return _PluginManagerTile(
+                        key: ValueKey(plugin.id),
+                        index: index,
+                        plugin: plugin,
+                        enabled: isEnabled,
+                        icon: _buildPluginIcon(context, plugin),
+                        onTap: () => showDialog(
+                          context: context,
+                          builder: (_) => PluginDetailsDialog(plugin: plugin),
+                        ),
+                        onLongPress: () => _confirmDelete(context, ref, plugin),
+                        onEnabledChanged: (val) async {
+                          await ref
+                              .read(pluginRegistryProvider.notifier)
+                              .setEnabled(plugin.id, val);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// 管理中心的单条插件卡片：拖拽手柄 + 图标 + 信息 + 启停开关
+class _PluginManagerTile extends StatelessWidget {
+  const _PluginManagerTile({
+    super.key,
+    required this.index,
+    required this.plugin,
+    required this.enabled,
+    required this.icon,
+    required this.onTap,
+    required this.onLongPress,
+    required this.onEnabledChanged,
+  });
+
+  final int index;
+  final ToolPlugin plugin;
+  final bool enabled;
+  final Widget icon;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final ValueChanged<bool> onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs + 2,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        onTap: onTap,
+        onLongPress: onLongPress,
+        hoverColor: scheme.primary.withValues(alpha: 0.05),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              ReorderableDelayedDragStartListener(
+                index: index,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Icon(
+                      Icons.drag_indicator,
+                      color: scheme.outline,
+                      size: 22,
+                    ),
+                  ),
                 ),
               ),
-              itemCount: allPlugins.length,
-              onReorderItem: (oldIndex, newIndex) async {
-                await ref
-                    .read(pluginRegistryProvider.notifier)
-                    .reorder(oldIndex, newIndex);
-              },
-              proxyDecorator:
-                  (Widget child, int index, Animation<double> animation) {
-                return AnimatedBuilder(
-                  animation: animation,
-                  builder: (BuildContext context, Widget? child) {
-                    final double animValue =
-                        Curves.easeInOut.transform(animation.value);
-                    final double elevation = lerpDouble(2, 8, animValue) ?? 6;
-                    return Material(
-                      color: Colors.transparent,
-                      elevation: 0,
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          cardTheme: Theme.of(context).cardTheme.copyWith(
-                                elevation: elevation,
-                                shadowColor:
-                                    Colors.black.withValues(alpha: 0.6),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  side: BorderSide(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.8),
-                                    width: 1.5,
-                                  ),
-                                ),
-                              ),
-                        ),
-                        child: child!,
-                      ),
-                    );
-                  },
-                  child: child,
-                );
-              },
-              itemBuilder: (context, index) {
-                final plugin = allPlugins[index];
-                // 列表实例变化（含启禁用触发的缓存失效）即驱动整页重建，
-                // 此处直接读取注册表最新启禁用态即可保持一致
-                final isEnabled =
-                    ref.read(pluginRegistryProvider).isEnabled(plugin.id);
-                return Card(
-                  key: ValueKey(plugin.id),
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    leading: ReorderableDelayedDragStartListener(
-                      index: index,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.grab,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.drag_indicator,
-                                color: Theme.of(context).colorScheme.outline,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildPluginIcon(context, plugin),
-                            ],
-                          ),
-                        ),
+              const SizedBox(width: AppSpacing.xs),
+              icon,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 名称独占整行：类型徽标下沉至元信息行，
+                    // 长插件名不再被徽标挤压成省略号
+                    Text(
+                      plugin.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
                       ),
                     ),
-                    title: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    const SizedBox(height: AppSpacing.xxs),
+                    // 简介与版本分行渲染: 版本号独立成行且不受 maxLines 约束,
+                    // 避免长简介折行占满额度后把版本号挤出可视范围
+                    Text(
+                      plugin.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
                       children: [
                         Flexible(
                           child: Text(
-                            plugin.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            '版本: ${plugin.version}',
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.outline,
+                            ),
                           ),
                         ),
                         if (plugin.isDynamic) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '动态',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
-                            ),
+                          const SizedBox(width: AppSpacing.sm - 2),
+                          const AppBadge(
+                            label: '动态',
+                            tone: AppBadgeTone.primary,
+                            dense: true,
                           ),
                         ],
                       ],
                     ),
-                    // 简介与版本分行渲染: 版本号独立成行且不受 maxLines 约束,
-                    // 避免长简介折行占满额度后把版本号挤出可视范围
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          plugin.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '版本: ${plugin.version}',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
-                    ),
-                    trailing: Switch(
-                      value: isEnabled,
-                      onChanged: (val) async {
-                        await ref
-                            .read(pluginRegistryProvider.notifier)
-                            .setEnabled(plugin.id, val);
-                      },
-                    ),
-                    onTap: () => showDialog(
-                      context: context,
-                      builder: (_) => PluginDetailsDialog(plugin: plugin),
-                    ),
-                    onLongPress: () => _confirmDelete(context, ref, plugin),
-                  ),
-                );
-              },
-            ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Switch(
+                value: enabled,
+                onChanged: onEnabledChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

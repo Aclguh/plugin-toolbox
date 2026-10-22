@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
+
 import '../providers/app_providers.dart';
 
 /// 运行时即时动态权限申请提示器 (Just-in-Time Permission Prompt)
@@ -26,43 +28,63 @@ class PluginPermissionPrompt {
       barrierDismissible: false,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return AlertDialog(
-          icon:
-              Icon(Icons.security, color: theme.colorScheme.primary, size: 32),
-          title: const Text('权限申请提示'),
+        final scheme = theme.colorScheme;
+        return AppDialog(
+          icon: Icons.shield_outlined,
+          title: '权限申请提示',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '插件「${plugin.name}」正在请求使用以下能力：',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+                  color: scheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: 0.28),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(_getPermissionIcon(permission), size: 28),
-                    const SizedBox(width: 12),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: scheme.primary.withValues(alpha: 0.12),
+                      ),
+                      child: Icon(
+                        _getPermissionIcon(permission),
+                        size: 20,
+                        color: scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             permission.label,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurface,
+                            ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: AppSpacing.xxs),
                           Text(
                             permission.description,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -71,12 +93,11 @@ class PluginPermissionPrompt {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 '此操作需要向该插件授予对应权限。您是否同意授权？',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],

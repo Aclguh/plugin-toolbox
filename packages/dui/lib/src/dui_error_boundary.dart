@@ -43,31 +43,29 @@ class DuiErrorPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final errorColor = theme.colorScheme.error;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0x33FF5252) : const Color(0x1AFF5252),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Colors.redAccent.withValues(alpha: 0.5),
-        ),
+        color: errorColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: errorColor.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 16, color: Colors.redAccent),
+          Icon(Icons.error_outline, size: 16, color: errorColor),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               DuiLocalizations.of(context).isZh
                   ? '组件 [$type] 加载异常: $error'
                   : 'Component [$type] render error: $error',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.redAccent,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: errorColor,
+                height: 1.4,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

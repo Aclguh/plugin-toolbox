@@ -40,8 +40,11 @@ class AppColorSchemes {
     onPrimaryContainer: Color(0xFFDCE4FF),
     secondary: brandMint,
     onSecondary: Color(0xFF003734),
-    secondaryContainer: Color(0xFF00504B),
-    onSecondaryContainer: Color(0xFF72F5EC),
+    // M3 的 FilledButton.tonal 与部分容器取色自 secondaryContainer：
+    // 这里锚定到品牌靛青，避免全站出现与品牌深蓝冲突的薄荷绿按钮块；
+    // 薄荷青语义仍由 secondary 承担（开关、状态强调）
+    secondaryContainer: Color(0xFF374A82),
+    onSecondaryContainer: Color(0xFFDCE4FF),
     tertiary: brandCoral,
     onTertiary: Color(0xFF552100),
     tertiaryContainer: Color(0xFF783100),
@@ -77,8 +80,9 @@ class AppColorSchemes {
     onPrimaryContainer: brandDeepNavy,
     secondary: Color(0xFF006A63),
     onSecondary: Colors.white,
-    secondaryContainer: Color(0xFFD0F8F4),
-    onSecondaryContainer: Color(0xFF00201D),
+    // 与深色主题同理：tonal 按钮统一走品牌蓝系容器，而非薄荷绿块
+    secondaryContainer: Color(0xFFDCE4FF),
+    onSecondaryContainer: Color(0xFF111936),
     tertiary: Color(0xFF9E431B),
     onTertiary: Colors.white,
     tertiaryContainer: Color(0xFFFFDBD0),

@@ -7,6 +7,11 @@ import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 
+/// 工具箱首页：品牌导航 + 已启用插件的可拖拽网格。
+///
+/// 视觉规范要点：
+/// - 图标网格间距与卡片圆角统一取自设计令牌，横竖屏切换时按可用宽度自适应列数；
+/// - 空态、加载态、错误态统一使用共享状态组件，避免"没有插件时"页面观感失衡。
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
@@ -19,7 +24,24 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PluginToolbox'),
+        toolbarHeight: AppLayout.appBarHeight + AppSpacing.md,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('PluginToolbox'),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              l10n?.myTools ?? '我的工具',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w400,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.storefront_outlined),
@@ -36,57 +58,65 @@ class HomePage extends ConsumerWidget {
             tooltip: l10n?.settings ?? '设置',
             onPressed: () => context.push('/settings'),
           ),
+          const SizedBox(width: AppSpacing.xs),
         ],
       ),
       body: init.when(
         data: (_) {
           if (plugins.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.dashboard_customize_outlined,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(l10n?.emptyToolsPrompt ?? '暂无已启用的插件'),
-                  const SizedBox(height: 12),
-                  FilledButton.tonal(
-                    onPressed: () => context.push('/store'),
-                    child: Text(l10n?.goToStoreToInstall ?? '去插件商店安装'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => context.push('/manager'),
-                    child: Text(l10n?.importLocalPtx ?? '导入本地 .ptx'),
-                  ),
-                ],
+            // 说明性副文案目前仅有中文版本：英文环境下直接省略，
+            // 避免出现中英混排的割裂观感
+            final isZh = Localizations.localeOf(context).languageCode == 'zh';
+            return AppEmptyState(
+              icon: Icons.dashboard_customize_outlined,
+              title: l10n?.emptyToolsPrompt ?? '暂无已启用的插件',
+              message: isZh ? '安装插件后即可在此快速打开；长按图标可调整排列顺序。' : null,
+              action: FilledButton.icon(
+                onPressed: () => context.push('/store'),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                label: Text(l10n?.goToStoreToInstall ?? '去插件商店安装'),
+              ),
+              secondaryAction: TextButton.icon(
+                onPressed: () => context.push('/manager'),
+                icon: const Icon(Icons.file_upload_outlined, size: 18),
+                label: Text(l10n?.importLocalPtx ?? '导入本地 .ptx'),
               ),
             );
           }
 
-          final isPortrait =
-              MediaQuery.of(context).orientation == Orientation.portrait;
-          final crossAxisCount = isPortrait ? 3 : 4;
+          final media = MediaQuery.of(context);
+          final isPortrait = media.orientation == Orientation.portrait;
 
           // 卡片宽高比随可用宽度动态计算：固定值在小屏会挤压文字、
           // 在平板等大屏会过度拉伸留白
           return LayoutBuilder(builder: (context, constraints) {
-            const horizontalPadding = 16.0;
-            const crossSpacing = 10.0;
+            final crossAxisCount = AppLayout.gridColumnsFor(
+              constraints.maxWidth,
+              portrait: isPortrait,
+            );
+            const horizontalPadding = AppSpacing.lg;
+            const crossSpacing = AppSpacing.md;
             final itemWidth = (constraints.maxWidth -
                     horizontalPadding * 2 -
                     crossSpacing * (crossAxisCount - 1)) /
                 crossAxisCount;
-            final childAspectRatio = (itemWidth / 130).clamp(0.78, 1.15);
+            // 卡片高度设下限 136dp：保证图标 + 两行标题 + 两行简介在最小屏宽下
+            // 仍有余量，避免亚像素级 RenderFlex 溢出；上限用宽度比 1.15 约束，
+            // 防止平板多列时卡片被过度拉扁
+            final itemHeight =
+                (itemWidth / 1.15) < 136 ? 136.0 : itemWidth / 1.15;
+            final childAspectRatio = itemWidth / itemHeight;
 
             return ReorderableGridView.builder(
-              padding: const EdgeInsets.all(horizontalPadding),
+              padding: const EdgeInsets.fromLTRB(
+                horizontalPadding,
+                AppSpacing.md,
+                horizontalPadding,
+                AppSpacing.xxl,
+              ),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                mainAxisSpacing: 10,
+                mainAxisSpacing: crossSpacing,
                 crossAxisSpacing: crossSpacing,
                 childAspectRatio: childAspectRatio,
               ),
@@ -99,7 +129,7 @@ class HomePage extends ConsumerWidget {
               dragWidgetBuilder: (index, child) {
                 return Material(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                     side: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -108,7 +138,7 @@ class HomePage extends ConsumerWidget {
                       width: 1.5,
                     ),
                   ),
-                  elevation: 8,
+                  elevation: AppElevation.drag,
                   shadowColor: Colors.black.withValues(alpha: 0.6),
                   color: Theme.of(context).colorScheme.surfaceContainerLow,
                   clipBehavior: Clip.antiAlias,
@@ -126,7 +156,7 @@ class HomePage extends ConsumerWidget {
             );
           });
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const AppLoadingView(),
         error: (err, _) => ErrorView(message: '加载插件失败: $err'),
       ),
     );

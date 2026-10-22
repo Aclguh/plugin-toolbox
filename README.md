@@ -51,6 +51,9 @@
 - **轻量受控脚本引擎**：
   - 内置沙箱级 Lua 脚本运行时，兼具高性能与轻量化。
   - 提供安全宿主 API 集合：剪贴板、沙箱存储、系统信息。
+- **统一设计系统与一致体验**：
+  - `packages/ui` 提供间距 / 圆角 / 动效令牌、品牌字体层级与语义色扩展（成功 / 警告 / 信息），亮暗主题共享同一套组件形状与页面转场。
+  - 空态、加载态、错误页、徽标、提示条与弹窗统一由共享组件承载，配合悬停 / 聚焦 / 按压反馈与自适应栅格，保证各页面在同一规范下持续演进。
 
 
 ---
@@ -70,7 +73,7 @@ plugin-toolbox/
 │   │   └── src/store/    # 插件商店目录客户端与版本语义（jsDelivr CDN）
 │   ├── lua/              # 脚本执行层：Lua 脚本引擎与沙箱 API 绑定（含指令数预算防护）
 │   ├── dui/              # 声明式 UI 引擎：JSON AST -> Flutter Widget 动态渲染
-│   ├── ui/               # 共享表现层：AppTheme 品牌主题系统与通用组件库
+│   ├── ui/               # 共享表现层：设计令牌、品牌主题、语义色与通用状态组件
 │   └── third_party/
 │       └── lua_dardo/    # Lua VM 本地维护分支 (Apache-2.0)：新增指令数预算能力
 ├── sample_plugins/       # 官方样例插件源码与打包脚本 (pack.py)
@@ -231,8 +234,8 @@ dart analyze
 # 2. 独立规范与逻辑自动化验证（纯 Dart 快速执行，152 项断言全通过）
 dart run tool/verify.dart
 
-# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 463 用例）
-#    packages/core 111 / packages/lua 154 / packages/dui 85 / packages/ui 13 / app 100
+# 3. 分层单元测试与 Widget 测试（纯软件架构与宿主交互测试，无需外部设备，共 480 用例）
+#    packages/core 111 / packages/lua 154 / packages/dui 87 / packages/ui 24 / app 104
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test

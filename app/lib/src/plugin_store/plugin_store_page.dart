@@ -24,6 +24,26 @@ String pluginCategoryLabel(String categoryName) =>
 String pluginPermissionLabel(String permissionName) =>
     PluginPermission.fromString(permissionName)?.label ?? permissionName;
 
+/// 分类图标：让商店条目的视觉识别从纯文字升级为"图标 + 文本"双通道
+IconData pluginCategoryIcon(String categoryName) {
+  switch (PluginCategory.fromString(categoryName)) {
+    case PluginCategory.encoding:
+      return Icons.swap_horiz_rounded;
+    case PluginCategory.generator:
+      return Icons.auto_awesome_outlined;
+    case PluginCategory.text:
+      return Icons.text_fields_rounded;
+    case PluginCategory.system:
+      return Icons.settings_suggest_outlined;
+    case PluginCategory.calculator:
+      return Icons.calculate_outlined;
+    case PluginCategory.network:
+      return Icons.public_rounded;
+    case PluginCategory.other:
+      return Icons.extension_outlined;
+  }
+}
+
 /// 插件商店页：浏览远端插件目录并逐个确认安装。
 ///
 /// 版本与简介一律来自远端 `plugin-source/<id>/plugin.json`；安装前会展示
@@ -40,8 +60,15 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   final Map<String, String> _busyPlugins = {};
 
   /// 搜索与分类过滤状态
+  final TextEditingController _searchController = TextEditingController();
   String _searchKeyword = '';
   String? _selectedCategory;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _refresh() async {
     ref.invalidate(pluginStoreResolvedRefProvider);
@@ -54,110 +81,129 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(item.state == PluginStoreInstallState.updateAvailable
-            ? '更新插件'
-            : '安装插件'),
-        content: SingleChildScrollView(
-          child: Column(
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final sensitivePermissions = item.entry.permissions
+            .map(PluginPermission.fromString)
+            .where((p) => p != null && p.isSensitive)
+            .cast<PluginPermission>()
+            .toList();
+
+        return AppDialog(
+          icon: item.state == PluginStoreInstallState.updateAvailable
+              ? Icons.system_update_alt_rounded
+              : Icons.download_for_offline_outlined,
+          title: item.state == PluginStoreInstallState.updateAvailable
+              ? '更新插件'
+              : '安装插件',
+          content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${item.name} v${item.version}'),
-              const SizedBox(height: 8),
-              Text(item.description),
-              const SizedBox(height: 12),
-              Text('分类: ${pluginCategoryLabel(item.entry.category)}'),
-              Text('作者: ${item.entry.author}'),
-              Text('体积: ${item.entry.packageSizeLabel}'),
               Text(
-                '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
+                '${item.name} v${item.version}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-              if (item.entry.permissions.any((p) =>
-                  PluginPermission.fromString(p)?.isSensitive ?? false)) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .errorContainer
-                        .withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Theme.of(ctx)
-                          .colorScheme
-                          .error
-                          .withValues(alpha: 0.4),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                item.description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // 弹窗内的元信息卡需显式铺满对话框宽度，
+              // 否则 Card 会收缩成内容宽度而显得突兀
+              SizedBox(
+                width: double.maxFinite,
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _dialogMetaLine(
+                          ctx,
+                          '分类: ${pluginCategoryLabel(item.entry.category)}',
+                        ),
+                        _dialogMetaLine(ctx, '作者: ${item.entry.author}'),
+                        _dialogMetaLine(
+                          ctx,
+                          '体积: ${item.entry.packageSizeLabel}',
+                        ),
+                        _dialogMetaLine(
+                          ctx,
+                          '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.security_update_warning_outlined,
-                            size: 18,
-                            color: Theme.of(ctx).colorScheme.error,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '敏感权限授权提醒',
-                            style:
-                                Theme.of(ctx).textTheme.labelMedium?.copyWith(
-                                      color: Theme.of(ctx).colorScheme.error,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      for (final p in item.entry.permissions
-                          .map(PluginPermission.fromString)
-                          .where((p) => p != null && p.isSensitive)
-                          .cast<PluginPermission>())
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            '• ${p.label}: ${p.description}',
-                            style: Theme.of(ctx).textTheme.bodySmall,
-                          ),
-                        ),
-                    ],
-                  ),
+                ),
+              ),
+              if (sensitivePermissions.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppBanner(
+                  tone: AppBannerTone.danger,
+                  title: '敏感权限授权提醒',
+                  message: sensitivePermissions
+                      .map((p) => '• ${p.label}: ${p.description}')
+                      .join('\n'),
                 ),
               ],
               if (item.installedVersion != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   item.state == PluginStoreInstallState.updateAvailable
                       ? '将把本地 ${item.installedVersion} 覆盖为 ${item.version}'
                       : '本地已安装 ${item.installedVersion}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              item.state == PluginStoreInstallState.updateAvailable
-                  ? '更新'
-                  : '安装',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
             ),
-          ),
-        ],
-      ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                item.state == PluginStoreInstallState.updateAvailable
+                    ? '更新'
+                    : '安装',
+              ),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirmed != true || !mounted) return;
     await _install(item);
+  }
+
+  /// 弹窗内的键值信息行：冒号后数值加粗，提升扫读效率
+  Widget _dialogMetaLine(BuildContext context, String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+      child: Text(
+        text,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 
   Future<void> _install(PluginStoreItem item) async {
@@ -202,13 +248,12 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: success ? 3 : 4),
-      ),
-    );
+    // 失败提示停留更久，便于用户读取具体原因
+    if (success) {
+      AppSnack.success(context, message);
+    } else {
+      AppSnack.error(context, message);
+    }
     if (success) {
       // 安装态与本地版本已变化, 刷新目录以更新按钮状态
       ref.invalidate(pluginStoreCatalogProvider);
@@ -224,9 +269,11 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
     return PluginPageScaffold(
       title: '插件商店',
+      subtitle: '浏览目录、确认权限后一键安装',
+      maxContentWidth: AppLayout.maxContentWidth,
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
           tooltip: '刷新插件目录',
           onPressed: _busyPlugins.isEmpty ? _refresh : null,
         ),
@@ -247,26 +294,12 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     PluginStoreService service,
   ) {
     return catalogAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ErrorView(
-                message: error is PluginStoreException
-                    ? error.message
-                    : '插件目录加载失败，请检查网络后重试',
-              ),
-              const SizedBox(height: 16),
-              FilledButton.tonal(
-                onPressed: _refresh,
-                child: const Text('重新加载'),
-              ),
-            ],
-          ),
-        ),
+      loading: () => const AppSkeletonList(itemCount: 4),
+      error: (error, _) => ErrorView(
+        message:
+            error is PluginStoreException ? error.message : '插件目录加载失败，请检查网络后重试',
+        onRetry: _refresh,
+        retryLabel: '重新加载',
       ),
       data: (catalog) {
         final allItems = service.buildItems(
@@ -275,26 +308,14 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           appVersion: kHostAppVersion,
         );
         if (allItems.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.storefront_outlined,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('远端插件目录为空'),
-                  const SizedBox(height: 12),
-                  FilledButton.tonal(
-                    onPressed: _refresh,
-                    child: const Text('重新加载'),
-                  ),
-                ],
-              ),
+          return AppEmptyState(
+            icon: Icons.storefront_outlined,
+            title: '远端插件目录为空',
+            message: '当前插件仓库暂无可安装的插件，可稍后重试或在设置中切换仓库。',
+            action: FilledButton.tonalIcon(
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('重新加载'),
             ),
           );
         }
@@ -318,7 +339,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             itemCount: filteredItems.isEmpty ? 4 : filteredItems.length + 3,
             itemBuilder: (context, index) {
               if (index == 0) return _buildSearchBar();
@@ -336,25 +358,45 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   }
 
   Widget _buildSearchBar() {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: '搜索插件名称、描述或作者...',
-          prefixIcon: const Icon(Icons.search, size: 20),
+          prefixIcon: const Icon(Icons.search_rounded, size: 20),
           suffixIcon: _searchKeyword.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () => setState(() => _searchKeyword = ''),
+                  tooltip: '清空搜索',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchKeyword = '');
+                  },
                 )
               : null,
           filled: true,
           isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm + 2,
+          ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderSide: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.5),
+            ),
           ),
         ),
         onChanged: (val) => setState(() => _searchKeyword = val.trim()),
@@ -375,7 +417,10 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs,
+      ),
       child: Row(
         children: [
           FilterChip(
@@ -383,7 +428,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
             selected: _selectedCategory == null,
             onSelected: (_) => setState(() => _selectedCategory = null),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           for (final cat in sortedCats) ...[
             FilterChip(
               label: Text(pluginCategoryLabel(cat)),
@@ -391,7 +436,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
               onSelected: (sel) =>
                   setState(() => _selectedCategory = sel ? cat : null),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
           ],
         ],
       ),
@@ -400,28 +445,24 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   Widget _buildEmptyFilterState() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.search_off_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: 12),
-            const Text('未找到匹配的插件'),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _searchKeyword = '';
-                  _selectedCategory = null;
-                });
-              },
-              child: const Text('清除筛选条件'),
-            ),
-          ],
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.xxxl,
+        horizontal: AppSpacing.xxl,
+      ),
+      child: AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: '未找到匹配的插件',
+        message: '试试更换关键词，或清除当前分类筛选。',
+        action: TextButton.icon(
+          onPressed: () {
+            _searchController.clear();
+            setState(() {
+              _searchKeyword = '';
+              _selectedCategory = null;
+            });
+          },
+          icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+          label: const Text('清除筛选条件'),
         ),
       ),
     );
@@ -430,16 +471,19 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   /// 安装进行中的页面级遮罩：阻断重复点击，并展示正在安装的插件名。
   Widget _buildBusyOverlay() {
     final name = _busyPlugins.length == 1 ? _busyPlugins.values.first : null;
+    final scheme = Theme.of(context).colorScheme;
     return Positioned.fill(
       child: IgnorePointer(
         child: ColoredBox(
-          color: Colors.black.withValues(alpha: 0.45),
+          color: scheme.shadow.withValues(alpha: 0.45),
           child: Center(
             child: Card(
-              margin: const EdgeInsets.symmetric(horizontal: 40),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl,
+                  vertical: AppSpacing.lg,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -448,7 +492,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.lg),
                     Flexible(
                       child: Text(
                         name == null ? '正在安装插件 …' : '正在下载并安装 $name …',
@@ -476,23 +520,44 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         ? '共 ${allItems.length} 个插件'
         : '共 ${allItems.length} 个插件 (已筛选出 ${filteredItems.length} 个)';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            countLabel,
-            style: theme.textTheme.titleSmall,
+          Row(
+            children: [
+              Text(
+                countLabel,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+              AppBadge(
+                label: _selectedCategory == null
+                    ? '全部分类'
+                    : pluginCategoryLabel(_selectedCategory!),
+                tone: _selectedCategory == null
+                    ? AppBadgeTone.neutral
+                    : AppBadgeTone.primary,
+                dense: true,
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xxs),
           Text(
-            '目录来源: $sourceLabel · 版本信息取自 plugin-source 清单',
+            '来源: $sourceLabel · 版本取自 plugin-source 清单',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           if (catalog.skipped.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               '${catalog.skipped.length} 个条目元数据不完整已跳过',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -507,79 +572,178 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   Widget _buildItemCard(PluginStoreItem item) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final busy = _busyPlugins.containsKey(item.id);
     final updateAvailable =
         item.state == PluginStoreInstallState.updateAvailable;
+    final installed = item.installedVersion != null;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs + 2,
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        scheme.primary.withValues(alpha: 0.18),
+                        scheme.secondary.withValues(alpha: 0.08),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Icon(
+                    pluginCategoryIcon(item.entry.category),
+                    size: 20,
+                    color: scheme.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 名称独占一行：安装态徽标下沉到下一行，
+                      // 避免长插件名被徽标与右侧状态挤压成省略号
                       Text(
                         item.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '版本 ${item.version} · ${pluginCategoryLabel(item.entry.category)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        '版本 ${item.version} · ${pluginCategoryLabel(item.entry.category)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (installed) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            if (updateAvailable) ...[
+                              const AppBadge(
+                                label: '可更新',
+                                tone: AppBadgeTone.warning,
+                                dense: true,
+                              ),
+                              const SizedBox(width: AppSpacing.sm - 2),
+                            ],
+                            Flexible(
+                              child: Text(
+                                '本地已安装 ${item.installedVersion}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: scheme.outline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 _buildAction(item, busy, updateAvailable),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               item.description,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '作者 ${item.entry.author} · 体积 ${item.entry.packageSizeLabel} · '
-              '权限 ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('/')}',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
+                color: scheme.onSurfaceVariant,
+                height: 1.45,
               ),
             ),
-            if (item.installedVersion != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                '本地已安装 ${item.installedVersion}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.outline,
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              children: [
+                _metaItem(
+                  context,
+                  Icons.person_outline_rounded,
+                  '作者 ${item.entry.author}',
                 ),
-              ),
-            ],
+                _metaItem(
+                  context,
+                  Icons.inventory_2_outlined,
+                  '体积 ${item.entry.packageSizeLabel}',
+                ),
+                _metaItem(
+                  context,
+                  Icons.key_outlined,
+                  '权限 ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('/')}',
+                ),
+              ],
+            ),
             if (!item.minAppVersionSatisfied) ...[
-              const SizedBox(height: 6),
-              Text(
-                '需要宿主版本 ${item.entry.minAppVersion} 及以上',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
+              const SizedBox(height: AppSpacing.sm),
+              AppBanner(
+                tone: AppBannerTone.warning,
+                message: '需要宿主版本 ${item.entry.minAppVersion} 及以上',
               ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// 元信息胶囊：图标 + 文本，替代长串拼接文案
+  Widget _metaItem(BuildContext context, IconData icon, String text) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs + 1,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            text,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -609,21 +773,30 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.check,
-            size: 16,
-            color: Theme.of(context).colorScheme.secondary,
+            Icons.check_circle_outline_rounded,
+            size: 14,
+            color: context.appColors.success,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             '已是最新',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.appColors.success,
+                  fontWeight: FontWeight.w600,
                 ),
           ),
         ],
       );
     }
+    // 安装/更新按钮使用紧凑内边距：列表项右侧留给插件名称的宽度更充裕
     return FilledButton.tonal(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.xs,
+        ),
+      ),
       onPressed: () => _confirmAndInstall(item),
       child: Text(updateAvailable ? '更新' : '安装'),
     );

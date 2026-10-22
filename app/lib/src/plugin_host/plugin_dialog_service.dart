@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
 /// 插件宿主统一对话框与交互服务
 class PluginDialogService {
   static void showToast(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnack.info(context, message);
   }
 
   static Future<void> showAlert(
       BuildContext context, String title, String message) async {
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
+      builder: (ctx) => AppDialog(
+        icon: Icons.info_outline_rounded,
+        title: title,
+        content: Text(
+          message,
+          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
+        ),
         actions: [
-          TextButton(
+          FilledButton.tonal(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('确定'),
           ),
@@ -33,9 +34,15 @@ class PluginDialogService {
       BuildContext context, String title, String message) async {
     final res = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
+      builder: (ctx) => AppDialog(
+        icon: Icons.help_outline_rounded,
+        title: title,
+        content: Text(
+          message,
+          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -75,21 +82,46 @@ class PluginDialogService {
   }) async {
     return await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(title),
-        children: items.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final item = entry.value;
-          return SimpleDialogOption(
-            onPressed: () =>
-                Navigator.of(ctx).pop({'index': idx, 'text': item}),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(item),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SimpleDialog(
+          title: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          );
-        }).toList(),
-      ),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(
+            AppSpacing.xxl,
+            AppSpacing.xl,
+            AppSpacing.xxl,
+            AppSpacing.sm,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          children: items.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final item = entry.value;
+            final selected = idx == initialIndex;
+            return ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              title: Text(item),
+              trailing: selected
+                  ? Icon(
+                      Icons.check_circle_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    )
+                  : null,
+              onTap: () => Navigator.of(ctx).pop({'index': idx, 'text': item}),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 
@@ -100,32 +132,45 @@ class PluginDialogService {
   }) async {
     return await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                title,
-                style: Theme.of(ctx).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.xs,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            ...items.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final item = entry.value;
-              return ListTile(
-                title: Text(item, textAlign: TextAlign.center),
-                onTap: () =>
-                    Navigator.of(ctx).pop({'index': idx, 'text': item}),
-              );
-            }),
-          ],
-        ),
-      ),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+              ...items.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                return ListTile(
+                  title: Text(item, textAlign: TextAlign.center),
+                  onTap: () =>
+                      Navigator.of(ctx).pop({'index': idx, 'text': item}),
+                );
+              }),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -223,12 +268,15 @@ class _PromptDialogState extends State<_PromptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
+    return AppDialog(
+      icon: Icons.edit_note_rounded,
+      title: widget.title,
+      scrollable: false,
       content: TextField(
         controller: _controller,
-        decoration: InputDecoration(hintText: widget.hint),
         autofocus: true,
+        textInputAction: TextInputAction.done,
+        decoration: InputDecoration(hintText: widget.hint),
       ),
       actions: [
         TextButton(

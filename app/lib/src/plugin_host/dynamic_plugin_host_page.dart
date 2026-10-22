@@ -201,6 +201,7 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
   Widget build(BuildContext context) {
     return PluginPageScaffold(
       title: widget.plugin.name,
+      subtitle: 'v${widget.plugin.version} · ${widget.plugin.category.label}',
       actions: [
         IconButton(
           icon: const Icon(Icons.bug_report_outlined),
@@ -218,12 +219,20 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
       ],
       body: switch (_session.status) {
         PluginSessionStatus.loading =>
-          const Center(child: CircularProgressIndicator()),
-        PluginSessionStatus.error =>
-          ErrorView(message: '插件运行错误:\n${_session.errorMessage}'),
+          const AppLoadingView(label: '正在启动插件运行环境…'),
+        PluginSessionStatus.error => ErrorView(
+            title: '插件运行失败',
+            message: '插件运行错误:\n${_session.errorMessage}',
+            onRetry: () =>
+                _session.reload(registry: ref.read(pluginRegistryProvider)),
+          ),
         PluginSessionStatus.ready => _session.uiRootNode != null
             ? _session.renderer.build(context, _session.uiRootNode!)
-            : const Center(child: Text('无 UI 描述')),
+            : const AppEmptyState(
+                icon: Icons.dashboard_outlined,
+                title: '无 UI 描述',
+                message: '该插件未提供 ui/main.ui.json 描述文件，暂时没有可渲染的界面。',
+              ),
       },
     );
   }

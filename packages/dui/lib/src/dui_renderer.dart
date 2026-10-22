@@ -180,11 +180,7 @@ class DuiRenderer {
       textKeys:
           rawText != null ? DuiState.extractKeys(rawText) : const <String>{},
       props: props,
-      children: [
-        if (rawChildren is List)
-          for (final c in rawChildren)
-            if (c is Map) _asMap(c),
-      ],
+      children: _compileChildren(node, rawChildren),
       events: _asMap(node['events']),
       ref: node['ref']?.toString(),
     );
@@ -227,6 +223,28 @@ class DuiRenderer {
     registerInputFactories(this);
     registerMediaFactories(this);
     registerDataViewFactories(this);
+  }
+
+  /// 子节点编译。
+  ///
+  /// 规范写法是 `children: [...]`，但生态中不少手写插件会写成单子节点
+  /// `child: {...}`（与部分声明式框架一致）。这里把 `child` 作为
+  /// 单元素 `children` 的别名兼容，避免整页静默渲染为空白。
+  static List<Map<String, dynamic>> _compileChildren(
+    Map<String, dynamic> node,
+    Object? rawChildren,
+  ) {
+    if (rawChildren is List) {
+      return [
+        for (final c in rawChildren)
+          if (c is Map) _asMap(c),
+      ];
+    }
+    final single = node['child'];
+    if (single is Map) {
+      return [_asMap(single)];
+    }
+    return const <Map<String, dynamic>>[];
   }
 
   /// 防御式 Map 转换：不同来源的 JSON 数据可能解析为 `Map<dynamic, dynamic>`，

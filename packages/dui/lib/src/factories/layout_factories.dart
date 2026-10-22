@@ -191,7 +191,11 @@ void registerLayoutFactories(DuiRenderer renderer) {
               padding: const EdgeInsets.all(16),
               child: Text(
                 emptyText,
-                style: const TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+                style: Theme.of(node.context).textTheme.bodySmall?.copyWith(
+                      color:
+                          Theme.of(node.context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
           );
@@ -320,7 +324,11 @@ void registerLayoutFactories(DuiRenderer renderer) {
               padding: const EdgeInsets.all(16),
               child: Text(
                 emptyText,
-                style: const TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+                style: Theme.of(node.context).textTheme.bodySmall?.copyWith(
+                      color:
+                          Theme.of(node.context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
           );

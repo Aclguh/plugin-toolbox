@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_lua/plugin_toolbox_lua.dart';
+import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
 /// 插件运行期诊断与开发者控制台底部抽屉
 class PluginDiagnosticSheet extends StatefulWidget {
@@ -26,10 +27,7 @@ class PluginDiagnosticSheet extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      showDragHandle: true,
       builder: (_) => PluginDiagnosticSheet(
         plugin: plugin,
         runner: runner,
@@ -99,35 +97,38 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
       builder: (context, scrollController) {
         return Column(
           children: [
-            // 顶端拖拽提手与标题栏
+            // 标题栏：图标底衬 + 标题 + 关闭按钮
             Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.xs,
+                AppSpacing.sm,
+                AppSpacing.sm,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.developer_mode_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '插件诊断与控制台',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    ),
+                    child: Icon(
+                      Icons.developer_mode_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 18,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      '插件诊断与控制台',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
                     tooltip: '关闭',
@@ -138,9 +139,6 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
             ),
             TabBar(
               controller: _tabController,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.colorScheme.primary,
               tabs: const [
                 Tab(text: '运行状态'),
                 Tab(text: '控制台日志'),
@@ -153,12 +151,12 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                   // Tab 1: 运行状态与资源配额
                   ListView(
                     controller: scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     children: [
                       _buildInfoCard(theme, ctx, allocatedBytes),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       _buildPermissionsCard(theme, ctx),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       _buildActionsCard(theme, ctx),
                     ],
                   ),
@@ -167,17 +165,24 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                          horizontal: AppSpacing.lg,
+                          vertical: AppSpacing.sm,
+                        ),
                         child: Row(
                           children: [
-                            Text(
-                              '共 ${logs.length} 条记录',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                            AppBadge(
+                              label: '共 ${logs.length} 条记录',
+                              tone: AppBadgeTone.neutral,
+                              dense: true,
                             ),
                             const Spacer(),
                             TextButton.icon(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 36),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                ),
+                              ),
                               icon: const Icon(Icons.copy_rounded, size: 16),
                               label: const Text('复制全部'),
                               onPressed: logs.isEmpty
@@ -186,16 +191,16 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                                       Clipboard.setData(ClipboardData(
                                         text: logs.join('\n'),
                                       ));
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text('已复制日志到剪贴板'),
-                                          duration: Duration(seconds: 1),
-                                        ),
-                                      );
+                                      AppSnack.success(context, '已复制日志到剪贴板');
                                     },
                             ),
                             TextButton.icon(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 36),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                ),
+                              ),
                               icon: const Icon(Icons.delete_outline, size: 16),
                               label: const Text('清空'),
                               onPressed: logs.isEmpty
@@ -208,40 +213,59 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
                           ],
                         ),
                       ),
-                      const Divider(height: 1),
                       Expanded(
                         child: logs.isEmpty
-                            ? Center(
-                                child: Text(
-                                  '暂无控制台日志输出\n(Lua 中调用 print() 会在此处显示)',
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                            ? const AppEmptyState(
+                                icon: Icons.terminal_rounded,
+                                title: '暂无控制台日志输出',
+                                message: '(Lua 中调用 print() 会在此处显示)',
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  AppSpacing.lg,
+                                  0,
+                                  AppSpacing.lg,
+                                  AppSpacing.lg,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: theme
+                                        .colorScheme.surfaceContainerLowest,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.md),
+                                    border: Border.all(
+                                      color: theme.colorScheme.outlineVariant
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: ListView.builder(
+                                    controller: scrollController,
+                                    padding: const EdgeInsets.all(
+                                      AppSpacing.md,
+                                    ),
+                                    itemCount: logs.length,
+                                    itemBuilder: (context, index) {
+                                      final line = logs[index];
+                                      final isError = line.contains('[ERROR]');
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 2,
+                                        ),
+                                        child: Text(
+                                          line,
+                                          style: TextStyle(
+                                            fontFamily: AppTypography.monospace,
+                                            fontSize: 12,
+                                            height: 1.45,
+                                            color: isError
+                                                ? theme.colorScheme.error
+                                                : theme.colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                padding: const EdgeInsets.all(12),
-                                itemCount: logs.length,
-                                itemBuilder: (context, index) {
-                                  final line = logs[index];
-                                  final isError = line.contains('[ERROR]');
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 2),
-                                    child: Text(
-                                      line,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 12,
-                                        color: isError
-                                            ? theme.colorScheme.error
-                                            : theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  );
-                                },
                               ),
                       ),
                     ],
@@ -255,153 +279,159 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
     );
   }
 
+  /// 诊断分组的统一卡片外壳
+  Widget _buildSection({
+    required ThemeData theme,
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoCard(
     ThemeData theme,
     PluginContext? ctx,
     int allocatedBytes,
   ) {
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '基础信息与资源占用',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildRow('插件标识 (ID)', widget.plugin.id),
-            _buildRow('版本号', widget.plugin.manifest.version),
-            _buildRow('分类', widget.plugin.manifest.category.label),
-            _buildRow(
-              'Lua 虚拟机堆分配',
-              _formatBytes(allocatedBytes),
-            ),
-            _buildRow(
-              '沙箱存储占用',
-              _isLoadingDisk
-                  ? '扫描中...'
-                  : '${_formatBytes(_diskBytes)} / ${widget.plugin.manifest.storageQuotaMb} MB',
-            ),
-          ],
-        ),
+    return _buildSection(
+      theme: theme,
+      icon: Icons.memory_rounded,
+      title: '基础信息与资源占用',
+      child: Column(
+        children: [
+          _buildRow(theme, '插件标识 (ID)', widget.plugin.id),
+          _buildRow(theme, '版本号', widget.plugin.manifest.version),
+          _buildRow(theme, '分类', widget.plugin.manifest.category.label),
+          _buildRow(theme, 'Lua 虚拟机堆分配', _formatBytes(allocatedBytes)),
+          _buildRow(
+            theme,
+            '沙箱存储占用',
+            _isLoadingDisk
+                ? '扫描中...'
+                : '${_formatBytes(_diskBytes)} / ${widget.plugin.manifest.storageQuotaMb} MB',
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildPermissionsCard(ThemeData theme, PluginContext? ctx) {
     final permissions = ctx?.grantedPermissions.toList() ?? [];
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '运行期已获授权',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+    return _buildSection(
+      theme: theme,
+      icon: Icons.verified_user_outlined,
+      title: '运行期已获授权',
+      child: permissions.isEmpty
+          ? Text(
+              '未授予任何敏感权限',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
+            )
+          : Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: permissions
+                  .map(
+                    (p) => AppBadge(
+                      label: p.name,
+                      tone: AppBadgeTone.primary,
+                      dense: true,
+                    ),
+                  )
+                  .toList(),
             ),
-            const SizedBox(height: 8),
-            if (permissions.isEmpty)
-              Text(
-                '未授予任何敏感权限',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: permissions.map((p) {
-                  return Chip(
-                    label: Text(p.name),
-                    visualDensity: VisualDensity.compact,
-                    backgroundColor:
-                        theme.colorScheme.primaryContainer.withAlpha(120),
-                  );
-                }).toList(),
-              ),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildActionsCard(ThemeData theme, PluginContext? ctx) {
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '运维与诊断操作',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
+    return _buildSection(
+      theme: theme,
+      icon: Icons.handyman_outlined,
+      title: '运维与诊断操作',
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.cleaning_services_outlined),
+            title: const Text('清理沙箱临时缓存'),
+            subtitle: const Text('安全清理 data/temp 目录下的非持久化缓存文件'),
+            onTap: () async {
+              final root = widget.plugin.rootDir;
+              final tempDir = Directory('${root.path}/data/temp');
+              if (await tempDir.exists()) {
+                await tempDir.delete(recursive: true);
+              }
+              ctx?.invalidateStorageQuotaCache();
+              await _refreshDiskUsage();
+              if (mounted) {
+                AppSnack.success(context, '已清理沙箱临时缓存');
+              }
+            },
+          ),
+          if (widget.onReload != null)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.cleaning_services_outlined),
-              title: const Text('清理沙箱临时缓存'),
-              subtitle: const Text('安全清理 data/temp 目录下的非持久化缓存文件'),
-              onTap: () async {
-                final root = widget.plugin.rootDir;
-                final tempDir = Directory('${root.path}/data/temp');
-                if (await tempDir.exists()) {
-                  await tempDir.delete(recursive: true);
-                }
-                ctx?.invalidateStorageQuotaCache();
-                await _refreshDiskUsage();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已清理沙箱临时缓存')),
-                  );
-                }
+              leading: const Icon(Icons.refresh_rounded),
+              title: const Text('重新加载插件'),
+              subtitle: const Text('重置 UI 状态与 Lua 运行时实例'),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onReload?.call();
               },
             ),
-            if (widget.onReload != null)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.refresh_rounded),
-                title: const Text('重新加载插件'),
-                subtitle: const Text('重置 UI 状态与 Lua 运行时实例'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  widget.onReload?.call();
-                },
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildRow(String label, String value) {
+  Widget _buildRow(ThemeData theme, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13)),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
         ],

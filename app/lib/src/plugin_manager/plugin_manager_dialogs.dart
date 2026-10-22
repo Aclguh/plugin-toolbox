@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
 import '../providers/app_providers.dart';
 import 'ptx_import.dart';
@@ -31,10 +32,35 @@ class ImportSummaryDialog extends StatelessWidget {
         buffer.writeln('· $reason');
       }
     }
-    return AlertDialog(
-      title: const Text('导入结果'),
-      content: SingleChildScrollView(
-        child: Text(buffer.toString().trimRight()),
+
+    final hasFailure = outcome.failed.isNotEmpty;
+    final theme = Theme.of(context);
+
+    return AppDialog(
+      icon: hasFailure
+          ? Icons.report_gmailerrorred_outlined
+          : Icons.task_alt_rounded,
+      iconColor:
+          hasFailure ? theme.colorScheme.error : context.appColors.success,
+      title: '导入结果',
+      content: Container(
+        width: double.maxFinite,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Text(
+          buffer.toString().trimRight(),
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontFamily: AppTypography.monospace,
+            height: 1.55,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -54,11 +80,18 @@ class InstallErrorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('安装失败'),
-      content: Text(message),
+    return AppDialog(
+      icon: Icons.error_outline_rounded,
+      iconColor: Theme.of(context).colorScheme.error,
+      title: '安装失败',
+      content: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
       actions: [
-        TextButton(
+        FilledButton.tonal(
           onPressed: () => Navigator.pop(context),
           child: const Text('确定'),
         ),
@@ -83,57 +116,51 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AlertDialog(
-      title: Row(
+    return AppDialog(
+      icon: Icons.security_update_warning_outlined,
+      iconColor: theme.colorScheme.error,
+      title: '敏感权限授权确认',
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.security_update_warning_outlined,
-            color: theme.colorScheme.error,
-            size: 24,
-          ),
-          const SizedBox(width: 8),
-          const Text('敏感权限授权确认'),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('插件「$pluginName v$pluginVersion」申请了以下敏感权限：'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: theme.colorScheme.error.withValues(alpha: 0.4),
-                ),
+          Text('插件「$pluginName v$pluginVersion」申请了以下敏感权限：'),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: theme.colorScheme.error.withValues(alpha: 0.4),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final p in sensitivePermissions)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        '• ${p.label}: ${p.description}',
-                        style: theme.textTheme.bodySmall,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final p in sensitivePermissions)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxs,
+                    ),
+                    child: Text(
+                      '• ${p.label}: ${p.description}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              '授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            '授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -141,6 +168,10 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
           child: const Text('拒绝并取消'),
         ),
         FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.colorScheme.error,
+            foregroundColor: theme.colorScheme.onError,
+          ),
           onPressed: () => Navigator.pop(context, true),
           child: const Text('同意并安装'),
         ),
@@ -157,8 +188,11 @@ class UninstallConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('卸载插件'),
+    final theme = Theme.of(context);
+    return AppDialog(
+      icon: Icons.delete_outline_rounded,
+      iconColor: theme.colorScheme.error,
+      title: '卸载插件',
       content: Text('确定要卸载插件「$pluginName」吗？\n卸载后相关数据将被清除。'),
       actions: [
         TextButton(
@@ -167,8 +201,8 @@ class UninstallConfirmDialog extends StatelessWidget {
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Theme.of(context).colorScheme.onError,
+            backgroundColor: theme.colorScheme.error,
+            foregroundColor: theme.colorScheme.onError,
           ),
           onPressed: () => Navigator.pop(context, true),
           child: const Text('卸载'),
@@ -201,99 +235,103 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
         dynamicPlugin?.manifest.permissions ?? <PluginPermission>[];
     final grantedPermissions =
         dynamicPlugin?.context?.grantedPermissions ?? <PluginPermission>{};
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-    return AlertDialog(
-      title: Text(plugin.name),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ID: ${plugin.id}'),
-            const SizedBox(height: 4),
-            Text('版本: ${plugin.version}'),
-            const SizedBox(height: 4),
-            Text('分类: ${plugin.category.label}'),
-            if (dynamicPlugin != null) ...[
-              const SizedBox(height: 4),
-              Text('作者: ${dynamicPlugin.manifest.author}'),
-              const SizedBox(height: 4),
-              Text('沙箱配额: ${dynamicPlugin.manifest.storageQuotaMb} MB'),
-            ],
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 6),
-            Text(
-              '权限管理',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            if (declaredPermissions.isEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                '该插件未声明任何系统权限',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-              ),
-            ] else ...[
-              const SizedBox(height: 6),
-              ...declaredPermissions.map((perm) {
-                final isGranted = grantedPermissions.contains(perm);
-                return SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Row(
-                    children: [
-                      Text(perm.label),
-                      if (perm.isSensitive) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '敏感',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ],
+    return AppDialog(
+      icon: Icons.extension_outlined,
+      title: plugin.name,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.maxFinite,
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _metaRow(context, 'ID: ${plugin.id}'),
+                    _metaRow(context, '版本: ${plugin.version}'),
+                    _metaRow(context, '分类: ${plugin.category.label}'),
+                    if (dynamicPlugin != null) ...[
+                      _metaRow(context, '作者: ${dynamicPlugin.manifest.author}'),
+                      _metaRow(
+                        context,
+                        '沙箱配额: ${dynamicPlugin.manifest.storageQuotaMb} MB',
+                      ),
                     ],
-                  ),
-                  subtitle: Text(perm.description),
-                  value: isGranted,
-                  onChanged: (enabled) async {
-                    final current = Set<PluginPermission>.from(
-                      dynamicPlugin?.context?.grantedPermissions ??
-                          declaredPermissions,
-                    );
-                    if (enabled) {
-                      current.add(perm);
-                    } else {
-                      current.remove(perm);
-                    }
-                    setState(() {
-                      dynamicPlugin?.context?.setGrantedPermissions(current);
-                    });
-                    await ref
-                        .read(pluginRegistryProvider.notifier)
-                        .setCustomPermissions(plugin.id, current);
-                  },
-                );
-              }),
-            ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            '权限管理',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
+          ),
+          if (declaredPermissions.isEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '该插件未声明任何系统权限',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.outline,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: AppSpacing.xs),
+            ...declaredPermissions.map((perm) {
+              final isGranted = grantedPermissions.contains(perm);
+              return SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Row(
+                  children: [
+                    Text(perm.label),
+                    if (perm.isSensitive) ...[
+                      const SizedBox(width: AppSpacing.sm - 2),
+                      const AppBadge(
+                        label: '敏感',
+                        tone: AppBadgeTone.danger,
+                        dense: true,
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: Text(perm.description),
+                value: isGranted,
+                onChanged: (enabled) async {
+                  final current = Set<PluginPermission>.from(
+                    dynamicPlugin?.context?.grantedPermissions ??
+                        declaredPermissions,
+                  );
+                  if (enabled) {
+                    current.add(perm);
+                  } else {
+                    current.remove(perm);
+                  }
+                  setState(() {
+                    dynamicPlugin?.context?.setGrantedPermissions(current);
+                  });
+                  await ref
+                      .read(pluginRegistryProvider.notifier)
+                      .setCustomPermissions(plugin.id, current);
+                },
+              );
+            }),
           ],
-        ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
       ),
       actions: [
         if (dynamicPlugin != null)
@@ -308,6 +346,19 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
           child: const Text('完成'),
         ),
       ],
+    );
+  }
+
+  Widget _metaRow(BuildContext context, String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs + 1),
+      child: Text(
+        text,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 
@@ -333,23 +384,12 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
           await file.writeAsBytes(bytes, flush: true);
         }
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('插件已导出至: $outputPath'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          AppSnack.success(context, '插件已导出至: $outputPath');
         }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('导出失败: $e'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppSnack.error(context, '导出失败: $e');
       }
     }
   }

@@ -51,6 +51,9 @@ After installing, browse and one-click install/update plugins in the in-app **Pl
 - **Lightweight Sandboxed Scripting Engine**:
   - A built-in sandbox-level Lua runtime that is both high-performance and lightweight.
   - A safe host API surface: clipboard, sandbox storage, and system information.
+- **Unified design system**:
+  - `packages/ui` ships spacing / radius / motion tokens, a brand typography scale and semantic colors (success / warning / info); light and dark themes share one set of component shapes and page transitions.
+  - Empty, loading and error states, badges, banners and dialogs all come from shared widgets, with hover / focus / press feedback and an adaptive grid so every page evolves under a single spec.
 
 ---
 
@@ -69,7 +72,7 @@ plugin-toolbox/
 │   │   └── src/store/    # Store catalog client & version semantics (GitHub Contents API)
 │   ├── lua/              # Script execution: Lua engine & sandbox API bindings (with instruction budget)
 │   ├── dui/              # Declarative UI engine: JSON AST -> Flutter Widget dynamic rendering
-│   ├── ui/               # Shared presentation: AppTheme brand design system & reusable widget library
+│   ├── ui/               # Shared presentation: design tokens, brand theme, semantic colors & state widgets
 │   └── third_party/
 │       └── lua_dardo/    # Locally maintained Lua VM fork (Apache-2.0): adds instruction budget
 ├── sample_plugins/       # Official reference plugins with packing scripts
@@ -236,8 +239,8 @@ dart analyze
 # 2. Automated specification and logic verification (150 assertions, pure Dart)
 dart run tool/verify.dart
 
-# 3. Layered unit & widget tests (pure software testing, 463 cases, no devices needed)
-#    packages/core 111 / packages/lua 154 / packages/dui 85 / packages/ui 13 / app 100
+# 3. Layered unit & widget tests (pure software testing, 480 cases, no devices needed)
+#    packages/core 111 / packages/lua 154 / packages/dui 87 / packages/ui 24 / app 104
 cd packages/core && flutter test
 cd packages/lua && flutter test
 cd packages/dui && flutter test

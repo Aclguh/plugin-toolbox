@@ -468,7 +468,8 @@ class _DuiTabsState extends State<DuiTabs> {
               children: [
                 for (int i = 0; i < titles.length; i++)
                   Expanded(
-                    child: GestureDetector(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
                       onTap: () {
                         if (_currentIndex != i) {
                           setState(() {
@@ -480,8 +481,10 @@ class _DuiTabsState extends State<DuiTabs> {
                           widget.onChanged?.call(i);
                         }
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.symmetric(vertical: 9),
                         decoration: BoxDecoration(
                           color: _currentIndex == i
                               ? colorScheme.primary

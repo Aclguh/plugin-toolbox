@@ -52,87 +52,86 @@ class SettingsPage extends ConsumerWidget {
 
     return PluginPageScaffold(
       title: l10n?.settings ?? '设置',
+      maxContentWidth: AppLayout.maxContentWidth,
       body: ListView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
         children: [
-          SectionHeader(title: l10n?.appearanceAndDisplay ?? '外观与显示'),
-          SwitchListTile(
-            secondary: const Icon(Icons.screen_rotation_outlined),
-            title: Text(l10n?.autoRotateScreen ?? '重力旋转屏幕'),
-            subtitle:
-                Text(l10n?.autoRotateScreenDesc ?? '开启后允许横竖屏自由旋转，关闭时锁定竖屏'),
-            value: autoRotate,
-            onChanged: (val) {
-              ref.read(autoRotateProvider.notifier).toggle(val);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.palette_outlined),
-            title: Text(l10n?.themeMode ?? '主题模式'),
-            subtitle: Text(switch (themeMode) {
-              ThemeMode.dark => l10n?.themeDark ?? '品牌深色（默认）',
-              ThemeMode.light => l10n?.themeLight ?? '清新浅色',
-              ThemeMode.system => l10n?.themeSystem ?? '跟随系统',
-            }),
-            trailing: DropdownButton<ThemeMode>(
-              value: themeMode,
-              underline: const SizedBox(),
-              items: const [
-                DropdownMenuItem(
-                  value: ThemeMode.dark,
-                  child: Text('品牌深色'),
+          AppSection(
+            title: l10n?.appearanceAndDisplay ?? '外观与显示',
+            icon: Icons.palette_outlined,
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.screen_rotation_outlined),
+                title: Text(l10n?.autoRotateScreen ?? '重力旋转屏幕'),
+                subtitle: Text(
+                  l10n?.autoRotateScreenDesc ?? '开启后允许横竖屏自由旋转，关闭时锁定竖屏',
                 ),
-                DropdownMenuItem(
-                  value: ThemeMode.light,
-                  child: Text('清新浅色'),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.system,
-                  child: Text('跟随系统'),
-                ),
-              ],
-              onChanged: (mode) {
-                if (mode != null) {
-                  ref.read(themeModeProvider.notifier).setMode(mode);
-                }
-              },
-            ),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.color_lens_outlined),
-            title: Text(l10n?.dynamicColor ?? '动态取色 (Material You)'),
-            subtitle:
-                Text(l10n?.dynamicColorDesc ?? '开启后提取壁纸色彩，关闭时使用工具箱专属品牌配色'),
-            value: useDynamicColor,
-            onChanged: (val) {
-              ref.read(dynamicColorEnabledProvider.notifier).toggle(val);
-            },
-          ),
-          const SectionHeader(title: '插件与仓库'),
-          ListTile(
-            leading: const Icon(Icons.source_outlined),
-            title: const Text('自定义插件仓库'),
-            subtitle: Text(
-              repoConfig.isDefault
-                  ? '当前: Aclguh/PTX-plugins（官方默认）'
-                  : '当前: ${repoConfig.summary}',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCustomRepoDialog(context, ref, repoConfig),
-          ),
-          SectionHeader(title: l10n?.about ?? '关于'),
-          ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/icons/plugin-toolbox-icon.png',
-                width: 36,
-                height: 36,
+                value: autoRotate,
+                onChanged: (val) {
+                  ref.read(autoRotateProvider.notifier).toggle(val);
+                },
               ),
-            ),
-            title: const Text('PluginToolbox'),
-            subtitle: const Text('版本 0.2.1 • 万物皆插件'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showAboutDetailsDialog(context),
+              ListTile(
+                leading: const Icon(Icons.brightness_6_outlined),
+                title: Text(l10n?.themeMode ?? '主题模式'),
+                subtitle: Text(switch (themeMode) {
+                  ThemeMode.dark => l10n?.themeDark ?? '品牌深色（默认）',
+                  ThemeMode.light => l10n?.themeLight ?? '清新浅色',
+                  ThemeMode.system => l10n?.themeSystem ?? '跟随系统',
+                }),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showThemeModeSheet(context, ref, themeMode),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.color_lens_outlined),
+                title: Text(l10n?.dynamicColor ?? '动态取色 (Material You)'),
+                subtitle: Text(
+                  l10n?.dynamicColorDesc ?? '开启后提取壁纸色彩，关闭时使用工具箱专属品牌配色',
+                ),
+                value: useDynamicColor,
+                onChanged: (val) {
+                  ref.read(dynamicColorEnabledProvider.notifier).toggle(val);
+                },
+              ),
+            ],
+          ),
+          AppSection(
+            title: '插件与仓库',
+            icon: Icons.inventory_2_outlined,
+            subtitle: '插件目录的来源配置，影响商店可安装的插件集合',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.source_outlined),
+                title: const Text('自定义插件仓库'),
+                subtitle: Text(
+                  repoConfig.isDefault
+                      ? '当前: Aclguh/PTX-plugins（官方默认）'
+                      : '当前: ${repoConfig.summary}',
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showCustomRepoDialog(context, ref, repoConfig),
+              ),
+            ],
+          ),
+          AppSection(
+            title: l10n?.about ?? '关于',
+            icon: Icons.info_outline_rounded,
+            children: [
+              ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Image.asset(
+                    'assets/icons/plugin-toolbox-icon.png',
+                    width: 36,
+                    height: 36,
+                  ),
+                ),
+                title: const Text('PluginToolbox'),
+                subtitle: const Text('版本 0.2.1 • 万物皆插件'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showAboutDetailsDialog(context),
+              ),
+            ],
           ),
         ],
       ),
@@ -142,12 +141,75 @@ class SettingsPage extends ConsumerWidget {
   /// 复制文本到剪贴板并弹出轻量提示
   static void _copyText(BuildContext context, String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label已复制到剪贴板'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+    AppSnack.success(context, '$label已复制到剪贴板');
+  }
+
+  /// 主题模式选择面板：以底部抽屉替代下拉框，
+  /// 移动端单手可达，且能完整展示"当前选中"状态。
+  void _showThemeModeSheet(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode current,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final options = <(ThemeMode, String, IconData)>[
+      (ThemeMode.dark, l10n?.themeDark ?? '品牌深色（默认）', Icons.dark_mode_outlined),
+      (ThemeMode.light, l10n?.themeLight ?? '清新浅色', Icons.light_mode_outlined),
+      (
+        ThemeMode.system,
+        l10n?.themeSystem ?? '跟随系统',
+        Icons.brightness_auto_outlined
       ),
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.xs,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                child: Text(
+                  l10n?.themeMode ?? '主题模式',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              for (final option in options)
+                ListTile(
+                  leading: Icon(
+                    option.$3,
+                    color: option.$1 == current
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(option.$2),
+                  trailing: option.$1 == current
+                      ? Icon(
+                          Icons.check_circle_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        )
+                      : null,
+                  onTap: () {
+                    ref.read(themeModeProvider.notifier).setMode(option.$1);
+                    Navigator.of(ctx).pop();
+                  },
+                ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -167,105 +229,115 @@ class SettingsPage extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('自定义插件仓库'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '支持输入 GitHub 仓库链接或 owner/repo 格式。'
-                  '保存后插件商店将从该仓库拉取插件目录与安装包。',
-                  style: TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: 'GitHub 仓库链接',
-                    hintText: '例如: https://github.com/owner/repo',
-                    errorText: errorText,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: controller.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              setState(() {
-                                controller.clear();
-                                errorText = null;
-                              });
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (_) {
-                    if (errorText != null) {
-                      setState(() => errorText = null);
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '当前仓库: ${currentConfig.summary}${currentConfig.isDefault ? '（官方默认）' : ''}',
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                if (ref
-                        .read(customPluginRepositoryProvider.notifier)
-                        .savedConfigs
-                        .length >
-                    1) ...[
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const Text('已订阅的源 (点击快速选择):',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  for (final cfg in ref
-                      .read(customPluginRepositoryProvider.notifier)
-                      .savedConfigs)
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        cfg.summary.toLowerCase() ==
-                                currentConfig.summary.toLowerCase()
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        size: 18,
-                        color: cfg.summary.toLowerCase() ==
-                                currentConfig.summary.toLowerCase()
-                            ? Theme.of(ctx).colorScheme.primary
-                            : null,
-                      ),
-                      title: Text(
-                        cfg.summary + (cfg.isDefault ? ' (官方默认)' : ''),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      trailing: !cfg.isDefault
-                          ? IconButton(
-                              icon: const Icon(Icons.close, size: 16),
-                              tooltip: '移除该源',
-                              onPressed: () async {
-                                await ref
-                                    .read(
-                                        customPluginRepositoryProvider.notifier)
-                                    .removeSavedRepository(cfg);
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                      onTap: () {
-                        controller.text = cfg.isDefault ? '' : cfg.githubUrl;
-                        setState(() => errorText = null);
-                      },
+        builder: (ctx, setState) => AppDialog(
+          icon: Icons.cloud_sync_outlined,
+          title: '自定义插件仓库',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '支持输入 GitHub 仓库链接或 owner/repo 格式。'
+                '保存后插件商店将从该仓库拉取插件目录与安装包。',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                     ),
-                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'GitHub 仓库链接',
+                  hintText: '例如: https://github.com/owner/repo',
+                  errorText: errorText,
+                  prefixIcon: const Icon(Icons.link_rounded, size: 20),
+                  suffixIcon: controller.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          tooltip: '清空输入',
+                          onPressed: () {
+                            setState(() {
+                              controller.clear();
+                              errorText = null;
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (_) => setState(() => errorText = null),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '当前仓库: ${currentConfig.summary}${currentConfig.isDefault ? '（官方默认）' : ''}',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              if (ref
+                      .read(customPluginRepositoryProvider.notifier)
+                      .savedConfigs
+                      .length >
+                  1) ...[
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  '已订阅的源 (点击快速选择):',
+                  style: Theme.of(ctx).textTheme.labelMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (final cfg in ref
+                          .read(customPluginRepositoryProvider.notifier)
+                          .savedConfigs)
+                        ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.only(
+                            left: AppSpacing.md,
+                            right: AppSpacing.xs,
+                          ),
+                          leading: Icon(
+                            cfg.summary.toLowerCase() ==
+                                    currentConfig.summary.toLowerCase()
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 18,
+                            color: cfg.summary.toLowerCase() ==
+                                    currentConfig.summary.toLowerCase()
+                                ? Theme.of(ctx).colorScheme.primary
+                                : Theme.of(ctx).colorScheme.outline,
+                          ),
+                          title: Text(
+                            cfg.summary + (cfg.isDefault ? ' (官方默认)' : ''),
+                            style: Theme.of(ctx).textTheme.bodyMedium,
+                          ),
+                          trailing: !cfg.isDefault
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 16),
+                                  tooltip: '移除该源',
+                                  onPressed: () async {
+                                    await ref
+                                        .read(customPluginRepositoryProvider
+                                            .notifier)
+                                        .removeSavedRepository(cfg);
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
+                          onTap: () {
+                            controller.text =
+                                cfg.isDefault ? '' : cfg.githubUrl;
+                            setState(() => errorText = null);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
           actions: [
             if (!currentConfig.isDefault)
@@ -278,12 +350,7 @@ class SettingsPage extends ConsumerWidget {
                   ref.invalidate(pluginStoreCatalogProvider);
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('已恢复为官方默认插件仓库'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    AppSnack.info(context, '已恢复为官方默认插件仓库');
                   }
                 },
                 child: const Text('恢复默认'),
@@ -303,12 +370,7 @@ class SettingsPage extends ConsumerWidget {
                   ref.invalidate(pluginStoreCatalogProvider);
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('已恢复为官方默认插件仓库'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    AppSnack.info(context, '已恢复为官方默认插件仓库');
                   }
                   return;
                 }
@@ -336,12 +398,7 @@ class SettingsPage extends ConsumerWidget {
 
                 if (ctx.mounted) Navigator.of(ctx).pop();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('插件仓库已切换为: ${parsed.summary}'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  AppSnack.success(context, '插件仓库已切换为: ${parsed.summary}');
                 }
               },
               child: const Text('保存'),
@@ -359,32 +416,55 @@ class SettingsPage extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        titlePadding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxl,
+          AppSpacing.xxl,
+          AppSpacing.xxl,
+          AppSpacing.md,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
         title: Column(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                'assets/icons/plugin-toolbox-icon.png',
-                width: 56,
-                height: 56,
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: Image.asset(
+                  'assets/icons/plugin-toolbox-icon.png',
+                  width: 56,
+                  height: 56,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
+            const SizedBox(height: AppSpacing.md),
+            Text(
               'PluginToolbox',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               '版本 0.2.1 (Build 3)',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               '万物皆插件 • 极致轻量的动态插件化工具箱',
               textAlign: TextAlign.center,
@@ -395,58 +475,67 @@ class SettingsPage extends ConsumerWidget {
           ],
         ),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                context: ctx,
-                icon: Icons.android_outlined,
-                title: '应用包名',
-                value: kAppPackageName,
-                copyable: true,
-                onCopy: () => _copyText(ctx, kAppPackageName, '应用包名'),
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
               ),
-              const Divider(height: 16),
-              _buildInfoRow(
-                context: ctx,
-                icon: Icons.code_outlined,
-                title: 'GitHub 仓库',
-                value: kAppOfficialRepository,
-                copyable: true,
-                onCopy: () =>
-                    _copyText(ctx, kAppOfficialRepository, 'GitHub 仓库链接'),
+              child: Column(
+                children: [
+                  _buildInfoRow(
+                    context: ctx,
+                    icon: Icons.android_outlined,
+                    title: '应用包名',
+                    value: kAppPackageName,
+                    copyable: true,
+                    onCopy: () => _copyText(ctx, kAppPackageName, '应用包名'),
+                  ),
+                  const Divider(height: 1),
+                  _buildInfoRow(
+                    context: ctx,
+                    icon: Icons.code_outlined,
+                    title: 'GitHub 仓库',
+                    value: kAppOfficialRepository,
+                    copyable: true,
+                    onCopy: () => _copyText(
+                      ctx,
+                      kAppOfficialRepository,
+                      'GitHub 仓库链接',
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  _buildInfoRow(
+                    context: ctx,
+                    icon: Icons.gavel_outlined,
+                    title: '开源许可',
+                    value: kAppLicenseName,
+                    copyable: false,
+                    trailing: TextButton(
+                      onPressed: () => _showLicenseDialog(ctx),
+                      child: const Text('查看协议'),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  _buildInfoRow(
+                    context: ctx,
+                    icon: Icons.layers_outlined,
+                    title: '核心架构',
+                    value: kAppArchitecture,
+                    copyable: false,
+                  ),
+                  const Divider(height: 1),
+                  _buildInfoRow(
+                    context: ctx,
+                    icon: Icons.group_outlined,
+                    title: '开发团队',
+                    value: kAppTeam,
+                    copyable: false,
+                  ),
+                ],
               ),
-              const Divider(height: 16),
-              _buildInfoRow(
-                context: ctx,
-                icon: Icons.gavel_outlined,
-                title: '开源许可',
-                value: kAppLicenseName,
-                copyable: false,
-                trailing: TextButton(
-                  onPressed: () => _showLicenseDialog(ctx),
-                  child: const Text('查看协议'),
-                ),
-              ),
-              const Divider(height: 16),
-              _buildInfoRow(
-                context: ctx,
-                icon: Icons.layers_outlined,
-                title: '核心架构',
-                value: kAppArchitecture,
-                copyable: false,
-              ),
-              const Divider(height: 16),
-              _buildInfoRow(
-                context: ctx,
-                icon: Icons.group_outlined,
-                title: '开发团队',
-                value: kAppTeam,
-                copyable: false,
-              ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
         actions: [
@@ -489,18 +578,22 @@ GitHub 仓库: $kAppOfficialRepository
     final theme = Theme.of(context);
     return InkWell(
       onTap: copyable ? onCopy : null,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: theme.colorScheme.primary,
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+              ),
+              child: Icon(icon, size: 17, color: theme.colorScheme.primary),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,7 +604,7 @@ GitHub 仓库: $kAppOfficialRepository
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(
                     value,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -525,8 +618,9 @@ GitHub 仓库: $kAppOfficialRepository
               trailing
             else if (copyable)
               IconButton(
-                icon: const Icon(Icons.copy_outlined, size: 18),
+                icon: const Icon(Icons.copy_outlined, size: 17),
                 tooltip: '复制 $title',
+                visualDensity: VisualDensity.compact,
                 onPressed: onCopy,
               ),
           ],
@@ -539,32 +633,49 @@ GitHub 仓库: $kAppOfficialRepository
   void _showLicenseDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('开源协议 (MIT License)'),
-        content: const SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: SelectableText(
-              kAppFullLicenseText,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                height: 1.4,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AppDialog(
+          icon: Icons.gavel_outlined,
+          title: '开源协议 (MIT License)',
+          scrollable: false,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 320),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              child: const SingleChildScrollView(
+                child: SelectableText(
+                  kAppFullLicenseText,
+                  style: TextStyle(
+                    fontFamily: AppTypography.monospace,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        actions: [
-          FilledButton.tonal(
-            onPressed: () => _copyText(ctx, kAppFullLicenseText, '开源协议全文'),
-            child: const Text('复制协议'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
+          actions: [
+            FilledButton.tonal(
+              onPressed: () => _copyText(ctx, kAppFullLicenseText, '开源协议全文'),
+              child: const Text('复制协议'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

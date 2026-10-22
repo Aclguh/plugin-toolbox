@@ -26,6 +26,9 @@ class PluginToolboxApp extends ConsumerWidget {
           theme: AppTheme.light(dynamicColorScheme: lightScheme),
           darkTheme: AppTheme.dark(dynamicColorScheme: darkScheme),
           themeMode: themeMode,
+          // 主题切换采用统一缓动，避免瞬间闪变造成的割裂感
+          themeAnimationDuration: AppMotion.normal,
+          themeAnimationCurve: AppMotion.emphasized,
           routerConfig: router,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
