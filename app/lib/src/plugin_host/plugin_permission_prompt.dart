@@ -18,9 +18,10 @@ class PluginPermissionPrompt {
     required DynamicPlugin plugin,
     required PluginPermission permission,
     required WidgetRef ref,
+    bool forcePrompt = false,
   }) async {
     final currentPermissions = plugin.context?.grantedPermissions ?? {};
-    if (currentPermissions.contains(permission)) {
+    if (!forcePrompt && currentPermissions.contains(permission)) {
       return true;
     }
 

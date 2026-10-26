@@ -172,13 +172,17 @@ class _DynamicPluginHostPageState extends ConsumerState<DynamicPluginHostPage>
   }
 
   @override
-  Future<bool> requestPermission(PluginPermission permission) async {
+  Future<bool> requestPermission(
+    PluginPermission permission, {
+    bool forcePrompt = false,
+  }) async {
     if (!mounted) return false;
     return await PluginPermissionPrompt.requestPermission(
       context,
       plugin: widget.plugin,
       permission: permission,
       ref: ref,
+      forcePrompt: forcePrompt,
     );
   }
 

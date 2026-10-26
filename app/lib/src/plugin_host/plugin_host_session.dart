@@ -47,7 +47,8 @@ abstract class PluginSessionUiHandler {
     String targetPluginId, {
     Map<String, dynamic>? initialData,
   });
-  Future<bool> requestPermission(PluginPermission permission);
+  Future<bool> requestPermission(PluginPermission permission,
+      {bool forcePrompt = false});
   Future<String?> simulateScanBarcode({String? prompt});
   Future<String?> simulateDecodeBarcode();
 }
@@ -378,10 +379,82 @@ class PluginHostSession extends ChangeNotifier
         false;
   }
 
+  final Set<PluginPermission> _sessionPromptedPermissions = {};
+
+  /// 校验或请求权限：
+  /// 1. 若插件未声明该权限，向用户申请；
+  /// 2. 若属于敏感硬件/隐私权限 (isSensitive)，遵循最小权限与透明度原则，首次在运行时使用需用户动态二次确认。
   Future<bool> ensurePermission(PluginPermission perm) async {
-    final granted = plugin.context?.hasPermission(perm) ?? false;
-    if (granted) return true;
-    return await uiHandler?.requestPermission(perm) ?? false;
+    final hasPerm = plugin.context?.hasPermission(perm) ?? false;
+    if (!hasPerm) {
+      final ok = await uiHandler?.requestPermission(perm) ?? false;
+      if (ok) {
+        _sessionPromptedPermissions.add(perm);
+      }
+      return ok;
+    }
+
+    if (perm.isSensitive && !_sessionPromptedPermissions.contains(perm)) {
+      final ok =
+          await uiHandler?.requestPermission(perm, forcePrompt: true) ?? false;
+      if (ok) {
+        _sessionPromptedPermissions.add(perm);
+      }
+      return ok;
+    }
+
+    return true;
+  }
+
+  @override
+  Future<String?> takePhoto({
+    String? destPath,
+    int quality = 90,
+    String lensDirection = 'back',
+  }) async {
+    if (!await ensurePermission(PluginPermission.camera)) return null;
+    return super.takePhoto(
+      destPath: destPath,
+      quality: quality,
+      lensDirection: lensDirection,
+    );
+  }
+
+  @override
+  Future<String?> pickImage() async {
+    if (!await ensurePermission(PluginPermission.photoLibrary)) return null;
+    return super.pickImage();
+  }
+
+  @override
+  Future<bool> startAudioRecording(String destPath) async {
+    if (!await ensurePermission(PluginPermission.microphone)) return false;
+    return super.startAudioRecording(destPath);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getCurrentPosition() async {
+    if (!await ensurePermission(PluginPermission.location)) return null;
+    return super.getCurrentPosition();
+  }
+
+  @override
+  Future<bool> startBluetoothScan(
+      void Function(Map<String, dynamic> device) onDeviceFound) async {
+    if (!await ensurePermission(PluginPermission.bluetooth)) return false;
+    return super.startBluetoothScan(onDeviceFound);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> readNdef() async {
+    if (!await ensurePermission(PluginPermission.nfc)) return null;
+    return super.readNdef();
+  }
+
+  @override
+  Future<bool> writeNdef(List<Map<String, dynamic>> records) async {
+    if (!await ensurePermission(PluginPermission.nfc)) return false;
+    return super.writeNdef(records);
   }
 
   @override
