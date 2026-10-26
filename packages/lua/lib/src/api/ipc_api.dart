@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
@@ -16,9 +17,7 @@ class IpcApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.ipc)) {
-        ls.error2('权限不足: 插件未声明 ipc 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.ipc, 'ipc');
     }
 
     // plugin.call(targetPluginId, functionName [, args | callback, callback])

@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -15,9 +16,8 @@ class NotificationApi {
     ls.newTable();
 
     void checkNotificationPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.notification)) {
-        ls.error2('权限不足: 插件未声明 notification 权限');
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.notification, 'notification');
     }
 
     // notification.show(title, body [, payload, callback])

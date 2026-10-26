@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
@@ -16,9 +17,7 @@ class NfcApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.nfc)) {
-        ls.error2('权限不足: 插件未声明 nfc 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.nfc, 'nfc');
     }
 
     // nfc.isAvailable([callback]) -> bool

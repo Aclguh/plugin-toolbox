@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:io';
 import 'dart:ui' show Brightness, FlutterView, PlatformDispatcher, Size;
 
@@ -21,9 +22,8 @@ class SystemApi {
 
     // 屏幕写操作权限门控，与 screen_api.dart 保持一致
     void checkScreenPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.screen)) {
-        ls.error2('权限不足: 插件未声明 screen 权限');
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.screen, 'system.screen');
     }
 
     // system.platform()

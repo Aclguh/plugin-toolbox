@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -17,10 +18,8 @@ class AudioApi {
 
     // audio.play(relPath [, callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'audio.play');
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSandboxPath(ls, context, relPath);
       final cbRef = callbacks.ref(2);
@@ -87,14 +86,10 @@ class AudioApi {
 
     // audio.startRecord(destRelPath [, callback]) -> 录音至沙箱指定路径
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.microphone)) {
-        ls.error2('权限不足: 插件未声明 microphone 权限');
-        return 0;
-      }
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.microphone, 'audio.startRecord');
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'audio.startRecord');
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSandboxPath(ls, context, relPath);
       final cbRef = callbacks.ref(2);
@@ -142,10 +137,8 @@ class AudioApi {
 
     // audio.getDecibel([callback]) -> 实时环境声音分贝值 (dB)
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.microphone)) {
-        ls.error2('权限不足: 插件未声明 microphone 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.microphone, 'audio.getDecibel');
       final cbRef = callbacks.ref(1);
       unawaited(
         delegate.getAudioDecibel().then((db) {

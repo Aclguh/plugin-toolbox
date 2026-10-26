@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -16,9 +17,7 @@ class ImageApi {
     ls.newTable();
 
     void checkStorage(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.storage, 'image');
     }
 
     String resolveSafeFullPath(LuaState ls, String relPath) =>

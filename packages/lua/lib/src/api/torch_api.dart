@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 
 import 'package:lua_dardo/lua.dart';
@@ -19,9 +20,7 @@ class TorchApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.torch)) {
-        ls.error2('权限不足: 插件未声明 torch 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.torch, 'torch');
     }
 
     // torch.on([callback])

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:lua_dardo/lua.dart';
@@ -345,7 +346,8 @@ class LuaEngine {
         () => NotificationApi.bind(_ls, context, delegate, _callbacks!);
     _lazyModuleBinders['audio'] = () {
       AudioApi.bind(_ls, context, delegate, _callbacks!);
-      _disposableTracker.addCallback(() => delegate.stopAudio());
+      _disposableTracker.addCallback(
+          () => unawaited(delegate.stopAudio().catchError((_) => false)));
     };
     _lazyModuleBinders['socket'] = () {
       _socketApi = SocketApi();

@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -30,9 +31,7 @@ class SocketApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.network)) {
-        ls.error2('权限不足: 插件未声明 network 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.network, 'socket');
     }
 
     // socket.tcpConnect(host, port, optionsTable) -> string (socketId)

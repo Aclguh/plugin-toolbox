@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:io';
 
 import 'package:lua_dardo/lua.dart';
@@ -39,9 +40,8 @@ class DatabaseApi {
     // database 为独立权限语义：storage 仅代表键值/文件存储，
     // 结构化数据库读写必须显式声明 database 权限。
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.database)) {
-        ls.error2('权限不足: 插件未声明 database 权限');
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.database, 'database');
     }
 
     final rootDir = context.rootDir;

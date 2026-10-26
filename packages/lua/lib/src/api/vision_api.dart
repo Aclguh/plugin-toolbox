@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -19,10 +20,8 @@ class VisionApi {
 
     // vision.decodeBarcode(relPath [, callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'vision.ocr');
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSandboxPath(ls, context, relPath);
 

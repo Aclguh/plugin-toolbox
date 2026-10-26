@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 
@@ -16,9 +17,7 @@ class ScreenApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.screen)) {
-        ls.error2('权限不足: 插件未声明 screen 权限');
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.screen, 'screen');
     }
 
     // screen.setKeepScreenOn(enabled [, callback])
@@ -96,10 +95,8 @@ class ScreenApi {
     // screen.capture([optionsTable | callback, callback])
     // 截取视图或组件并保存至沙箱 (需 storage 权限)
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'screen.capture');
       String? targetRef;
       String? destRelPath;
       int? cbRef;

@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 
 import 'package:lua_dardo/lua.dart';
@@ -19,10 +20,8 @@ class StorageApi {
 
     // storage.set(key, value [, callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'storage');
       final key = ls.checkString(1) ?? '';
       dynamic val;
       final type = ls.type(2);
@@ -61,10 +60,8 @@ class StorageApi {
     // 读取为异步操作，无法在同步 Lua 栈中直接返回值：
     // 传入回调函数则异步携带存储值回调，否则结果写入状态 __storage_value
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'storage');
       final key = ls.checkString(1) ?? '';
       final cbRef = callbacks.ref(2);
       unawaited(
@@ -87,10 +84,8 @@ class StorageApi {
 
     // storage.remove(key [, callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'storage');
       final key = ls.checkString(1) ?? '';
       final cbRef = callbacks.ref(2);
       final future = context.storage.remove(key);

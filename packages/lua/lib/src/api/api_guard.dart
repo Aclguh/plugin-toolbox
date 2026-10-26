@@ -94,4 +94,72 @@ class ApiGuard {
       ls.error2('权限不足: 插件未声明 $names 权限');
     }
   }
+
+  /// 校验指定索引位置的参数必须为字符串，返回非空字符串
+  static String checkString(LuaState ls, int index, [String? paramName]) {
+    if (!ls.isString(index)) {
+      final name = paramName ?? '第 $index 个参数';
+      ls.error2('参数错误: $name 必须为字符串类型');
+    }
+    return ls.toStr(index) ?? '';
+  }
+
+  /// 获取可选字符串参数，未提供或为 nil 时返回 defaultValue
+  static String? optString(LuaState ls, int index, [String? defaultValue]) {
+    if (ls.isNoneOrNil(index)) return defaultValue;
+    return ls.toStr(index) ?? defaultValue;
+  }
+
+  /// 校验指定索引位置必须为整数
+  static int checkInt(LuaState ls, int index, [String? paramName]) {
+    if (!ls.isInteger(index) && !ls.isNumber(index)) {
+      final name = paramName ?? '第 $index 个参数';
+      ls.error2('参数错误: $name 必须为整数');
+    }
+    return ls.toInteger(index);
+  }
+
+  /// 获取可选整数参数
+  static int? optInt(LuaState ls, int index, [int? defaultValue]) {
+    if (ls.isNoneOrNil(index)) return defaultValue;
+    return ls.toInteger(index);
+  }
+
+  /// 校验指定索引位置必须为数值
+  static double checkNumber(LuaState ls, int index, [String? paramName]) {
+    if (!ls.isNumber(index)) {
+      final name = paramName ?? '第 $index 个参数';
+      ls.error2('参数错误: $name 必须为数值');
+    }
+    return ls.toNumber(index);
+  }
+
+  /// 获取可选数值参数
+  static double? optNumber(LuaState ls, int index, [double? defaultValue]) {
+    if (ls.isNoneOrNil(index)) return defaultValue;
+    return ls.toNumber(index);
+  }
+
+  /// 校验指定索引位置必须为布尔类型
+  static bool checkBool(LuaState ls, int index, [String? paramName]) {
+    if (!ls.isBoolean(index)) {
+      final name = paramName ?? '第 $index 个参数';
+      ls.error2('参数错误: $name 必须为布尔类型');
+    }
+    return ls.toBoolean(index);
+  }
+
+  /// 获取可选布尔参数
+  static bool optBool(LuaState ls, int index, [bool defaultValue = false]) {
+    if (ls.isNoneOrNil(index)) return defaultValue;
+    return ls.toBoolean(index);
+  }
+
+  /// 校验指定索引位置必须为 Table
+  static void checkTable(LuaState ls, int index, [String? paramName]) {
+    if (!ls.isTable(index)) {
+      final name = paramName ?? '第 $index 个参数';
+      ls.error2('参数错误: $name 必须为 Table/Object');
+    }
+  }
 }

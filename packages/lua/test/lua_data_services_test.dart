@@ -752,6 +752,62 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
+    test('DatabaseApi: SELECT 投影、ORDER BY (含 null)、LIMIT 与 OFFSET 分页查询',
+        () async {
+      final tempDir = await Directory.systemTemp.createTemp('ptx_db_advanced_');
+      final dbCtx = PluginContext(
+        pluginId: 'db_advanced_test',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        rootDir: tempDir,
+        grantedPermissions: {PluginPermission.database},
+      );
+      final dbEngine = LuaEngine(context: dbCtx, delegate: delegate);
+
+      dbEngine.loadAndExecute('''
+        db.execute("CREATE TABLE items (id INT, name TEXT, score INT)", function(res) end)
+        db.execute("INSERT INTO items (id, name, score) VALUES (1, 'Alice', 90)", function(res) end)
+        db.execute("INSERT INTO items (id, name, score) VALUES (2, 'Bob', 80)", function(res) end)
+        db.execute("INSERT INTO items (id, name, score) VALUES (3, 'Charlie', 95)", function(res) end)
+        db.execute("INSERT INTO items (id, name, score) VALUES (4, 'Dave', nil)", function(res) end)
+
+        -- 投影列 + ORDER BY score DESC + LIMIT 2 OFFSET 1
+        db.query("SELECT name, score FROM items ORDER BY score DESC LIMIT 2 OFFSET 1", {}, function(res)
+          state.set("q1_ok", res.ok)
+          state.set("q1_err", res.error)
+          if res.ok and res.rows then
+            state.set("q1_count", #res.rows)
+            if #res.rows >= 1 then state.set("row1_name", res.rows[1].name) end
+            if #res.rows >= 2 then state.set("row2_name", res.rows[2].name) end
+          end
+        end)
+
+        -- ORDER BY 升序 (null 在最前)
+        db.query("SELECT name FROM items ORDER BY score ASC", {}, function(res)
+          if res.ok and #res.rows >= 1 then
+            state.set("asc_first_name", res.rows[1].name)
+          end
+        end)
+      ''');
+
+      for (var i = 0; i < 40; i++) {
+        if (delegate.getState('row1_name') != null &&
+            delegate.getState('asc_first_name') != null) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+
+      expect(delegate.getState('row1_name'), 'Alice');
+      expect(delegate.getState('row2_name'), 'Bob');
+      expect(delegate.getState('row2_name'), 'Bob');
+      expect(delegate.getState('asc_first_name'), 'Dave');
+
+      dbEngine.close();
+      await tempDir.delete(recursive: true);
+    });
+
     test('DatabaseApi: 支持注入自定义 PluginDatabaseFactory 驱动并透明调用', () async {
       final customDb = _MockCustomDatabase();
       final tempDir = Directory.systemTemp.createTempSync('ptx_custom_db_');

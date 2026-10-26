@@ -490,10 +490,14 @@ class SandboxDatabaseEngine implements PluginDatabase {
         if (valA == null && valB == null) return 0;
         if (valA == null) return isDesc ? 1 : -1;
         if (valB == null) return isDesc ? -1 : 1;
-        final comp = Comparable.compare(
-          valA is Comparable ? valA : valA.toString(),
-          valB is Comparable ? valB : valB.toString(),
-        );
+        final int comp;
+        if (valA is num && valB is num) {
+          comp = valA.compareTo(valB);
+        } else if (valA is Comparable && valA.runtimeType == valB.runtimeType) {
+          comp = (valA as dynamic).compareTo(valB);
+        } else {
+          comp = valA.toString().compareTo(valB.toString());
+        }
         return isDesc ? -comp : comp;
       });
     }
@@ -797,7 +801,7 @@ class SandboxDatabaseEngine implements PluginDatabase {
   static dynamic _parseLiteral(String s) {
     if (s.isEmpty) return null;
     final lower = s.toLowerCase();
-    if (lower == 'null') return null;
+    if (lower == 'null' || lower == 'nil') return null;
     if (lower == 'true') return true;
     if (lower == 'false') return false;
     if (int.tryParse(s) != null) return int.parse(s);

@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -23,9 +24,8 @@ class ArchiveApi {
     ls.newTable();
 
     void checkStoragePermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'archive');
     }
 
     // archive.unzip(zipRelPath, targetDirRel) -> bool, error

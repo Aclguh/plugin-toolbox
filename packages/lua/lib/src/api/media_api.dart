@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -19,10 +20,8 @@ class MediaApi {
 
     // media.pickImage([callback])
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.photoLibrary)) {
-        ls.error2('权限不足: 插件未声明 photoLibrary 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.photoLibrary, 'media.pickMedia');
 
       final cbRef = callbacks.ref(1);
       unawaited(
@@ -46,10 +45,8 @@ class MediaApi {
     // media.pickFile([callback])
     // 与 fs.pickFile 权限对齐：选取结果会落入插件沙箱，统一要求 storage 权限
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'media.pickFile');
       final cbRef = callbacks.ref(1);
       unawaited(
         delegate.pickFile().then((relPath) {

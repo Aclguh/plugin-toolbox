@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -26,9 +27,8 @@ class WebSocketApi {
     ls.newTable();
 
     void checkPermission(LuaState ls) {
-      if (!context.hasPermission(PluginPermission.network)) {
-        ls.error2('权限不足: 插件未声明 network 权限');
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.network, 'websocket');
     }
 
     // websocket.connect(url, optionsTable) -> string (wsId)

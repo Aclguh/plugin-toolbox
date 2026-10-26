@@ -580,6 +580,56 @@ items:
           isFalse);
     });
 
+    test('ApiGuard 参数提取与校验助手函数测试', () {
+      final ls = LuaState.newState();
+
+      // 栈上推入测试数据:
+      // 1: 字符串 "hello"
+      // 2: 整数 42
+      // 3: 浮点数 3.14
+      // 4: 布尔值 true
+      // 5: table {}
+      // 6: nil
+      ls.pushString('hello');
+      ls.pushInteger(42);
+      ls.pushNumber(3.14);
+      ls.pushBoolean(true);
+      ls.newTable();
+      ls.pushNil();
+
+      // checkString & optString
+      expect(ApiGuard.checkString(ls, 1), 'hello');
+      expect(ApiGuard.optString(ls, 1), 'hello');
+      expect(ApiGuard.optString(ls, 6, 'default'), 'default');
+      expect(ApiGuard.optString(ls, 99, 'fallback'), 'fallback');
+      expect(() => ApiGuard.checkString(ls, 4), throwsA(anything));
+
+      // checkInt & optInt
+      expect(ApiGuard.checkInt(ls, 2), 42);
+      expect(ApiGuard.optInt(ls, 2), 42);
+      expect(ApiGuard.optInt(ls, 6, 100), 100);
+      expect(ApiGuard.optInt(ls, 99, 200), 200);
+      expect(() => ApiGuard.checkInt(ls, 1), throwsA(anything));
+
+      // checkNumber & optNumber
+      expect(ApiGuard.checkNumber(ls, 3), closeTo(3.14, 0.001));
+      expect(ApiGuard.optNumber(ls, 3), closeTo(3.14, 0.001));
+      expect(ApiGuard.optNumber(ls, 6, 0.5), 0.5);
+      expect(ApiGuard.optNumber(ls, 99, 1.5), 1.5);
+      expect(() => ApiGuard.checkNumber(ls, 1), throwsA(anything));
+
+      // checkBool & optBool
+      expect(ApiGuard.checkBool(ls, 4), isTrue);
+      expect(ApiGuard.optBool(ls, 4), isTrue);
+      expect(ApiGuard.optBool(ls, 6, false), isFalse);
+      expect(ApiGuard.optBool(ls, 99, true), isTrue);
+      expect(() => ApiGuard.checkBool(ls, 1), throwsA(anything));
+
+      // checkTable
+      expect(() => ApiGuard.checkTable(ls, 5), returnsNormally);
+      expect(() => ApiGuard.checkTable(ls, 1), throwsA(anything));
+    });
+
     test('ApiGuard.checkPermission 与 checkAnyPermission 静态断言', () {
       final ls = LuaState.newState();
       final ctxWithStorage = PluginContext(

@@ -1,3 +1,4 @@
+import 'api_guard.dart';
 import 'dart:async';
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -18,10 +19,8 @@ class CameraApi {
     // camera.scan([options, callback])
     // 调起摄像头扫码（条形码/二维码）
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.camera)) {
-        ls.error2('权限不足: 插件未声明 camera 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.camera, 'camera.scan');
 
       String? prompt;
       int? cbRef;
@@ -60,10 +59,8 @@ class CameraApi {
     // camera.decodeImage(relPath [, callback])
     // 对沙箱图片进行条形码/二维码解码
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(
+          ls, context, PluginPermission.storage, 'camera.decodeImage');
       final relPath = ls.checkString(1) ?? '';
       final fullPath = resolveSandboxPath(ls, context, relPath);
 
@@ -90,14 +87,8 @@ class CameraApi {
     // camera.takePhoto([optionsTable | callback, callback])
     // 拍摄照片并保存至沙箱 (需 camera 与 storage 权限)
     ls.pushDartFunction((ls) {
-      if (!context.hasPermission(PluginPermission.camera)) {
-        ls.error2('权限不足: 插件未声明 camera 权限');
-        return 0;
-      }
-      if (!context.hasPermission(PluginPermission.storage)) {
-        ls.error2('权限不足: 插件未声明 storage 权限');
-        return 0;
-      }
+      ApiGuard.checkPermission(ls, context, PluginPermission.camera, 'camera');
+      ApiGuard.checkPermission(ls, context, PluginPermission.storage, 'camera');
 
       int quality = 90;
       String lensDirection = 'back';
