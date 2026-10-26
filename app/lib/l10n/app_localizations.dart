@@ -469,6 +469,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'暂无敏感权限访问记录'**
   String get noAuditTrail;
+
+  /// No description provided for @exportDiagnosticReport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出诊断报告'**
+  String get exportDiagnosticReport;
+
+  /// No description provided for @exportDiagnosticReportDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制包含运行状态、权限审计与持久化日志的完整诊断报告'**
+  String get exportDiagnosticReportDesc;
+
+  /// No description provided for @diagnosticReportCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制完整诊断报告至剪贴板'**
+  String get diagnosticReportCopied;
 }
 
 class _AppLocalizationsDelegate

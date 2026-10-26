@@ -75,5 +75,8 @@
   "noLogsTitle": "No Console Logs",
   "noLogsMessage": "(Calls to print() in Lua will appear here)",
   "auditTrailTitle": "Security Access Audit Trail",
-  "noAuditTrail": "No sensitive access records"
+  "noAuditTrail": "No sensitive access records",
+  "exportDiagnosticReport": "Export Diagnostic Report",
+  "exportDiagnosticReportDesc": "Copy complete report including runtime status, audit trail, and persistent logs",
+  "diagnosticReportCopied": "Diagnostic report copied to clipboard"
 }

@@ -1,6 +1,7 @@
 import 'package:plugin_toolbox/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox/src/plugin_host/plugin_diagnostic_sheet.dart';
@@ -54,9 +55,11 @@ void main() {
   });
 
   tearDown(() async {
-    if (tempDir.existsSync()) {
-      await tempDir.delete(recursive: true);
-    }
+    try {
+      if (tempDir.existsSync()) {
+        await tempDir.delete(recursive: true);
+      }
+    } catch (_) {}
   });
 
   testWidgets('PluginDiagnosticSheet 渲染基础信息、权限与控制台日志', (tester) async {
@@ -184,5 +187,54 @@ void main() {
     expect(find.text('DENY'), findsOneWidget);
     expect(find.text('read_config'), findsOneWidget);
     expect(find.text('http_get'), findsOneWidget);
+  });
+
+  testWidgets('PluginDiagnosticSheet 点击导出诊断报告能够触发并弹出成功提示', (tester) async {
+    final List<MethodCall> calls = [];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () {
+                PluginDiagnosticSheet.show(
+                  ctx,
+                  plugin: mockPlugin,
+                );
+              },
+              child: const Text('打开'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+
+    final exportFinder = find.text('导出诊断报告');
+    expect(exportFinder, findsOneWidget);
+    await tester.tap(exportFinder);
+    await tester.pump();
+
+    expect(
+      calls.any((c) =>
+          c.method == 'Clipboard.setData' &&
+          (c.arguments['text'] as String).contains('Plugin Diagnostic Report')),
+      isTrue,
+    );
   });
 }

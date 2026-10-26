@@ -197,4 +197,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noAuditTrail => '暂无敏感权限访问记录';
+
+  @override
+  String get exportDiagnosticReport => '导出诊断报告';
+
+  @override
+  String get exportDiagnosticReportDesc => '复制包含运行状态、权限审计与持久化日志的完整诊断报告';
+
+  @override
+  String get diagnosticReportCopied => '已复制完整诊断报告至剪贴板';
 }

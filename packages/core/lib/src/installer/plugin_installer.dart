@@ -326,7 +326,8 @@ class PluginInstaller {
     final filename = parts.last;
     if (filename == 'storage.json' ||
         filename.endsWith('.bak') ||
-        filename.endsWith('.tmp')) {
+        filename.endsWith('.tmp') ||
+        filename.startsWith('diagnostic.log')) {
       return true;
     }
     return false;

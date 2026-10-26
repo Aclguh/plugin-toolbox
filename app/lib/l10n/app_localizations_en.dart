@@ -203,4 +203,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noAuditTrail => 'No sensitive access records';
+
+  @override
+  String get exportDiagnosticReport => 'Export Diagnostic Report';
+
+  @override
+  String get exportDiagnosticReportDesc =>
+      'Copy complete report including runtime status, audit trail, and persistent logs';
+
+  @override
+  String get diagnosticReportCopied => 'Diagnostic report copied to clipboard';
 }

@@ -4,6 +4,14 @@ import '../event/event_bus.dart';
 import '../storage/plugin_storage.dart';
 import '../model/plugin_permission.dart';
 
+/// 诊断日志级别
+enum DiagnosticLevel {
+  debug,
+  info,
+  warning,
+  error,
+}
+
 /// 敏感权限调用运行时安全审计事件实体
 class PermissionAuditRecord {
   final DateTime timestamp;
@@ -235,11 +243,37 @@ class PluginContext {
     _reservedBytes = 0;
   }
 
+  /// 单个沙箱诊断日志文件的最大字节数 (100 KB)
+  static const int maxDiagnosticLogSizeBytes = 100 * 1024;
+
   /// 诊断控制台内存日志条目队列（最多保留 200 条，用于运行期诊断面板）
   final List<String> _diagnosticLogs = [];
 
   /// 获取不可变诊断日志视图
   List<String> get diagnosticLogs => List.unmodifiable(_diagnosticLogs);
+
+  /// 将日志安全追加至沙箱诊断日志文件 (diagnostic.log)，并在超限时自动滚动备份
+  void _writeDiagnosticLogToFile(String line) {
+    final dir = rootDir;
+    if (dir == null) return;
+    try {
+      if (!dir.existsSync()) {
+        dir.createSync(recursive: true);
+      }
+      final logFile = File('${dir.path}/diagnostic.log');
+      if (logFile.existsSync() &&
+          logFile.lengthSync() >= maxDiagnosticLogSizeBytes) {
+        final oldFile = File('${dir.path}/diagnostic.log.old');
+        if (oldFile.existsSync()) {
+          oldFile.deleteSync();
+        }
+        logFile.renameSync(oldFile.path);
+      }
+      logFile.writeAsStringSync('$line\n', mode: FileMode.append, flush: false);
+    } catch (_) {
+      // 容错降级：诊断日志写盘失败不阻断插件业务执行
+    }
+  }
 
   /// 记录一条诊断日志
   void recordLog(String message) {
@@ -247,12 +281,114 @@ class PluginContext {
       _diagnosticLogs.removeAt(0);
     }
     final time = DateTime.now().toIso8601String().substring(11, 19);
-    _diagnosticLogs.add('[$time] $message');
+    final entry = '[$time] $message';
+    _diagnosticLogs.add(entry);
+    _writeDiagnosticLogToFile(entry);
   }
 
-  /// 清空诊断日志
+  /// 记录结构化诊断日志，支持等级、标签、异常信息并自动滚动写入沙箱 diagnostic.log
+  void recordDiagnostic(
+    DiagnosticLevel level,
+    String tag,
+    String message, [
+    Object? error,
+    StackTrace? st,
+  ]) {
+    final levelStr = level.name.toUpperCase().padRight(5);
+    final errorSuffix = error != null ? ' | error: $error' : '';
+    final fullMessage = '[$levelStr] [$tag] $message$errorSuffix';
+    recordLog(fullMessage);
+  }
+
+  /// 获取沙箱中的诊断日志文件（若存在）
+  File? get diagnosticLogFile {
+    final dir = rootDir;
+    if (dir == null) return null;
+    final file = File('${dir.path}/diagnostic.log');
+    return file.existsSync() ? file : null;
+  }
+
+  /// 读取持久化的诊断日志全文（含滚动归档）
+  String readDiagnosticLogsText() {
+    final buf = StringBuffer();
+    final dir = rootDir;
+    if (dir != null) {
+      final oldFile = File('${dir.path}/diagnostic.log.old');
+      if (oldFile.existsSync()) {
+        try {
+          buf.writeln(oldFile.readAsStringSync());
+        } catch (_) {}
+      }
+      final curFile = File('${dir.path}/diagnostic.log');
+      if (curFile.existsSync()) {
+        try {
+          buf.writeln(curFile.readAsStringSync());
+        } catch (_) {}
+      }
+    }
+    if (buf.isEmpty) {
+      buf.write(_diagnosticLogs.join('\n'));
+    }
+    return buf.toString().trim();
+  }
+
+  /// 生成包含运行状态、权限审计与持久化日志的诊断报告全文
+  String generateDiagnosticReport({
+    int? allocatedBytes,
+    String? pluginName,
+    String? pluginVersion,
+  }) {
+    final buf = StringBuffer();
+    buf.writeln('=== Plugin Diagnostic Report ===');
+    buf.writeln('Plugin ID: $pluginId');
+    if (pluginName != null) buf.writeln('Plugin Name: $pluginName');
+    if (pluginVersion != null) buf.writeln('Plugin Version: $pluginVersion');
+    buf.writeln('Report Time: ${DateTime.now().toIso8601String()}');
+    buf.writeln('Storage Quota: ${storageQuotaMb}MB');
+    buf.writeln('Current Storage Used: ${_formatBytes(currentUsedBytes)}');
+    if (allocatedBytes != null) {
+      buf.writeln('Lua Heap Allocation: ${_formatBytes(allocatedBytes)}');
+    }
+    buf.writeln(
+        'Granted Permissions: ${grantedPermissions.map((p) => p.name).join(', ')}');
+    buf.writeln();
+    buf.writeln('--- Audit Trail (Recent ${auditTrail.length}) ---');
+    if (auditTrail.isEmpty) {
+      buf.writeln('(none)');
+    } else {
+      for (final r in auditTrail) {
+        buf.writeln(r.toString());
+      }
+    }
+    buf.writeln();
+    buf.writeln('--- Diagnostic Logs ---');
+    final logsText = readDiagnosticLogsText();
+    if (logsText.isEmpty) {
+      buf.writeln('(none)');
+    } else {
+      buf.writeln(logsText);
+    }
+    return buf.toString();
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  /// 清空诊断日志与沙箱日志文件
   void clearDiagnosticLogs() {
     _diagnosticLogs.clear();
+    final dir = rootDir;
+    if (dir != null) {
+      try {
+        final cur = File('${dir.path}/diagnostic.log');
+        if (cur.existsSync()) cur.deleteSync();
+        final old = File('${dir.path}/diagnostic.log.old');
+        if (old.existsSync()) old.deleteSync();
+      } catch (_) {}
+    }
   }
 
   /// 权限审计轨迹队列（最多保留 100 条）

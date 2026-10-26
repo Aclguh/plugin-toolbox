@@ -462,6 +462,29 @@ class _PluginDiagnosticSheetState extends State<PluginDiagnosticSheet>
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.file_download_outlined),
+            title: Text(l10n?.exportDiagnosticReport ?? '导出诊断报告'),
+            subtitle: Text(
+              l10n?.exportDiagnosticReportDesc ?? '复制包含运行状态、权限审计与持久化日志的完整诊断报告',
+            ),
+            onTap: () async {
+              final report = ctx?.generateDiagnosticReport(
+                    allocatedBytes: widget.runner?.engine.allocatedBytes,
+                    pluginName: widget.plugin.manifest.name,
+                    pluginVersion: widget.plugin.manifest.version,
+                  ) ??
+                  'No diagnostic context';
+              await Clipboard.setData(ClipboardData(text: report));
+              if (mounted) {
+                AppSnack.success(
+                  context,
+                  l10n?.diagnosticReportCopied ?? '已复制完整诊断报告至剪贴板',
+                );
+              }
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.cleaning_services_outlined),
             title: Text(l10n?.cleanTempCache ?? '清理沙箱临时缓存'),
             subtitle: Text(
