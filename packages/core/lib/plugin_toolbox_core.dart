@@ -29,9 +29,11 @@ export 'src/event/app_event.dart';
 export 'src/storage/plugin_storage.dart';
 export 'src/permission/permission_manager.dart';
 
-// 沙箱安全
+// 沙箱安全与签名
 export 'src/sandbox/sandbox_path.dart';
 export 'src/sandbox/toolbox_path_provider.dart';
+export 'src/security/ed25519.dart';
+export 'src/security/plugin_signature.dart';
 
 // 备份与还原
 export 'src/backup/toolbox_backup_service.dart';

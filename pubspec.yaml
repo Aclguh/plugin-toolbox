@@ -7,3 +7,5 @@ environment:
 dev_dependencies:
   melos: ^6.0.0
   flutter_lints: ^5.0.0
+  crypto: ^3.0.5
+  archive: ^3.6.1

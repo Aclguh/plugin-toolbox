@@ -12,6 +12,7 @@ import '../event/event_bus.dart';
 import '../event/app_event.dart';
 import '../sandbox/sandbox_path.dart';
 import '../storage/plugin_storage.dart';
+import '../security/plugin_signature.dart';
 
 class PluginInstaller {
   static const int maxPackageSizeBytes = ToolboxConstants.maxPackageSizeBytes;
@@ -39,6 +40,7 @@ class PluginInstaller {
     Directory? baseDirectory,
     ToolboxPathProvider? pathProvider,
     String? expectedSha256,
+    PluginSignatureVerifier? signatureVerifier,
   }) async {
     final length = await ptxFile.length();
     if (length > maxPackageSizeBytes) {
@@ -62,6 +64,7 @@ class PluginInstaller {
           pluginsBasePath: pluginsBasePath,
           length: length,
           expectedSha256: expectedSha256,
+          signatureVerifier: signatureVerifier,
         ));
 
     final manifest = PluginManifest.fromJsonString(installData['manifest']!);
@@ -78,6 +81,7 @@ class PluginInstaller {
     required String pluginsBasePath,
     required int length,
     String? expectedSha256,
+    PluginSignatureVerifier? signatureVerifier,
   }) async {
     final ptxFile = File(ptxPath);
     final bytes = await ptxFile.readAsBytes();
@@ -105,6 +109,15 @@ class PluginInstaller {
 
     if (archive.files.length > maxEntryCount) {
       throw const FormatException('安装包条目数超限 (超过 $maxEntryCount 个)，疑似恶意压缩包');
+    }
+
+    if (signatureVerifier != null) {
+      final sigResult = signatureVerifier.verifyArchive(archive);
+      if (signatureVerifier.requireSignature && !sigResult.isValid) {
+        throw FormatException('插件数字签名校验失败: ${sigResult.message}');
+      } else if (sigResult.isTampered) {
+        throw FormatException('插件数字签名校验失败: ${sigResult.message}');
+      }
     }
 
     final manifestEntry = archive.findFile('plugin.json');

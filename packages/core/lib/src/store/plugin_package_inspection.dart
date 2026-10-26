@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 
 import '../model/plugin_manifest.dart';
+import '../security/plugin_signature.dart';
 import 'jsdelivr_plugin_store_source.dart' show PluginStoreException;
 
 /// 安装包内清单与顶层文件的一致性核对结果。
@@ -14,6 +15,7 @@ class PluginPackageContract {
     required this.entryNames,
     required this.missingEntryScript,
     required this.missingUiDefinition,
+    this.signatureResult,
   });
 
   /// 安装包内的插件清单
@@ -28,7 +30,11 @@ class PluginPackageContract {
   /// 清单声明的 UI 描述文件在包内缺失
   final bool missingUiDefinition;
 
+  /// 可选的数字签名校验结果
+  final PluginSignatureVerificationResult? signatureResult;
+
   bool get isConsistent => !missingEntryScript && !missingUiDefinition;
+  bool get hasValidSignature => signatureResult?.isValid ?? false;
 }
 
 /// 在不落盘的前提下读取 .ptx 内的清单与文件清单。
@@ -36,7 +42,10 @@ class PluginPackageContract {
 /// 商店的元数据来自 `plugin-source`，安装包来自 `dist`，两者由仓库中不同提交
 /// 产出时可能出现 id / 入口脚本不一致；安装前用本函数把两者对齐，
 /// 把"装上一个必然报错的插件"变成一条可见提示。
-PluginPackageContract inspectPluginPackage(Uint8List bytes) {
+PluginPackageContract inspectPluginPackage(
+  Uint8List bytes, {
+  PluginSignatureVerifier? signatureVerifier,
+}) {
   final Archive archive;
   try {
     archive = ZipDecoder().decodeBytes(bytes);
@@ -63,11 +72,19 @@ PluginPackageContract inspectPluginPackage(Uint8List bytes) {
     throw PluginStoreException('安装包内的 plugin.json 无法解析: ${e.message}');
   }
 
+  final sigResult = signatureVerifier?.verifyArchive(archive);
+  if (signatureVerifier != null && signatureVerifier.requireSignature) {
+    if (sigResult == null || !sigResult.isValid) {
+      throw PluginStoreException('插件签名校验未通过: ${sigResult?.message}');
+    }
+  }
+
   return PluginPackageContract(
     manifest: manifest,
     entryNames: names,
     missingEntryScript: !names.contains(manifest.entry),
     missingUiDefinition: !names.contains(manifest.ui),
+    signatureResult: sigResult,
   );
 }
 
