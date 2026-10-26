@@ -21,13 +21,15 @@ class DuiCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parsedCommands = _parseCommands(commands);
-    return Container(
-      width: width,
-      height: height,
-      color: backgroundColor,
-      child: CustomPaint(
-        size: Size(width, height),
-        painter: DuiCanvasPainter(parsedCommands),
+    return RepaintBoundary(
+      child: Container(
+        width: width,
+        height: height,
+        color: backgroundColor,
+        child: CustomPaint(
+          size: Size(width, height),
+          painter: DuiCanvasPainter(parsedCommands),
+        ),
       ),
     );
   }

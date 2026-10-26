@@ -176,49 +176,51 @@ class _DuiDrawingPadState extends State<DuiDrawingPad> {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(widget.borderRadius),
-      child: Container(
-        width: widget.width,
-        height: widget.height,
-        color: bg,
-        child: GestureDetector(
-          onPanStart: (details) {
-            setState(() {
-              _activePoints = [details.localPosition];
-            });
-          },
-          onPanUpdate: (details) {
-            setState(() {
-              _activePoints.add(details.localPosition);
-            });
-          },
-          onPanEnd: (details) {
-            if (_activePoints.isNotEmpty) {
+      child: RepaintBoundary(
+        child: Container(
+          width: widget.width,
+          height: widget.height,
+          color: bg,
+          child: GestureDetector(
+            onPanStart: (details) {
               setState(() {
-                _strokes.add(DuiDrawingStroke(
-                  points: List.from(_activePoints),
-                  color: widget.strokeColor,
-                  strokeWidth: widget.strokeWidth,
-                ));
-                _activePoints.clear();
+                _activePoints = [details.localPosition];
               });
-              _syncState(hasDrawing: true, count: _strokes.length);
-              widget.onChanged?.call();
-              // 异步刷新 base64 输出
-              exportBase64().then((b64) {
-                if (b64 != null && mounted) {
-                  _syncState(
-                      hasDrawing: true, count: _strokes.length, base64: b64);
-                }
+            },
+            onPanUpdate: (details) {
+              setState(() {
+                _activePoints.add(details.localPosition);
               });
-            }
-          },
-          child: CustomPaint(
-            size: Size(widget.width ?? double.infinity, widget.height),
-            painter: _DuiDrawingPainter(
-              strokes: _strokes,
-              activePoints: _activePoints,
-              activeColor: widget.strokeColor,
-              activeWidth: widget.strokeWidth,
+            },
+            onPanEnd: (details) {
+              if (_activePoints.isNotEmpty) {
+                setState(() {
+                  _strokes.add(DuiDrawingStroke(
+                    points: List.from(_activePoints),
+                    color: widget.strokeColor,
+                    strokeWidth: widget.strokeWidth,
+                  ));
+                  _activePoints.clear();
+                });
+                _syncState(hasDrawing: true, count: _strokes.length);
+                widget.onChanged?.call();
+                // 异步刷新 base64 输出
+                exportBase64().then((b64) {
+                  if (b64 != null && mounted) {
+                    _syncState(
+                        hasDrawing: true, count: _strokes.length, base64: b64);
+                  }
+                });
+              }
+            },
+            child: CustomPaint(
+              size: Size(widget.width ?? double.infinity, widget.height),
+              painter: _DuiDrawingPainter(
+                strokes: _strokes,
+                activePoints: _activePoints,
+                activeColor: widget.strokeColor,
+                activeWidth: widget.strokeWidth,
+              ),
             ),
           ),
         ),
