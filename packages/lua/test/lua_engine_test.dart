@@ -513,6 +513,28 @@ void main() {
       expect(sparseResult, {'1': 'first', '3': 'third'});
     });
 
+    test('宿主 API 懒绑定机制：低频/重型模块按需触发加载', () {
+      // 核心 API 默认已绑定
+      expect(engine.isModuleBound('state'), isTrue);
+      expect(engine.isModuleBound('clipboard'), isTrue);
+      expect(engine.isModuleBound('codec'), isTrue);
+
+      // 低频模块初始处于未绑定状态
+      expect(engine.isModuleBound('crypto'), isFalse);
+      expect(engine.isModuleBound('network'), isFalse);
+      expect(engine.isModuleBound('qrcode'), isFalse);
+
+      // 访问 crypto 模块，触发按需加载并自动缓存
+      engine.loadAndExecute('local c = crypto');
+      expect(engine.isModuleBound('crypto'), isTrue);
+      expect(engine.isModuleBound('network'), isFalse);
+
+      // bindAll 显式全量绑定
+      engine.bindAll();
+      expect(engine.isModuleBound('network'), isTrue);
+      expect(engine.isModuleBound('qrcode'), isTrue);
+    });
+
     test('LuaEngine.close() 幂等且禁止在关闭后继续调用 (P2-5)', () {
       expect(engine.isClosed, isFalse);
       engine.close();

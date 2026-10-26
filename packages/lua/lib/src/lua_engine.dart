@@ -81,6 +81,8 @@ class LuaEngine {
   WebSocketApi? _webSocketApi;
   DatabaseApi? _databaseApi;
   final DisposableTracker _disposableTracker = DisposableTracker();
+  final Map<String, void Function()> _lazyModuleBinders = {};
+  final Set<String> _boundModules = {};
   bool _closed = false;
 
   /// 集中资源生命周期追踪器
@@ -278,73 +280,166 @@ class LuaEngine {
     void writeState(String key, dynamic value) =>
         delegate.onStateChanged(key, value);
 
+    // 核心高频 API 立即注入
     _timerApi = TimerApi();
     _timerApi!.bind(_ls, _callbacks!);
     _disposableTracker.addCallback(() => _timerApi?.dispose(_callbacks));
 
     StateApi.bind(_ls, delegate);
+    _boundModules.add('state');
     ClipboardApi.bind(_ls, context, delegate, _callbacks!, writeState);
-    StorageApi.bind(_ls, context, _callbacks!, writeState);
-    final networkClient = http.Client();
-    NetworkApi.bind(
-        _ls, context, _callbacks!, writeState, delegate, networkClient);
-    _disposableTracker.addCallback(() => networkClient.close());
-    DialogApi.bind(_ls, delegate, _callbacks!);
+    _boundModules.add('clipboard');
     CodecApi.bind(_ls);
+    _boundModules.add('codec');
     JsonApi.bind(_ls);
-    HashApi.bind(_ls);
+    _boundModules.add('json');
     UtilApi.bind(_ls);
-    SystemApi.bind(_ls, context, delegate, _callbacks!);
-    HapticApi.bind(_ls, delegate);
+    _boundModules.add('util');
+    DialogApi.bind(_ls, delegate, _callbacks!);
+    _boundModules.add('dialog');
     UiApi.bind(_ls, delegate);
-    ShareApi.bind(_ls, delegate, context, _callbacks!);
-    MediaApi.bind(_ls, context, delegate, _callbacks!, writeState);
-    FsApi.bind(_ls, context, delegate, _callbacks!);
-    CryptoApi.bind(_ls);
-    RegexApi.bind(_ls);
-    ColorApi.bind(_ls);
-    ArchiveApi.bind(_ls, context);
-    DocumentApi.bind(_ls);
-    TorchApi.bind(_ls, context, delegate, _callbacks!);
-    QrcodeApi.bind(_ls);
-    CameraApi.bind(_ls, context, delegate, _callbacks!);
-    VisionApi.bind(_ls, context, delegate, _callbacks!);
-    _sensorApi = SensorApi();
-    _sensorApi!.bind(_ls, context, delegate, _callbacks!);
-    _disposableTracker
-        .addCallback(() => _sensorApi?.dispose(delegate, _callbacks!));
+    _boundModules.add('ui');
+    HapticApi.bind(_ls, delegate);
+    _boundModules.add('haptic');
 
-    ImageApi.bind(_ls, context, delegate, _callbacks!);
-    NotificationApi.bind(_ls, context, delegate, _callbacks!);
-    AudioApi.bind(_ls, context, delegate, _callbacks!);
-    _socketApi = SocketApi();
-    _socketApi!.bind(_ls, context, _callbacks!);
-    _disposableTracker.addCallback(() => _socketApi?.dispose(_callbacks));
+    // 注册低频/重型 API 的懒加载映射表
+    _lazyModuleBinders['storage'] = () {
+      StorageApi.bind(_ls, context, _callbacks!, writeState);
+    };
+    _lazyModuleBinders['network'] = () {
+      final networkClient = http.Client();
+      NetworkApi.bind(
+          _ls, context, _callbacks!, writeState, delegate, networkClient);
+      _disposableTracker.addCallback(() => networkClient.close());
+    };
+    _lazyModuleBinders['hash'] = () => HashApi.bind(_ls);
+    _lazyModuleBinders['system'] =
+        () => SystemApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['share'] =
+        () => ShareApi.bind(_ls, delegate, context, _callbacks!);
+    _lazyModuleBinders['media'] =
+        () => MediaApi.bind(_ls, context, delegate, _callbacks!, writeState);
+    _lazyModuleBinders['fs'] =
+        () => FsApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['crypto'] = () => CryptoApi.bind(_ls);
+    _lazyModuleBinders['regex'] = () => RegexApi.bind(_ls);
+    _lazyModuleBinders['color'] = () => ColorApi.bind(_ls);
+    _lazyModuleBinders['archive'] = () => ArchiveApi.bind(_ls, context);
+    _lazyModuleBinders['document'] = () => DocumentApi.bind(_ls);
+    _lazyModuleBinders['torch'] =
+        () => TorchApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['qrcode'] = () => QrcodeApi.bind(_ls);
+    _lazyModuleBinders['camera'] =
+        () => CameraApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['vision'] =
+        () => VisionApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['sensor'] = () {
+      _sensorApi = SensorApi();
+      _sensorApi!.bind(_ls, context, delegate, _callbacks!);
+      _disposableTracker
+          .addCallback(() => _sensorApi?.dispose(delegate, _callbacks!));
+    };
+    _lazyModuleBinders['image'] =
+        () => ImageApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['notification'] =
+        () => NotificationApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['audio'] = () {
+      AudioApi.bind(_ls, context, delegate, _callbacks!);
+      _disposableTracker.addCallback(() => delegate.stopAudio());
+    };
+    _lazyModuleBinders['socket'] = () {
+      _socketApi = SocketApi();
+      _socketApi!.bind(_ls, context, _callbacks!);
+      _disposableTracker.addCallback(() => _socketApi?.dispose(_callbacks));
+    };
+    _lazyModuleBinders['websocket'] = () {
+      _webSocketApi = WebSocketApi();
+      _webSocketApi!.bind(_ls, context, _callbacks!);
+      _disposableTracker.addCallback(() => _webSocketApi?.dispose(_callbacks));
+    };
+    _lazyModuleBinders['biometrics'] =
+        () => BiometricsApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['task'] = () => TaskApi.bind(_ls, context, _callbacks!);
+    _lazyModuleBinders['screen'] = () {
+      ScreenApi.bind(_ls, context, delegate, _callbacks!);
+      _disposableTracker.addCallback(() => delegate.setKeepScreenOn(false));
+      _disposableTracker.addCallback(() => delegate.resetBrightness());
+    };
+    _lazyModuleBinders['location'] =
+        () => LocationApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['nfc'] =
+        () => NfcApi.bind(_ls, context, delegate, _callbacks!);
+    _lazyModuleBinders['bluetooth'] = () {
+      BluetoothApi.bind(_ls, context, delegate, _callbacks!);
+      _disposableTracker.addCallback(() => delegate.stopBluetoothScan());
+    };
+    void bindDatabase() {
+      _databaseApi = DatabaseApi(databaseFactory: databaseFactory);
+      _databaseApi!.bindInstance(_ls, context, _callbacks!);
+      _disposableTracker.addCallback(() => _databaseApi?.dispose());
+    }
 
-    _webSocketApi = WebSocketApi();
-    _webSocketApi!.bind(_ls, context, _callbacks!);
-    _disposableTracker.addCallback(() => _webSocketApi?.dispose(_callbacks));
+    _lazyModuleBinders['db'] = bindDatabase;
+    _lazyModuleBinders['database'] = bindDatabase;
 
-    BiometricsApi.bind(_ls, context, delegate, _callbacks!);
-    TaskApi.bind(_ls, context, _callbacks!);
-    ScreenApi.bind(_ls, context, delegate, _callbacks!);
-    LocationApi.bind(_ls, context, delegate, _callbacks!);
-    NfcApi.bind(_ls, context, delegate, _callbacks!);
-    BluetoothApi.bind(_ls, context, delegate, _callbacks!);
-    _databaseApi = DatabaseApi(databaseFactory: databaseFactory);
-    _databaseApi!.bindInstance(_ls, context, _callbacks!);
-    _disposableTracker.addCallback(() => _databaseApi?.dispose());
+    _lazyModuleBinders['ai'] =
+        () => AiApi.bind(_ls, context, delegate, _callbacks!);
 
-    AiApi.bind(_ls, context, delegate, _callbacks!);
-    IpcApi.bind(_ls, context, delegate, _callbacks!);
-    _disposableTracker.addCallback(
-        () => PluginIpcBroker.instance.unregisterService(context.pluginId));
-    _disposableTracker.addCallback(() => delegate.stopAudio());
-    _disposableTracker.addCallback(() => delegate.stopBluetoothScan());
-    _disposableTracker.addCallback(() => delegate.setKeepScreenOn(false));
-    _disposableTracker.addCallback(() => delegate.resetBrightness());
+    void bindIpc() {
+      IpcApi.bind(_ls, context, delegate, _callbacks!);
+      _disposableTracker.addCallback(
+          () => PluginIpcBroker.instance.unregisterService(context.pluginId));
+    }
 
-    I18nApi.bind(_ls, context);
+    _lazyModuleBinders['plugin'] = bindIpc;
+    _lazyModuleBinders['ipc'] = bindIpc;
+    _lazyModuleBinders['i18n'] = () => I18nApi.bind(_ls, context);
+
+    // 注入底层按需绑定桥接函数
+    _ls.pushDartFunction((ls) {
+      final modName = ls.checkString(1);
+      if (modName != null) {
+        _bindModule(modName);
+      }
+      return 0;
+    });
+    _ls.setGlobal('__bind_host_module');
+
+    // 在 Lua 全局表 _G 安装元表，按需懒加载未绑定的宿主模块
+    final lazyKeysLua =
+        _lazyModuleBinders.keys.map((k) => '["$k"]=true').join(',');
+    _ls.doString('''
+local __lazy_keys = {$lazyKeysLua}
+setmetatable(_G, {
+  __index = function(t, key)
+    if __lazy_keys[key] then
+      __bind_host_module(key)
+      return rawget(t, key)
+    end
+    return nil
+  end
+})
+''');
+  }
+
+  /// 显式全量绑定所有宿主 API（主要用于离线静态分析或需要预先穷举全局表的场景）
+  void bindAll() {
+    final modules = _lazyModuleBinders.keys.toList();
+    for (final mod in modules) {
+      _bindModule(mod);
+    }
+  }
+
+  /// 检查指定宿主模块是否已被实际绑定并驻留于全局环境
+  bool isModuleBound(String name) => _boundModules.contains(name);
+
+  void _bindModule(String name) {
+    if (_boundModules.contains(name)) return;
+    _boundModules.add(name);
+    final binder = _lazyModuleBinders[name];
+    if (binder != null) {
+      binder();
+    }
   }
 
   /// 校验脚本字符串是否以 Lua 预编译字节码魔数 (\x1bLua) 开头
