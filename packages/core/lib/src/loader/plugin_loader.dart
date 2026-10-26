@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:logger/logger.dart';
-import 'package:path_provider/path_provider.dart';
+import '../sandbox/toolbox_path_provider.dart';
 import '../model/plugin_manifest.dart';
 import '../plugin/dynamic_plugin.dart';
 
@@ -15,17 +15,25 @@ class PluginLoader {
   ///
   /// 可选指定 [baseDirectory]（用于测试或自定义存储位置）与 [logger]（用于日志注入）。
   /// 若目录不存在或为空则返回空列表；损坏的插件目录将被捕获并输出警告日志，避免阻断其他插件加载。
+  /// 全局默认路径解析器。在宿主启动时注入；纯 Dart 环境未配置时回退至系统临时目录
+  static ToolboxPathProvider? defaultPathProvider;
+
   static Future<List<DynamicPlugin>> loadAllInstalledPlugins({
     Directory? baseDirectory,
+    ToolboxPathProvider? pathProvider,
     Logger? logger,
   }) async {
     final effectiveLogger = logger ?? _defaultLogger;
     Directory pluginsBaseDir;
     if (baseDirectory != null) {
       pluginsBaseDir = baseDirectory;
+    } else if (pathProvider != null) {
+      pluginsBaseDir = pathProvider.pluginsDirectory;
+    } else if (defaultPathProvider != null) {
+      pluginsBaseDir = defaultPathProvider!.pluginsDirectory;
     } else {
-      final appDocDir = await getApplicationDocumentsDirectory();
-      pluginsBaseDir = Directory('${appDocDir.path}/plugins');
+      pluginsBaseDir =
+          Directory('${Directory.systemTemp.path}/plugin_toolbox/plugins');
     }
 
     if (!await pluginsBaseDir.exists()) {

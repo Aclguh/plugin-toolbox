@@ -151,6 +151,10 @@ void main() {
     );
     pluginsRoot = await Directory.systemTemp.createTemp('store_app_docs_');
     tempRoot = await Directory.systemTemp.createTemp('store_temp_');
+    PluginInstaller.defaultPathProvider = DirectoryPathProvider(
+      pluginsDirectory: Directory('${pluginsRoot.path}/plugins'),
+    );
+    PluginLoader.defaultPathProvider = PluginInstaller.defaultPathProvider;
   });
 
   tearDown(() async {

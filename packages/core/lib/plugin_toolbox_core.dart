@@ -31,6 +31,7 @@ export 'src/permission/permission_manager.dart';
 
 // 沙箱安全
 export 'src/sandbox/sandbox_path.dart';
+export 'src/sandbox/toolbox_path_provider.dart';
 
 // 备份与还原
 export 'src/backup/toolbox_backup_service.dart';

@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:archive/archive.dart';
-import 'package:path_provider/path_provider.dart';
+import '../sandbox/toolbox_path_provider.dart';
 import '../model/plugin_manifest.dart';
 import '../plugin/dynamic_plugin.dart';
 import '../event/event_bus.dart';
@@ -31,9 +31,13 @@ class PluginInstaller {
   ///
   /// CPU 密集型的 ZIP 解码、膨胀比计算与文件展开操作全流程在独立后台 Isolate
   /// 中执行，彻底杜绝主 UI 线程丢帧与卡顿；完成后回传清单与沙箱目录。
+  /// 全局默认路径解析器。在宿主启动时注入；纯 Dart 环境未配置时回退至系统临时目录
+  static ToolboxPathProvider? defaultPathProvider;
+
   static Future<DynamicPlugin> installFromPtx(
     File ptxFile, {
     Directory? baseDirectory,
+    ToolboxPathProvider? pathProvider,
     String? expectedSha256,
   }) async {
     final length = await ptxFile.length();
@@ -44,9 +48,12 @@ class PluginInstaller {
     final String pluginsBasePath;
     if (baseDirectory != null) {
       pluginsBasePath = baseDirectory.path;
+    } else if (pathProvider != null) {
+      pluginsBasePath = pathProvider.pluginsDirectory.path;
+    } else if (defaultPathProvider != null) {
+      pluginsBasePath = defaultPathProvider!.pluginsDirectory.path;
     } else {
-      final appDocDir = await getApplicationDocumentsDirectory();
-      pluginsBasePath = '${appDocDir.path}/plugins';
+      pluginsBasePath = '${Directory.systemTemp.path}/plugin_toolbox/plugins';
     }
 
     final ptxPath = ptxFile.path;
@@ -230,9 +237,11 @@ class PluginInstaller {
     final Directory pluginsBaseDir;
     if (baseDirectory != null) {
       pluginsBaseDir = baseDirectory;
+    } else if (defaultPathProvider != null) {
+      pluginsBaseDir = defaultPathProvider!.pluginsDirectory;
     } else {
-      final appDocDir = await getApplicationDocumentsDirectory();
-      pluginsBaseDir = Directory('${appDocDir.path}/plugins');
+      pluginsBaseDir =
+          Directory('${Directory.systemTemp.path}/plugin_toolbox/plugins');
     }
     final targetDir = Directory('${pluginsBaseDir.path}/$pluginId');
     try {

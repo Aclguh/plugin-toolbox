@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -256,6 +258,13 @@ final dynamicColorEnabledProvider =
 
 /// 应用启动时载入已安装的动态插件并进行初始化
 final appInitFutureProvider = FutureProvider<void>((ref) async {
+  // 0. 注入沙箱路径提供者，消除 core 包对 platform channel 的隐式耦合
+  final appDocDir = await getApplicationDocumentsDirectory();
+  final pluginsDir = Directory('${appDocDir.path}/plugins');
+  PluginLoader.defaultPathProvider =
+      DirectoryPathProvider(pluginsDirectory: pluginsDir);
+  PluginInstaller.defaultPathProvider = PluginLoader.defaultPathProvider;
+
   // 1. 应用屏幕旋转偏好（主题与动态取色偏好在 Notifier 构造时已同步载入）
   await ref.read(autoRotateProvider.notifier).init();
 
