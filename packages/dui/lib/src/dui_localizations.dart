@@ -48,6 +48,9 @@ class DuiLocalizations {
   String get confirm => isZh ? '确认' : 'Confirm';
   String get cancel => isZh ? '取消' : 'Cancel';
   String get searchPlaceholder => isZh ? '搜索...' : 'Search...';
+  String componentError(String type, Object error) => isZh
+      ? '组件 [$type] 加载异常: $error'
+      : 'Component [$type] render error: $error';
   String textTruncatedNotice(int displayed, int total) => isZh
       ? '文本过长已截断显示（展示前 $displayed / $total 字符），可通过复制获取全文'
       : 'Text truncated (showing $displayed / $total chars), copy to get full text';

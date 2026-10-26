@@ -90,6 +90,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get emptyToolsPrompt => '暂无已启用工具';
 
   @override
+  String get emptyToolsMessage => '安装插件后即可在此快速打开；长按图标可调整排列顺序。';
+
+  @override
   String get goToStoreToInstall => '去插件商店安装';
 
   @override

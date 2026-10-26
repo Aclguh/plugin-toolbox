@@ -779,6 +779,7 @@ void main() {
     expect(zh.confirm, isNotEmpty);
     expect(zh.searchHint, isNotEmpty);
     expect(zh.emptyToolsPrompt, isNotEmpty);
+    expect(zh.emptyToolsMessage, isNotEmpty);
     expect(zh.goToStoreToInstall, isNotEmpty);
     expect(zh.importLocalPtx, isNotEmpty);
 
@@ -810,6 +811,7 @@ void main() {
     expect(en.confirm, isNotEmpty);
     expect(en.searchHint, isNotEmpty);
     expect(en.emptyToolsPrompt, isNotEmpty);
+    expect(en.emptyToolsMessage, isNotEmpty);
     expect(en.goToStoreToInstall, isNotEmpty);
     expect(en.importLocalPtx, isNotEmpty);
   });

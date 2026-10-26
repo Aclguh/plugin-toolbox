@@ -27,6 +27,7 @@
   "confirm": "Confirm",
   "searchHint": "Search tools...",
   "emptyToolsPrompt": "No enabled tools yet",
+  "emptyToolsMessage": "Install plugins from the store to launch them here. Long-press icons to reorder.",
   "goToStoreToInstall": "Install from Store",
   "importLocalPtx": "Import local .ptx",
   "permissionPromptTitle": "Permission Request",

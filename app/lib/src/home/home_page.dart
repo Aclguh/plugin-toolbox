@@ -64,13 +64,10 @@ class HomePage extends ConsumerWidget {
       body: init.when(
         data: (_) {
           if (plugins.isEmpty) {
-            // 说明性副文案目前仅有中文版本：英文环境下直接省略，
-            // 避免出现中英混排的割裂观感
-            final isZh = Localizations.localeOf(context).languageCode == 'zh';
             return AppEmptyState(
               icon: Icons.dashboard_customize_outlined,
               title: l10n?.emptyToolsPrompt ?? '暂无已启用的插件',
-              message: isZh ? '安装插件后即可在此快速打开；长按图标可调整排列顺序。' : null,
+              message: l10n?.emptyToolsMessage ?? '安装插件后即可在此快速打开；长按图标可调整排列顺序。',
               action: FilledButton.icon(
                 onPressed: () => context.push('/store'),
                 icon: const Icon(Icons.shopping_bag_outlined, size: 18),

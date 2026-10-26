@@ -93,6 +93,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emptyToolsPrompt => 'No enabled tools yet';
 
   @override
+  String get emptyToolsMessage =>
+      'Install plugins from the store to launch them here. Long-press icons to reorder.';
+
+  @override
   String get goToStoreToInstall => 'Install from Store';
 
   @override

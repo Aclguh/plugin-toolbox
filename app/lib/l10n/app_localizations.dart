@@ -260,6 +260,12 @@ abstract class AppLocalizations {
   /// **'暂无已启用工具'**
   String get emptyToolsPrompt;
 
+  /// No description provided for @emptyToolsMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装插件后即可在此快速打开；长按图标可调整排列顺序。'**
+  String get emptyToolsMessage;
+
   /// No description provided for @goToStoreToInstall.
   ///
   /// In zh, this message translates to:

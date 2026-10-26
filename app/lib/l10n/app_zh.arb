@@ -27,6 +27,7 @@
   "confirm": "确认",
   "searchHint": "搜索工具...",
   "emptyToolsPrompt": "暂无已启用工具",
+  "emptyToolsMessage": "安装插件后即可在此快速打开；长按图标可调整排列顺序。",
   "goToStoreToInstall": "去插件商店安装",
   "importLocalPtx": "导入本地 .ptx",
   "permissionPromptTitle": "权限申请提示",

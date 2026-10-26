@@ -60,9 +60,7 @@ class DuiErrorPlaceholder extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              DuiLocalizations.of(context).isZh
-                  ? '组件 [$type] 加载异常: $error'
-                  : 'Component [$type] render error: $error',
+              DuiLocalizations.of(context).componentError(type, error),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: errorColor,
                 height: 1.4,
