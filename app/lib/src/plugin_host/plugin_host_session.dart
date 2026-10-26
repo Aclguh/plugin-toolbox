@@ -60,6 +60,8 @@ abstract class PluginSessionUiHandler {
 class PluginHostSession extends ChangeNotifier
     with PluginHostMediaDelegate, PluginHostSystemDelegate, PluginHostAiDelegate
     implements LuaHostDelegate, DuiActionExecutor {
+  @override
+  bool get isHeadless => false;
   final DynamicPlugin plugin;
   final Map<String, dynamic>? initialData;
   PluginSessionUiHandler? uiHandler;

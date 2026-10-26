@@ -13,6 +13,9 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   String? pickedImageResult;
 
   @override
+  bool get isHeadless => false;
+
+  @override
   void onStateChanged(String key, dynamic value) {
     state[key] = value;
   }

@@ -1,5 +1,8 @@
 import 'dart:async';
 
+/// 无头后台插件会话按需唤醒器函数契约
+typedef HeadlessPluginLauncher = Future<bool> Function(String pluginId);
+
 /// 跨插件互通与服务调用经纪人 (Inter-Plugin Communication Broker)
 ///
 /// 维护各插件注册暴露的公共服务接口，协调插件间的异步 RPC 调用与管道传值，
@@ -26,6 +29,9 @@ class PluginIpcBroker {
 
   final Map<String, _ServiceEntry> _services = {};
   final Map<String, List<DateTime>> _callTimestamps = {};
+
+  /// 可选的无头插件拉起器：当目标服务未注册时，Broker 可尝试按需唤醒目标插件的后台无头会话
+  HeadlessPluginLauncher? headlessLauncher;
 
   /// 注册插件提供的公共服务接口。
   /// 可选指定 [allowedCallers] 白名单集合；为 null 或包含 '*' 表示对所有插件公开。
@@ -81,7 +87,22 @@ class PluginIpcBroker {
     int maxCallsPerSecond = defaultMaxCallsPerSecond,
   }) async {
     final key = '$targetPluginId:$functionName';
-    final entry = _services[key];
+    var entry = _services[key];
+    if (entry == null && headlessLauncher != null) {
+      try {
+        final launched = await headlessLauncher!(targetPluginId);
+        if (launched) {
+          entry = _services[key];
+        }
+      } catch (e) {
+        return {
+          'ok': false,
+          'code': 'HEADLESS_WAKEUP_FAILED',
+          'error': '无头后台插件 [$targetPluginId] 唤醒失败: $e',
+        };
+      }
+    }
+
     if (entry == null) {
       return {
         'ok': false,
@@ -134,5 +155,6 @@ class PluginIpcBroker {
   void reset() {
     _services.clear();
     _callTimestamps.clear();
+    headlessLauncher = null;
   }
 }

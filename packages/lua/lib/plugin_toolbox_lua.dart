@@ -46,3 +46,4 @@ export 'src/api/ipc_api.dart';
 export 'src/api/i18n_api.dart';
 export 'src/api/api_guard.dart';
 export 'src/lua_value_codec.dart';
+export 'src/headless/headless_plugin_session.dart';

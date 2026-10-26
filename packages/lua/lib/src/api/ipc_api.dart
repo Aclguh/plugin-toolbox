@@ -141,6 +141,13 @@ class IpcApi {
     });
     ls.setField(-2, 'open');
 
+    // plugin.isHeadless() -> boolean
+    ls.pushDartFunction((ls) {
+      ls.pushBoolean(delegate.isHeadless);
+      return 1;
+    });
+    ls.setField(-2, 'isHeadless');
+
     // 绑定至全局 plugin
     ls.setGlobal('plugin');
   }

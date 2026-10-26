@@ -373,7 +373,10 @@ abstract class LuaHostDelegate
         LuaMediaDelegate,
         LuaDeviceDelegate,
         LuaAiDelegate,
-        LuaClipboardDelegate {}
+        LuaClipboardDelegate {
+  /// 当前是否处于无头（Headless）后台运行模式（无前台 UI 挂载）
+  bool get isHeadless => false;
+}
 
 /// 复合宿主委托适配器：将分领域的各个子委托组合为单一复合实例
 class CompositeLuaHostDelegate implements LuaHostDelegate {
@@ -392,6 +395,9 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
     this.aiDelegate,
     this.clipboardDelegate,
   });
+
+  @override
+  bool get isHeadless => false;
 
   // State
   @override
@@ -804,3 +810,32 @@ abstract class LuaHostDelegateProxy
         LuaDeviceDelegate,
         LuaAiDelegate,
         LuaClipboardDelegate {}
+
+/// 无头状态委托实现
+class HeadlessStateDelegate implements LuaStateDelegate {
+  final Map<String, dynamic> _states;
+  HeadlessStateDelegate([Map<String, dynamic>? initialStates])
+      : _states = Map.from(initialStates ?? {});
+
+  @override
+  void onStateChanged(String key, dynamic value) => _states[key] = value;
+
+  @override
+  dynamic getState(String key) => _states[key];
+
+  @override
+  Map<String, dynamic> getAllStates() => Map.unmodifiable(_states);
+}
+
+/// 无头（Headless）后台运行模式的宿主委托实现
+///
+/// 继承 CompositeLuaHostDelegate，具备内存状态管理与全套安全的静默兜底。
+class HeadlessLuaHostDelegate extends CompositeLuaHostDelegate {
+  HeadlessLuaHostDelegate({Map<String, dynamic>? initialStates})
+      : super(
+          stateDelegate: HeadlessStateDelegate(initialStates),
+        );
+
+  @override
+  bool get isHeadless => true;
+}
