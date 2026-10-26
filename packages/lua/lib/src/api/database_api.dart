@@ -63,7 +63,12 @@ class DatabaseApi {
     final dbFile = File('${rootDir.path}/plugin_data.db');
     final dbEngine = databaseFactory != null
         ? databaseFactory!(dbFile)
-        : SandboxDatabaseEngine(dbFile: dbFile);
+        : SandboxDatabaseEngine(
+            dbFile: dbFile,
+            eventBus: context.eventBus,
+            logger: context.logger,
+            pluginId: context.pluginId,
+          );
     _engine = dbEngine;
 
     // db.execute(sql [, paramsList | callback, callback])

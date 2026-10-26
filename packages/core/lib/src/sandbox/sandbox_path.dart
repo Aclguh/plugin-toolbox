@@ -89,6 +89,13 @@ class SandboxPath {
     return lowerTarget == lowerBase || lowerTarget.startsWith('$lowerBase/');
   }
 
+  /// 校验归档文件条目是否为符号链接 (Symbolic Link)，避免软链逃逸攻击
+  static bool isSymbolicLinkEntry(bool isSymLink, int mode) {
+    if (isSymLink) return true;
+    // Unix file mode 中的 S_IFLNK (0120000 / 0xA000)
+    return (mode & 0xF000) == 0xA000;
+  }
+
   /// 校验字节序列是否为预编译的 Lua 二进制字节码（以 \x1bLua 魔数开头）
   static bool isLuaBytecode(List<int> bytes) {
     if (bytes.length < 4) return false;

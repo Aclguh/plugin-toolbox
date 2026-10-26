@@ -8,21 +8,36 @@ import 'plugin_database.dart';
 ///
 /// 以单 JSON 文件承载全部表数据，写操作经串行操作队列排队执行，
 /// 脏数据防抖合并落盘；作为 [PluginDatabase] 默认的开箱即用轻量实现。
+import 'package:logger/logger.dart';
+import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
+
 class SandboxDatabaseEngine implements PluginDatabase {
   final File dbFile;
+  final EventBus? eventBus;
+  final Logger? logger;
+  final String? pluginId;
+
   Map<String, List<Map<String, dynamic>>> _tables = {};
   Future<void>? _loadFuture;
   Future<dynamic> _opQueue = Future.value();
   bool _isDirty = false;
   Timer? _debounceTimer;
 
-  SandboxDatabaseEngine({required this.dbFile});
+  SandboxDatabaseEngine({
+    required this.dbFile,
+    this.eventBus,
+    this.logger,
+    this.pluginId,
+  });
 
   Future<void> _ensureLoaded() {
     return _loadFuture ??= _doLoad();
   }
 
   Future<void> _doLoad() async {
+    Object? primaryError;
+    final tag = pluginId != null ? '[$pluginId]' : '[Database]';
+
     if (await dbFile.exists()) {
       try {
         final content = await dbFile.readAsString();
@@ -36,8 +51,10 @@ class SandboxDatabaseEngine implements PluginDatabase {
               ));
           return;
         }
-      } catch (_) {
-        // 主文件损坏，尝试从备份恢复
+        primaryError = const FormatException('数据库文件根节点不是有效 Map');
+      } catch (e, st) {
+        primaryError = e;
+        logger?.w('$tag 数据库主文件损坏: ${dbFile.path}', error: e, stackTrace: st);
       }
     }
 
@@ -53,10 +70,31 @@ class SandboxDatabaseEngine implements PluginDatabase {
                     .map((item) => Map<String, dynamic>.from(item as Map))
                     .toList(),
               ));
+          logger?.i('$tag 成功从备份恢复数据库: ${bakFile.path}');
+          eventBus?.fire(StorageCorruptionEvent(
+            namespace: pluginId ?? 'database',
+            filePath: dbFile.path,
+            reason: '主数据库损坏 ($primaryError)，已从备份恢复',
+            recoveredFromBackup: true,
+          ));
           return;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        logger?.w('$tag 数据库备份文件解析失败: ${bakFile.path}',
+            error: e, stackTrace: st);
+      }
     }
+
+    if (primaryError != null) {
+      logger?.e('$tag 数据库主文件与备份均已损坏，正在重置为空库: ${dbFile.path}');
+      eventBus?.fire(StorageCorruptionEvent(
+        namespace: pluginId ?? 'database',
+        filePath: dbFile.path,
+        reason: '数据库主文件与全部备份损坏且无法恢复 ($primaryError)，已重置为空',
+        recoveredFromBackup: false,
+      ));
+    }
+
     _tables = {};
   }
 

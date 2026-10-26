@@ -143,6 +143,10 @@ class PluginInstaller {
         if (!SandboxPath.isSafeRelativeEntry(filename)) {
           throw FormatException('检测到非法的包内相对路径: $filename');
         }
+        if (SandboxPath.isSymbolicLinkEntry(file.isSymbolicLink, file.mode)) {
+          throw FormatException(
+              '安全策略拦截: 安装包禁止包含符号链接 (Symbolic Link): $filename');
+        }
         if (file.isFile) {
           if (file.size > 0 &&
               totalExtractedBytes + file.size > maxUncompressedSizeBytes) {

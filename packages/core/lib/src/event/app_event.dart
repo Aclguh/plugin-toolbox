@@ -44,3 +44,22 @@ class PluginStateChangedEvent extends AppEvent {
   @override
   List<Object?> get props => [pluginId, isEnabled];
 }
+
+/// 存储介质或持久化数据损坏告警事件
+class StorageCorruptionEvent extends AppEvent {
+  final String namespace;
+  final String filePath;
+  final String reason;
+  final bool recoveredFromBackup;
+
+  StorageCorruptionEvent({
+    required this.namespace,
+    required this.filePath,
+    required this.reason,
+    required this.recoveredFromBackup,
+    super.timestamp,
+  });
+
+  @override
+  List<Object?> get props => [namespace, filePath, reason, recoveredFromBackup];
+}

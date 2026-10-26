@@ -47,7 +47,7 @@ jobs:
         run: melos run test:coverage
 
       - name: Coverage threshold gate check
-        run: dart run tool/check_coverage.dart --min-coverage 70 --require-all
+        run: dart run tool/check_coverage.dart --min-coverage 80 --require-all
 
       - name: Debug APK build smoke (app)
         working-directory: app

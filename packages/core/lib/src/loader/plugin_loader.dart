@@ -32,40 +32,39 @@ class PluginLoader {
       return [];
     }
 
-    final loadedList = <DynamicPlugin>[];
     // 启动路径使用异步流式列举，避免插件较多时 listSync 阻塞主线程
     final entities = await pluginsBaseDir.list().toList();
 
-    for (final entity in entities) {
-      if (entity is Directory) {
-        final dirName = entity.path.split(RegExp(r'[\\/]')).last;
-        // 跳过 `.` 前缀的隐藏目录：安装器的暂存/备份目录（.<id>.staging /
-        // .<id>.backup）与目标目录同父级，崩溃残留不得被误当插件重复加载
-        if (dirName.startsWith('.')) {
-          continue;
-        }
-        final manifestFile = File('${entity.path}/plugin.json');
-        if (await manifestFile.exists()) {
-          try {
-            final content = await manifestFile.readAsString();
-            final manifest = PluginManifest.fromJson(
-              json.decode(content) as Map<String, dynamic>,
-            );
-            loadedList.add(DynamicPlugin(
-              manifest: manifest,
-              rootDir: entity,
-            ));
-          } catch (e, st) {
-            effectiveLogger.w(
-              '跳过损坏的插件目录: ${entity.path}',
-              error: e,
-              stackTrace: st,
-            );
-          }
-        }
-      }
-    }
+    // 筛选合法的插件子目录（排除安装器暂存/备份的隐藏目录）
+    final pluginDirs = entities.whereType<Directory>().where((d) {
+      final dirName = d.path.split(RegExp(r'[\\/]')).last;
+      return !dirName.startsWith('.');
+    }).toList();
 
-    return loadedList;
+    // 并行异步并发读取与解析各个插件清单，提升冷启动并发性能
+    final loadTasks = pluginDirs.map((dir) async {
+      final manifestFile = File('${dir.path}/plugin.json');
+      if (!await manifestFile.exists()) return null;
+      try {
+        final content = await manifestFile.readAsString();
+        final manifest = PluginManifest.fromJson(
+          json.decode(content) as Map<String, dynamic>,
+        );
+        return DynamicPlugin(
+          manifest: manifest,
+          rootDir: dir,
+        );
+      } catch (e, st) {
+        effectiveLogger.w(
+          '跳过损坏的插件目录: ${dir.path}',
+          error: e,
+          stackTrace: st,
+        );
+        return null;
+      }
+    });
+
+    final results = await Future.wait(loadTasks);
+    return results.whereType<DynamicPlugin>().toList();
   }
 }

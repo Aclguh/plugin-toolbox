@@ -747,5 +747,65 @@ void main() {
           PluginFileStorageImpl(namespace: 'backup_ns', rootDir: tempDir);
       expect(await recoveryStorage.getString('safe_key'), 'safe_value');
     });
+
+    Future<void> waitFor(
+      bool Function() condition, {
+      int maxTries = 40,
+      int stepMs = 25,
+    }) async {
+      for (var i = 0; i < maxTries; i++) {
+        if (condition()) return;
+        await Future<void>.delayed(Duration(milliseconds: stepMs));
+      }
+    }
+
+    test('PluginFileStorageImpl 损坏恢复与重置时广播 StorageCorruptionEvent', () async {
+      final bus = EventBusImpl();
+      final events = <StorageCorruptionEvent>[];
+      final sub = bus.on<StorageCorruptionEvent>().listen(events.add);
+
+      final storage = PluginFileStorageImpl(
+        namespace: 'event_ns',
+        rootDir: tempDir,
+        eventBus: bus,
+      );
+      await storage.setString('k1', 'v1');
+      await storage.setString('k2', 'v2');
+
+      final mainFile = File('${tempDir.path}/storage.json');
+      final bakFile = File('${tempDir.path}/storage.json.bak');
+      await mainFile.writeAsString('corrupted', flush: true);
+
+      // 读取触发从 .bak 恢复
+      final recStorage = PluginFileStorageImpl(
+        namespace: 'event_ns',
+        rootDir: tempDir,
+        eventBus: bus,
+      );
+      expect(await recStorage.getString('k1'), 'v1');
+      await waitFor(() => events.isNotEmpty);
+      expect(events.isNotEmpty, isTrue);
+      expect(events.last.recoveredFromBackup, isTrue);
+
+      // 破坏 .bak 与 .tmp
+      await bakFile.writeAsString('corrupted_bak', flush: true);
+      final emptyStorage = PluginFileStorageImpl(
+        namespace: 'event_ns',
+        rootDir: tempDir,
+        eventBus: bus,
+      );
+      expect(await emptyStorage.getString('k1'), isNull);
+      await waitFor(() => events.any((e) => !e.recoveredFromBackup));
+      expect(events.last.recoveredFromBackup, isFalse);
+
+      await sub.cancel();
+      bus.dispose();
+    });
+
+    test('SandboxPath.isSymbolicLinkEntry 正确检测符号链接条目', () {
+      expect(SandboxPath.isSymbolicLinkEntry(true, 0), isTrue);
+      expect(SandboxPath.isSymbolicLinkEntry(false, 0xA1FF), isTrue);
+      expect(SandboxPath.isSymbolicLinkEntry(false, 0x81FF), isFalse);
+    });
   });
 }

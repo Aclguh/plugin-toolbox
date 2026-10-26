@@ -2,7 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../event/app_event.dart';
+import '../event/event_bus.dart';
 
 /// 插件沙箱持久化存储抽象接口
 abstract class PluginStorage {
@@ -64,29 +68,41 @@ abstract class PluginStorage {
 /// 1. 实现存储物理隔离，各插件存储文件存放在其沙箱根目录下，与沙箱同生共死；
 /// 2. 插件卸载或清理沙箱时随目录一并清除，杜绝全局 Key 污染；
 /// 3. 支持透明迁移旧版存放在 SharedPreferences 中的遗留数据；
-/// 4. 支持 50ms 脏写合并防抖（Debounce），避免连续写入引发频繁磁盘 I/O。
+/// 4. 支持 50ms 脏写合并防抖（Debounce），避免连续写入引发频繁磁盘 I/O；
+/// 5. 具备异常诊断日志上报与备份恢复告警机制，杜绝数据静默丢失。
 class PluginFileStorageImpl implements PluginStorage {
   final String namespace;
   final Directory rootDir;
   final String fileName;
   final Duration debounceDuration;
+  final EventBus? eventBus;
+  final Logger? logger;
 
   PluginFileStorageImpl({
     required this.namespace,
     required this.rootDir,
     this.fileName = 'storage.json',
     this.debounceDuration = const Duration(milliseconds: 50),
+    this.eventBus,
+    this.logger,
   });
 
   File get _file => File('${rootDir.path}/$fileName');
   Map<String, dynamic>? _data;
+  Future<void>? _loadFuture;
   Future<void> _writeQueue = Future.value();
   Timer? _debounceTimer;
   final List<Completer<bool>> _pendingCompleters = [];
   bool _isDirty = false;
 
-  Future<void> _ensureLoaded() async {
+  Future<void> _ensureLoaded() {
+    return _loadFuture ??= _doLoad();
+  }
+
+  Future<void> _doLoad() async {
     if (_data != null) return;
+    Object? primaryError;
+
     if (_file.existsSync()) {
       try {
         final content = await _file.readAsString();
@@ -95,7 +111,15 @@ class PluginFileStorageImpl implements PluginStorage {
           _data = decoded;
           return;
         }
-      } catch (_) {}
+        primaryError = const FormatException('storage.json 根节点不是 Map 对象');
+      } catch (e, st) {
+        primaryError = e;
+        logger?.w(
+          '[$namespace] 主存储文件读取或解析失败: ${_file.path}',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
 
     final bakFile = File('${_file.path}.bak');
@@ -105,9 +129,22 @@ class PluginFileStorageImpl implements PluginStorage {
         final decoded = jsonDecode(content);
         if (decoded is Map<String, dynamic>) {
           _data = decoded;
+          logger?.i('[$namespace] 成功从备份文件恢复存储数据: ${bakFile.path}');
+          eventBus?.fire(StorageCorruptionEvent(
+            namespace: namespace,
+            filePath: _file.path,
+            reason: '主存储文件损坏或格式无效 (${primaryError ?? '未知原因'})，已自动从 .bak 备份恢复',
+            recoveredFromBackup: true,
+          ));
           return;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        logger?.w(
+          '[$namespace] 备份文件解析失败: ${bakFile.path}',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
 
     final tmpFile = File('${_file.path}.tmp');
@@ -117,9 +154,32 @@ class PluginFileStorageImpl implements PluginStorage {
         final decoded = jsonDecode(content);
         if (decoded is Map<String, dynamic>) {
           _data = decoded;
+          logger?.i('[$namespace] 成功从未完成写入的临时文件恢复存储数据: ${tmpFile.path}');
+          eventBus?.fire(StorageCorruptionEvent(
+            namespace: namespace,
+            filePath: _file.path,
+            reason: '主存储文件与备份均不可用，已尝试从 .tmp 临时文件恢复',
+            recoveredFromBackup: true,
+          ));
           return;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        logger?.w(
+          '[$namespace] 临时文件解析失败: ${tmpFile.path}',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+
+    if (primaryError != null) {
+      logger?.e('[$namespace] 存储文件及其全部备份均已损坏，正在重置为空状态: ${_file.path}');
+      eventBus?.fire(StorageCorruptionEvent(
+        namespace: namespace,
+        filePath: _file.path,
+        reason: '主存储文件与全部备份损坏且无法恢复 ($primaryError)，已重置为空',
+        recoveredFromBackup: false,
+      ));
     }
 
     _data = <String, dynamic>{};
@@ -138,7 +198,13 @@ class PluginFileStorageImpl implements PluginStorage {
         }
         await _save(immediate: true);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      logger?.w(
+        '[$namespace] 从 SharedPreferences 迁移遗留数据发生异常',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   Future<bool> _save({bool immediate = false}) {
@@ -171,7 +237,8 @@ class PluginFileStorageImpl implements PluginStorage {
       for (final c in completers) {
         if (!c.isCompleted) c.complete(ok);
       }
-    }).catchError((Object _) {
+    }).catchError((Object e, StackTrace st) {
+      logger?.e('[$namespace] 异步刷盘队列执行失败', error: e, stackTrace: st);
       for (final c in completers) {
         if (!c.isCompleted) c.complete(false);
       }
@@ -206,7 +273,12 @@ class PluginFileStorageImpl implements PluginStorage {
 
       await tmpFile.rename(_file.path);
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      logger?.w(
+        '[$namespace] 存储文件写入或原子替换失败: ${_file.path}',
+        error: e,
+        stackTrace: st,
+      );
       return false;
     }
   }
@@ -451,8 +523,11 @@ class PluginStorageImpl implements PluginStorage {
 
 /// 插件持久化存储工厂，负责按插件 ID 实例化隔离的 [PluginStorage] 并维护进程内实例池
 class PluginStorageFactory {
+  final EventBus? eventBus;
+  final Logger? logger;
+
   /// 创建存储工厂实例
-  const PluginStorageFactory();
+  const PluginStorageFactory({this.eventBus, this.logger});
 
   /// 进程内实例缓存池（key 为 "file:${rootDir.path}" 或 "prefs:$pluginId"）
   static final Map<String, PluginStorage> _instances = {};
@@ -475,7 +550,12 @@ class PluginStorageFactory {
     final key = _cacheKey(pluginId, rootDir);
     return _instances.putIfAbsent(key, () {
       if (rootDir != null) {
-        return PluginFileStorageImpl(namespace: pluginId, rootDir: rootDir);
+        return PluginFileStorageImpl(
+          namespace: pluginId,
+          rootDir: rootDir,
+          eventBus: eventBus,
+          logger: logger,
+        );
       }
       return PluginStorageImpl(namespace: pluginId);
     });
