@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../storage/shared_preferences_store.dart';
 
 /// 统一注入的 SharedPreferences：在 main() 中初始化一次，
 /// 各 Notifier 不再各自 await getInstance()，测试中以 override 注入 mock
@@ -21,7 +22,10 @@ final eventBusProvider = Provider<EventBus>((ref) {
 });
 
 final storageFactoryProvider = Provider<PluginStorageFactory>((ref) {
-  return const PluginStorageFactory();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return PluginStorageFactory(
+    defaultStore: SharedPreferencesKeyValueStore(prefs),
+  );
 });
 
 /// SharedPreferences 读取的安全容空包装：存储故障时降级为默认值，绝不崩溃

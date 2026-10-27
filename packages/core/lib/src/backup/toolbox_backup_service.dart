@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../storage/key_value_store.dart';
 import '../model/plugin_manifest.dart';
 import '../model/plugin_permission.dart';
 import '../plugin/dynamic_plugin.dart';
@@ -232,7 +232,7 @@ class ToolboxBackupService {
     required Directory pluginsDirectory,
     bool restoreStorage = true,
     bool overwrite = true,
-    SharedPreferences? prefs,
+    KeyValueStore? prefs,
     PluginRegistry? registry,
   }) async {
     if (zipBytes.length > maxBackupFileSizeBytes) {

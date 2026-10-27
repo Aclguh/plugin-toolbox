@@ -2,20 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/test.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
   late Directory tempDir;
   late List<int> authorSeed;
   late List<int> authorPublicKey;
   late String authorPublicKeyHex;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
     tempDir = await Directory.systemTemp.createTemp('sig_test_');
 
     final (seed, pk) = Ed25519.generateKeyPair();

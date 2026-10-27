@@ -3,10 +3,10 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// 测试环境使用 MemoryKeyValueStore 替身
 
 /// 测试统一锚定的发布标签（生产禁用分支名，规避 jsDelivr 分支强缓存）
 const testRef = 'v1.0.0';
@@ -218,9 +218,9 @@ PluginStoreEntry entryWith({
     );
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  // 纯 Dart 单元测试环境初始化
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  // 消除 SharedPreferences mock 依赖
 
   group('PluginStoreSemantics 版本比较与安装态判定', () {
     test('标准三段的版本号比较', () {
@@ -375,7 +375,7 @@ void main() {
 
     test('第二次刷新命中缓存, 只剩清单接口 1 次请求', () async {
       final httpClient = buildFakeCdn();
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = MemoryKeyValueStore();
       final source = JsDelivrPluginStoreSource(
         owner: 'owner',
         repository: 'repo',
@@ -406,7 +406,7 @@ void main() {
     });
 
     test('清单缓存损坏时静默降级为全量拉取', () async {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = MemoryKeyValueStore();
       await prefs.setString(
           'plugin_store_cache_owner_repo_$testRef', 'not-json{{{');
 

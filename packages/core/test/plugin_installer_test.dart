@@ -5,14 +5,11 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:archive/archive.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/test.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
   setUpAll(() {
     PluginInstaller.defaultPathProvider = DirectoryPathProvider(
       pluginsDirectory: Directory('./plugins'),
@@ -325,7 +322,6 @@ void main() {
     });
 
     test('uninstall 清理沙箱目录与持久化存储数据', () async {
-      SharedPreferences.setMockInitialValues({});
       final file = await writeTempPtx(buildPtx(validEntries()));
       final plugin = await PluginInstaller.installFromPtx(file);
       expect(plugin.rootDir.existsSync(), isTrue);

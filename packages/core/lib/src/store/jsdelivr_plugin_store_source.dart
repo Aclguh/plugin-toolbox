@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../storage/key_value_store.dart';
 
 import 'plugin_package_inspection.dart';
 import 'plugin_store_entry.dart';
@@ -59,7 +59,7 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
     this.maxConcurrentRequests = 8,
     this.requestTimeout = const Duration(seconds: 20),
     http.Client? httpClient,
-    SharedPreferences? preferences,
+    KeyValueStore? preferences,
   })  : _http = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _preferences = preferences;
@@ -90,7 +90,7 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
 
   final http.Client _http;
   final bool _ownsHttpClient;
-  final SharedPreferences? _preferences;
+  final KeyValueStore? _preferences;
 
   /// 进程内清单缓存（内容哈希 -> 清单），避免同一次会话内重复拉取
   final Map<String, Map<String, dynamic>> _manifestCache = {};
@@ -115,7 +115,7 @@ class JsDelivrPluginStoreSource implements PluginStoreSource {
     required String repository,
     required String fallbackRef,
     http.Client? client,
-    SharedPreferences? preferences,
+    KeyValueStore? preferences,
     Duration timeout = const Duration(seconds: 5),
   }) async {
     final httpClient = client ?? http.Client();

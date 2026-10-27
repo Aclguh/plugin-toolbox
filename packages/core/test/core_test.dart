@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// 纯 Dart 单元测试环境
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  // 纯 Dart 单元测试初始化
   setUpAll(() {
     PluginInstaller.defaultPathProvider = DirectoryPathProvider(
       pluginsDirectory: Directory('./plugins'),
@@ -612,7 +612,6 @@ void main() {
     late Directory tempDir;
 
     setUp(() {
-      SharedPreferences.setMockInitialValues({});
       tempDir = Directory.systemTemp.createTempSync('ptx_storage_test_');
     });
 
@@ -687,14 +686,17 @@ void main() {
       expect(storageFile.existsSync(), isFalse);
     });
 
-    test('PluginFileStorageImpl 支持平滑迁移旧版 SharedPreferences 遗留数据', () async {
-      SharedPreferences.setMockInitialValues({
+    test('PluginFileStorageImpl 支持平滑迁移旧版 KeyValueStore 遗留数据', () async {
+      final legacyStore = MemoryKeyValueStore({
         'plugin.mig_ns.legacy_text': 'migrated_val',
         'plugin.other_ns.unrelated': 'should_ignore',
       });
 
-      final storage =
-          PluginFileStorageImpl(namespace: 'mig_ns', rootDir: tempDir);
+      final storage = PluginFileStorageImpl(
+        namespace: 'mig_ns',
+        rootDir: tempDir,
+        legacyStore: legacyStore,
+      );
       expect(await storage.getString('legacy_text'), 'migrated_val');
       expect(await storage.getString('unrelated'), isNull);
 

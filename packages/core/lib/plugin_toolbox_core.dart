@@ -27,6 +27,7 @@ export 'src/store/plugin_repository_config.dart';
 export 'src/event/event_bus.dart';
 export 'src/event/app_event.dart';
 export 'src/storage/plugin_storage.dart';
+export 'src/storage/key_value_store.dart';
 export 'src/permission/permission_manager.dart';
 
 // 沙箱安全与签名

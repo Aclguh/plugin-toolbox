@@ -1,18 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// 使用 MemoryKeyValueStore 替身
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  // 纯 Dart 单元测试环境初始化
 
   late Directory tempDir;
   late Directory pluginsDir;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    // 消除 mock 残留
     tempDir = await Directory.systemTemp.createTemp('toolbox_backup_test_');
     pluginsDir = Directory('${tempDir.path}/plugins');
     await pluginsDir.create(recursive: true);
@@ -123,7 +123,7 @@ void main() {
       await originalPluginDir.delete(recursive: true);
       expect(originalPluginDir.existsSync(), isFalse);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = MemoryKeyValueStore();
       final registry = PluginRegistry(
         eventBus: EventBusImpl(),
         storageFactory: const PluginStorageFactory(),

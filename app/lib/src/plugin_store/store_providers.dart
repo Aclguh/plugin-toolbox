@@ -3,6 +3,7 @@ import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/app_providers.dart';
+import '../storage/shared_preferences_store.dart';
 import 'store_service.dart';
 
 /// 插件商店的远端仓库坐标。
@@ -27,7 +28,7 @@ final pluginStoreResolvedRefProvider = FutureProvider<String>((ref) async {
     owner: repoConfig.owner,
     repository: repoConfig.repository,
     fallbackRef: repoConfig.isDefault ? kPluginStoreFallbackRef : 'HEAD',
-    preferences: prefs,
+    preferences: SharedPreferencesKeyValueStore(prefs),
   );
 });
 
@@ -159,7 +160,8 @@ final pluginStoreServiceProvider = Provider<PluginStoreService>((ref) {
     ref: resolvedRef,
     // 借用已注入的 SharedPreferences 缓存清单：源码未变化的插件刷新时
     // 不再重复下载 plugin.json，把一次刷新的请求数压到接近 1 次
-    preferences: ref.watch(sharedPreferencesProvider),
+    preferences:
+        SharedPreferencesKeyValueStore(ref.watch(sharedPreferencesProvider)),
   );
   ref.onDispose(client.close);
   return PluginStoreService(source: client);

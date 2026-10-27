@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../event/app_event.dart';
 import '../event/event_bus.dart';
+import 'key_value_store.dart';
 
 /// 插件沙箱持久化存储抽象接口
 abstract class PluginStorage {
@@ -77,6 +77,7 @@ class PluginFileStorageImpl implements PluginStorage {
   final Duration debounceDuration;
   final EventBus? eventBus;
   final Logger? logger;
+  final KeyValueStore? legacyStore;
 
   PluginFileStorageImpl({
     required this.namespace,
@@ -85,6 +86,7 @@ class PluginFileStorageImpl implements PluginStorage {
     this.debounceDuration = const Duration(milliseconds: 50),
     this.eventBus,
     this.logger,
+    this.legacyStore,
   });
 
   File get _file => File('${rootDir.path}/$fileName');
@@ -183,27 +185,33 @@ class PluginFileStorageImpl implements PluginStorage {
     }
 
     _data = <String, dynamic>{};
-    // 首次加载且无本地 storage.json 时，尝试平滑迁移 SharedPreferences 遗留数据
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final prefix = 'plugin.$namespace.';
-      final keys = prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
-      if (keys.isNotEmpty) {
-        for (final k in keys) {
-          final stripped = k.substring(prefix.length);
-          final val = prefs.get(k);
-          if (val != null) {
-            _data![stripped] = val;
+    // 首次加载且无本地 storage.json 时，若提供了 legacyStore，尝试平滑迁移遗留数据
+    if (legacyStore != null) {
+      try {
+        final prefix = 'plugin.$namespace.';
+        final legacyKeys =
+            legacyStore!.getKeys().where((k) => k.startsWith(prefix)).toList();
+        if (legacyKeys.isNotEmpty) {
+          for (final k in legacyKeys) {
+            final stripped = k.substring(prefix.length);
+            final val = legacyStore!.getString(k) ??
+                legacyStore!.getBool(k) ??
+                legacyStore!.getInt(k) ??
+                legacyStore!.getDouble(k) ??
+                legacyStore!.getStringList(k);
+            if (val != null) {
+              _data![stripped] = val;
+            }
           }
+          await _save(immediate: true);
         }
-        await _save(immediate: true);
+      } catch (e, st) {
+        logger?.w(
+          '[$namespace] 从遗留 KeyValueStore 迁移数据发生异常',
+          error: e,
+          stackTrace: st,
+        );
       }
-    } catch (e, st) {
-      logger?.w(
-        '[$namespace] 从 SharedPreferences 迁移遗留数据发生异常',
-        error: e,
-        stackTrace: st,
-      );
     }
   }
 
@@ -413,76 +421,86 @@ class PluginFileStorageImpl implements PluginStorage {
       }
     } catch (_) {}
 
-    // 清理可能存在的旧 SharedPreferences 遗留数据
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final prefix = 'plugin.$namespace.';
-      final keys = prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
-      for (final k in keys) {
-        await prefs.remove(k);
-      }
-    } catch (_) {}
+    // 清理可能存在的旧遗留数据
+    if (legacyStore != null) {
+      try {
+        final prefix = 'plugin.$namespace.';
+        final keys =
+            legacyStore!.getKeys().where((k) => k.startsWith(prefix)).toList();
+        for (final k in keys) {
+          await legacyStore!.remove(k);
+        }
+      } catch (_) {}
+    }
     return true;
   }
 }
 
 class PluginStorageImpl implements PluginStorage {
   final String namespace;
+  final KeyValueStore _store;
 
-  PluginStorageImpl({required this.namespace});
+  PluginStorageImpl({required this.namespace, KeyValueStore? store})
+      : _store = store ?? MemoryKeyValueStore();
 
   String _key(String key) => 'plugin.$namespace.$key';
-
-  Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   @override
   Future<bool> flush() async => true;
 
   @override
-  Future<String?> getString(String key) async =>
-      (await _prefs).getString(_key(key));
+  Future<String?> getString(String key) async => _store.getString(_key(key));
 
   @override
-  Future<bool> setString(String key, String value) async =>
-      (await _prefs).setString(_key(key), value);
+  Future<bool> setString(String key, String value) =>
+      _store.setString(_key(key), value);
 
   @override
-  Future<bool?> getBool(String key) async => (await _prefs).getBool(_key(key));
+  Future<bool?> getBool(String key) async => _store.getBool(_key(key));
 
   @override
-  Future<bool> setBool(String key, bool value) async =>
-      (await _prefs).setBool(_key(key), value);
+  Future<bool> setBool(String key, bool value) =>
+      _store.setBool(_key(key), value);
 
   @override
-  Future<int?> getInt(String key) async => (await _prefs).getInt(_key(key));
+  Future<int?> getInt(String key) async => _store.getInt(_key(key));
 
   @override
-  Future<bool> setInt(String key, int value) async =>
-      (await _prefs).setInt(_key(key), value);
+  Future<bool> setInt(String key, int value) => _store.setInt(_key(key), value);
 
   @override
-  Future<double?> getDouble(String key) async =>
-      (await _prefs).getDouble(_key(key));
+  Future<double?> getDouble(String key) async => _store.getDouble(_key(key));
 
   @override
-  Future<bool> setDouble(String key, double value) async =>
-      (await _prefs).setDouble(_key(key), value);
+  Future<bool> setDouble(String key, double value) =>
+      _store.setDouble(_key(key), value);
 
   @override
   Future<List<String>?> getStringList(String key) async =>
-      (await _prefs).getStringList(_key(key));
+      _store.getStringList(_key(key));
 
   @override
-  Future<bool> setStringList(String key, List<String> value) async =>
-      (await _prefs).setStringList(_key(key), value);
+  Future<bool> setStringList(String key, List<String> value) =>
+      _store.setStringList(_key(key), value);
 
   @override
-  Future<bool> remove(String key) async => (await _prefs).remove(_key(key));
+  Future<bool> remove(String key) => _store.remove(_key(key));
 
   @override
   Future<dynamic> getValue(String key) async {
-    final prefs = await _prefs;
-    return prefs.get(_key(key));
+    final k = _key(key);
+    final s = _store.getString(k);
+    if (s != null) {
+      try {
+        return jsonDecode(s);
+      } catch (_) {
+        return s;
+      }
+    }
+    return _store.getBool(k) ??
+        _store.getInt(k) ??
+        _store.getDouble(k) ??
+        _store.getStringList(k);
   }
 
   @override
@@ -502,20 +520,12 @@ class PluginStorageImpl implements PluginStorage {
   Future<bool> set(String key, dynamic value) => setValue(key, value);
 
   /// 清除该插件命名空间下的所有持久化键值。
-  ///
-  /// 【性能特征与架构演进说明】
-  /// 当前实现针对 SharedPreferences 全局键集合进行 O(N) 前缀过滤并逐项移除。
-  /// 在通用移动应用场景下（全局持久化键数通常在数百以内），该操作耗时为毫秒级且仅在卸载/清理时低频调用。
-  /// 规划路径：
-  /// - 中期：在插件写入时同步维护命名空间内部键索引集合，清理时直接按索引批量删除。
-  /// - 长期：随着插件生态丰富，可按需平滑迁移至独立 Box/Collection 隔离的轻量嵌入式存储（如 Hive / Isar）。
   @override
   Future<bool> clear() async {
-    final prefs = await _prefs;
     final prefix = 'plugin.$namespace.';
-    final keys = prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
+    final keys = _store.getKeys().where((k) => k.startsWith(prefix)).toList();
     for (final k in keys) {
-      await prefs.remove(k);
+      await _store.remove(k);
     }
     return true;
   }
@@ -525,9 +535,19 @@ class PluginStorageImpl implements PluginStorage {
 class PluginStorageFactory {
   final EventBus? eventBus;
   final Logger? logger;
+  final KeyValueStore? defaultStore;
 
   /// 创建存储工厂实例
-  const PluginStorageFactory({this.eventBus, this.logger});
+  const PluginStorageFactory({
+    this.eventBus,
+    this.logger,
+    this.defaultStore,
+  });
+
+  /// 默认共享内存键值存储实例，用于未提供 defaultStore 时的进程内全局兜底
+  static final KeyValueStore _sharedMemoryStore = MemoryKeyValueStore();
+
+  KeyValueStore get _effectiveStore => defaultStore ?? _sharedMemoryStore;
 
   /// 进程内实例缓存池（key 为 "file:${rootDir.path}" 或 "prefs:$pluginId"）
   static final Map<String, PluginStorage> _instances = {};
@@ -542,7 +562,7 @@ class PluginStorageFactory {
   /// 为指定插件 [pluginId] 创建或获取命名空间隔离的持久化存储对象。
   ///
   /// 若提供沙箱根目录 [rootDir]，则使用插件沙箱内的独立 `storage.json` 文件进行持久化存储；
-  /// 未提供时回退至共享的 `SharedPreferences` 命名空间存储。
+  /// 未提供时回退至基于 [defaultStore] 的命名空间存储。
   ///
   /// 【实例池化保障】：同一命名空间及沙箱路径在进程生命周期内共享同一单例实例，
   /// 彻底消除多处创建 Storage 导致的内存 `_data` 脏写覆盖与异步写入竞争。
@@ -555,9 +575,13 @@ class PluginStorageFactory {
           rootDir: rootDir,
           eventBus: eventBus,
           logger: logger,
+          legacyStore: _effectiveStore,
         );
       }
-      return PluginStorageImpl(namespace: pluginId);
+      return PluginStorageImpl(
+        namespace: pluginId,
+        store: _effectiveStore,
+      );
     });
   }
 
@@ -573,5 +597,6 @@ class PluginStorageFactory {
   /// 清空所有池化实例缓存（主要供测试重置环境使用）
   static void clearPool() {
     _instances.clear();
+    _sharedMemoryStore.clear();
   }
 }

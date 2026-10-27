@@ -1,17 +1,13 @@
 import 'dart:io';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/test.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
   late Directory tempDir;
   late PluginContext context;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
     tempDir = await Directory.systemTemp.createTemp('diag_test_');
 
     context = PluginContext(

@@ -1,6 +1,6 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// KeyValueStore 持久化契约验证
 
 /// PluginListController 的直接单元测试。
 ///
@@ -9,11 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 本文件同时验证该跨层契约：控制器的 order 输出经宿主键存取后可被
 /// loadOrder 无损还原，且损坏数据不会导致崩溃。
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  late KeyValueStore prefs;
 
   const orderKey = 'plugin_toolbox_plugin_order';
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() => prefs = MemoryKeyValueStore());
 
   group('loadOrder 载入语义', () {
     test('未知 ID 被忽略，未覆盖的已知插件按注册顺序追加尾部', () {
@@ -175,7 +175,7 @@ void main() {
 
   group('持久化契约（SharedPreferences 键 plugin_toolbox_plugin_order）', () {
     test('排序经宿主键保存后可被无损还原', () async {
-      final prefs = await SharedPreferences.getInstance();
+      // 使用内存 prefs
       final controller = PluginListController();
       controller.loadOrder({'a', 'b', 'c', 'd'}, const []);
       controller.reorder(3, 0); // d a b c
@@ -190,7 +190,7 @@ void main() {
     });
 
     test('双向重排结果持久化后两处恢复顺序一致', () async {
-      final prefs = await SharedPreferences.getInstance();
+      // 使用内存 prefs
       final controller = PluginListController();
       controller.loadOrder({'a', 'b', 'c', 'd', 'e'}, const []);
       controller.reorderEnabled(['a', 'c', 'e'], 2, 0); // 网格: e 到最前
@@ -206,7 +206,7 @@ void main() {
     });
 
     test('存档缺失或包含已卸载插件时安全降级', () async {
-      final prefs = await SharedPreferences.getInstance();
+      // 使用内存 prefs
       expect(prefs.getStringList(orderKey), isNull);
 
       // 存档含已卸载 ID：恢复时静默剔除，不崩溃
@@ -225,7 +225,7 @@ void main() {
       controller.add('d');
       expect(controller.order, ['c', 'a', 'd']);
 
-      final prefs = await SharedPreferences.getInstance();
+      // 使用内存 prefs
       expect(prefs.getStringList(orderKey), isNull,
           reason: '控制器自身不产生持久化副作用，写盘职责在宿主装配层');
     });
