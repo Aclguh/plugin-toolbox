@@ -203,6 +203,9 @@ class PluginInstaller {
       }
       try {
         await stagingDir.rename(targetDir.path);
+        if (hadOldInstall) {
+          await _restoreUserData(backupDir, targetDir);
+        }
       } catch (_) {
         if (hadOldInstall) {
           await _renameSilently(backupDir, targetDir);
@@ -230,6 +233,39 @@ class PluginInstaller {
     } on FileSystemException {
       // 忽略清理失败
     }
+  }
+
+  /// 将旧版本沙箱中的持久化用户数据与动态生成文件无损迁移至新安装目录中
+  static Future<void> _restoreUserData(
+      Directory backupDir, Directory targetDir) async {
+    try {
+      if (!await backupDir.exists()) return;
+      final entities = backupDir.listSync(recursive: true);
+      for (final entity in entities) {
+        if (entity is! File) continue;
+        final relPath = entity.path
+            .substring(backupDir.path.length)
+            .replaceAll(r'\', '/')
+            .replaceFirst(RegExp(r'^/+'), '');
+
+        // 仅迁移运行期持久化用户数据与数据库文件，属于旧版安装包的非数据代码文件随原子替换剔除
+        final isUserData = relPath == 'storage.json' ||
+            relPath.endsWith('.bak') ||
+            relPath.endsWith('.tmp') ||
+            relPath.startsWith('diagnostic.log') ||
+            relPath.startsWith('data/') ||
+            relPath.endsWith('.db') ||
+            relPath.endsWith('.sqlite');
+
+        if (isUserData) {
+          final targetFile = File('${targetDir.path}/$relPath');
+          try {
+            await targetFile.parent.create(recursive: true);
+            await entity.copy(targetFile.path);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   /// 尽力重命名：回滚恢复旧目录时使用，失败由上层重新抛出的原始异常覆盖

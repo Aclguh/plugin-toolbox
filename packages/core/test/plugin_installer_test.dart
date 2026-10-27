@@ -682,5 +682,65 @@ void main() {
 
       await baseDir.delete(recursive: true);
     });
+
+    test('覆盖更新已存在插件时，原沙箱中的持久化 storage.json 与用户数据文件无损保留', () async {
+      final baseDir = await tempDirFactory.createTemp('ptx_upgrade_test_');
+
+      // 1. 安装 1.0.0 版本
+      final v1PtxBytes = buildPtx({
+        'plugin.json': utf8Bytes('{"id":"upgrade_demo","name":"Upgrade Demo",'
+            '"version":"1.0.0","description":"v1","author":"a","type":"lua",'
+            '"category":"utility","entry":"main.lua","ui":"ui/main.ui.json"}'),
+        'main.lua': utf8Bytes('print("v1")'),
+        'ui/main.ui.json': utf8Bytes('{"type":"Column","children":[]}'),
+      });
+      final v1File = await writeTempPtx(v1PtxBytes);
+      final pluginV1 = await PluginInstaller.installFromPtx(
+        v1File,
+        baseDirectory: baseDir,
+      );
+      expect(pluginV1.manifest.version, '1.0.0');
+
+      // 2. 模拟运行期用户产生了持久化状态与业务文件
+      final sandboxDir = pluginV1.rootDir!;
+      final storageFile = File('${sandboxDir.path}/storage.json');
+      await storageFile.writeAsString('{"saved_key": "user_secret_data"}');
+
+      final userCustomData = File('${sandboxDir.path}/data/records.txt');
+      await userCustomData.parent.create(recursive: true);
+      await userCustomData.writeAsString('important user notes');
+
+      // 3. 安装 2.0.0 版本进行同名覆盖更新
+      final v2PtxBytes = buildPtx({
+        'plugin.json': utf8Bytes('{"id":"upgrade_demo","name":"Upgrade Demo",'
+            '"version":"2.0.0","description":"v2","author":"a","type":"lua",'
+            '"category":"utility","entry":"main.lua","ui":"ui/main.ui.json"}'),
+        'main.lua': utf8Bytes('print("v2")'),
+        'ui/main.ui.json': utf8Bytes('{"type":"Column","children":[]}'),
+      });
+      final v2File = await writeTempPtx(v2PtxBytes);
+      final pluginV2 = await PluginInstaller.installFromPtx(
+        v2File,
+        baseDirectory: baseDir,
+      );
+
+      // 4. 校验核心代码升级至 2.0.0 且用户历史数据完整无损保留
+      expect(pluginV2.manifest.version, '2.0.0');
+      final newMainLua =
+          await File('${sandboxDir.path}/main.lua').readAsString();
+      expect(newMainLua, 'print("v2")');
+
+      expect(await storageFile.exists(), isTrue);
+      final restoredStorage = await storageFile.readAsString();
+      expect(restoredStorage, contains('user_secret_data'));
+
+      expect(await userCustomData.exists(), isTrue);
+      final restoredCustom = await userCustomData.readAsString();
+      expect(restoredCustom, 'important user notes');
+
+      await baseDir.delete(recursive: true);
+      await v1File.parent.delete(recursive: true);
+      await v2File.parent.delete(recursive: true);
+    });
   });
 }
