@@ -224,8 +224,7 @@ void registerLayoutFactories(DuiRenderer renderer) {
               index: index,
               parent: node.scope,
             );
-            return renderer.buildWidget(node.context, itemTemplate,
-                scope: itemScope);
+            return renderer.buildWidget(ctx, itemTemplate, scope: itemScope);
           },
         );
       }
@@ -240,8 +239,7 @@ void registerLayoutFactories(DuiRenderer renderer) {
             index: index,
             parent: node.scope,
           );
-          return renderer.buildWidget(node.context, itemTemplate,
-              scope: itemScope);
+          return renderer.buildWidget(ctx, itemTemplate, scope: itemScope);
         },
       );
     }
