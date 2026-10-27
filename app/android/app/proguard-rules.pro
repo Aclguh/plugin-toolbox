@@ -18,3 +18,7 @@
 # 忽略第三方库无害警告
 -dontwarn io.flutter.**
 -dontwarn javax.annotation.**
+
+# Google ZXing 二维码库保留
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
