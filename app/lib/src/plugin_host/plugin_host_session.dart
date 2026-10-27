@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
@@ -176,10 +178,21 @@ class PluginHostSession extends ChangeNotifier
       }
 
       // 2. 初始化 Lua 运行时
+      final effectiveDbFactory = databaseFactory ??
+          (File dbFile) => SqlitePluginDatabase(
+                dbFile: dbFile,
+                fallbackEngine: SandboxDatabaseEngine(
+                  dbFile: dbFile,
+                  eventBus: plugin.context?.eventBus,
+                  logger: plugin.context?.logger,
+                  pluginId: plugin.id,
+                ),
+              );
+
       _runner = LuaPluginRunner(
         plugin: plugin,
         delegate: this,
-        databaseFactory: databaseFactory,
+        databaseFactory: effectiveDbFactory,
       );
       await _runner!.start();
 

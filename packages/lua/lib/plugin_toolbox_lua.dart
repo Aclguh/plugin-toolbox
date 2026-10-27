@@ -40,6 +40,7 @@ export 'src/api/bluetooth_api.dart';
 export 'src/api/database_api.dart';
 export 'src/api/plugin_database.dart';
 export 'src/api/sandbox_database_engine.dart';
+export 'src/api/sqlite_plugin_database.dart';
 export 'src/api/sandbox_utils.dart';
 export 'src/api/ai_api.dart';
 export 'src/api/ipc_api.dart';
