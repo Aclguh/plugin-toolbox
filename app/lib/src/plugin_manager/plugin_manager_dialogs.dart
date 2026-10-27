@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 import 'ptx_import.dart';
 
@@ -18,16 +19,19 @@ class ImportSummaryDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final buffer = StringBuffer();
     if (outcome.succeeded.isNotEmpty) {
-      buffer.writeln('成功 ${outcome.succeeded.length} 个:');
+      buffer.writeln(l10n?.importSummarySuccess(outcome.succeeded.length) ??
+          '成功 ${outcome.succeeded.length} 个:');
       for (final name in outcome.succeeded) {
         buffer.writeln('· $name');
       }
     }
     if (outcome.failed.isNotEmpty) {
       if (buffer.isNotEmpty) buffer.writeln();
-      buffer.writeln('失败 ${outcome.failed.length} 个:');
+      buffer.writeln(l10n?.importSummaryFailed(outcome.failed.length) ??
+          '失败 ${outcome.failed.length} 个:');
       for (final reason in outcome.failed) {
         buffer.writeln('· $reason');
       }
@@ -65,7 +69,7 @@ class ImportSummaryDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: Navigator.of(context).pop,
-          child: const Text('确定'),
+          child: Text(l10n?.ok ?? '确定'),
         ),
       ],
     );
@@ -80,10 +84,11 @@ class InstallErrorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AppDialog(
       icon: Icons.error_outline_rounded,
       iconColor: Theme.of(context).colorScheme.error,
-      title: '安装失败',
+      title: l10n?.installErrorTitle ?? '安装失败',
       content: Text(
         message,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -93,7 +98,7 @@ class InstallErrorDialog extends StatelessWidget {
       actions: [
         FilledButton.tonal(
           onPressed: () => Navigator.pop(context),
-          child: const Text('确定'),
+          child: Text(l10n?.ok ?? '确定'),
         ),
       ],
     );
@@ -174,16 +179,19 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return AppDialog(
       icon: Icons.security_update_warning_outlined,
       iconColor: theme.colorScheme.error,
-      title: '敏感权限授权确认',
+      title: l10n?.sensitivePermissionConfirmTitle ?? '敏感权限授权确认',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('插件「$pluginName v$pluginVersion」申请了以下敏感权限：'),
+          Text(l10n?.sensitivePermissionConfirmHeader(
+                  pluginName, pluginVersion) ??
+              '插件「$pluginName v$pluginVersion」申请了以下敏感权限：'),
           const SizedBox(height: AppSpacing.md),
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -214,7 +222,8 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            '授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。',
+            l10n?.sensitivePermissionConfirmExplanation ??
+                '授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -224,7 +233,7 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('拒绝并取消'),
+          child: Text(l10n?.denyAndCancel ?? '拒绝并取消'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -232,7 +241,7 @@ class SensitivePermissionConfirmDialog extends StatelessWidget {
             foregroundColor: theme.colorScheme.onError,
           ),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('同意并安装'),
+          child: Text(l10n?.agreeAndInstall ?? '同意并安装'),
         ),
       ],
     );
@@ -288,6 +297,7 @@ class PluginDetailsDialog extends ConsumerStatefulWidget {
 class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final plugin = widget.plugin;
     final dynamicPlugin = plugin is DynamicPlugin ? plugin : null;
     final declaredPermissions =
@@ -333,7 +343,7 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            '权限管理',
+            l10n?.permissionManagement ?? '权限管理',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: scheme.onSurface,
@@ -342,7 +352,7 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
           if (declaredPermissions.isEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
-              '该插件未声明任何系统权限',
+              l10n?.noPermissionsDeclared ?? '该插件未声明任何系统权限',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.outline,
               ),
@@ -397,12 +407,12 @@ class _PluginDetailsDialogState extends ConsumerState<PluginDetailsDialog> {
           TextButton.icon(
             key: const Key('export_plugin_button'),
             icon: const Icon(Icons.drive_file_move_outlined, size: 18),
-            label: const Text('导出 .ptx'),
+            label: Text(l10n?.exportPtxButton ?? '导出 .ptx'),
             onPressed: () => _exportPlugin(context, dynamicPlugin),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('完成'),
+          child: Text(l10n?.done ?? '完成'),
         ),
       ],
     );

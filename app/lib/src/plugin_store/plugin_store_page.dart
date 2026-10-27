@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 import 'store_providers.dart';
 import 'store_service.dart';
@@ -83,6 +84,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
+        final l10n = AppLocalizations.of(ctx);
         final sensitivePermissions = item.entry.permissions
             .map(PluginPermission.fromString)
             .where((p) => p != null && p.isSensitive)
@@ -94,8 +96,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
               ? Icons.system_update_alt_rounded
               : Icons.download_for_offline_outlined,
           title: item.state == PluginStoreInstallState.updateAvailable
-              ? '更新插件'
-              : '安装插件',
+              ? (l10n?.updatePluginTitle ?? '更新插件')
+              : (l10n?.installPluginTitle ?? '安装插件'),
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -151,7 +153,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                 const SizedBox(height: AppSpacing.md),
                 AppBanner(
                   tone: AppBannerTone.danger,
-                  title: '敏感权限授权提醒',
+                  title: l10n?.sensitivePermissionsWarningTitle ?? '敏感权限授权提醒',
                   message: sensitivePermissions
                       .map((p) => '• ${p.label}: ${p.description}')
                       .join('\n'),
@@ -162,7 +164,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                 Text(
                   item.state == PluginStoreInstallState.updateAvailable
                       ? '将把本地 ${item.installedVersion} 覆盖为 ${item.version}'
-                      : '本地已安装 ${item.installedVersion}',
+                      : l10n?.localInstalledVersion(item.installedVersion!) ??
+                          '本地已安装 ${item.installedVersion}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -173,14 +176,14 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
+              child: Text(l10n?.cancel ?? '取消'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(
                 item.state == PluginStoreInstallState.updateAvailable
-                    ? '更新'
-                    : '安装',
+                    ? (l10n?.update ?? '更新')
+                    : (l10n?.install ?? '安装'),
               ),
             ),
           ],
@@ -207,6 +210,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   }
 
   Future<void> _install(PluginStoreItem item) async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _busyPlugins[item.id] = item.name);
 
     // 安装期间由页面自身的遮罩层阻断交互并展示进度：
@@ -233,14 +237,20 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       success = true;
       final warnings =
           outcome.warnings.isEmpty ? '' : '（${outcome.warnings.join('；')}）';
-      message =
-          '${item.name} v${outcome.plugin.version} ${item.state == PluginStoreInstallState.updateAvailable ? '已更新' : '已安装'}$warnings';
+      final action = item.state == PluginStoreInstallState.updateAvailable
+          ? (l10n?.actionUpdated ?? '已更新')
+          : (l10n?.actionInstalled ?? '已安装');
+      message = l10n?.pluginInstallSuccess(
+              item.name, outcome.plugin.version, action, warnings) ??
+          '${item.name} v${outcome.plugin.version} $action$warnings';
     } on PluginStoreException catch (e) {
       message = '${item.name}: ${e.message}';
     } on FormatException catch (e) {
-      message = '${item.name}: 安装包无效 (${e.message})';
+      message = l10n?.invalidPackageError(item.name, e.message) ??
+          '${item.name}: 安装包无效 (${e.message})';
     } catch (_) {
-      message = '${item.name}: 安装失败，请稍后重试';
+      message =
+          l10n?.installFailedRetry(item.name) ?? '${item.name}: 安装失败，请稍后重试';
     } finally {
       if (mounted) {
         setState(() => _busyPlugins.remove(item.id));
@@ -262,19 +272,20 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final catalogAsync = ref.watch(pluginStoreCatalogProvider);
     // 仅跟随全量插件列表重建：无关事件不再刷新商店页
     final installedPlugins = ref.watch(allPluginListProvider);
     final service = ref.watch(pluginStoreServiceProvider);
 
     return PluginPageScaffold(
-      title: '插件商店',
-      subtitle: '浏览目录、确认权限后一键安装',
+      title: l10n?.pluginStore ?? '插件商店',
+      subtitle: l10n?.storeSubtitle ?? '浏览目录、确认权限后一键安装',
       maxContentWidth: AppLayout.maxContentWidth,
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh_rounded),
-          tooltip: '刷新插件目录',
+          tooltip: l10n?.refreshCatalogTooltip ?? '刷新插件目录',
           onPressed: _busyPlugins.isEmpty ? _refresh : null,
         ),
       ],
@@ -293,13 +304,15 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     List<ToolPlugin> installedPlugins,
     PluginStoreService service,
   ) {
+    final l10n = AppLocalizations.of(context);
     return catalogAsync.when(
       loading: () => const AppSkeletonList(itemCount: 4),
       error: (error, _) => ErrorView(
-        message:
-            error is PluginStoreException ? error.message : '插件目录加载失败，请检查网络后重试',
+        message: error is PluginStoreException
+            ? error.message
+            : (l10n?.errorCatalogLoadFailed ?? '插件目录加载失败，请检查网络后重试'),
         onRetry: _refresh,
-        retryLabel: '重新加载',
+        retryLabel: l10n?.retry ?? '重新加载',
       ),
       data: (catalog) {
         final allItems = service.buildItems(
@@ -310,12 +323,13 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         if (allItems.isEmpty) {
           return AppEmptyState(
             icon: Icons.storefront_outlined,
-            title: '远端插件目录为空',
-            message: '当前插件仓库暂无可安装的插件，可稍后重试或在设置中切换仓库。',
+            title: l10n?.emptyStoreTitle ?? '远端插件目录为空',
+            message:
+                l10n?.emptyStoreMessage ?? '当前插件仓库暂无可安装的插件，可稍后重试或在设置中切换仓库。',
             action: FilledButton.tonalIcon(
               onPressed: _refresh,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('重新加载'),
+              label: Text(l10n?.retry ?? '重新加载'),
             ),
           );
         }
@@ -358,6 +372,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   }
 
   Widget _buildSearchBar() {
+    final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -370,12 +385,12 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         controller: _searchController,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: '搜索插件名称、描述或作者...',
+          hintText: l10n?.storeSearchHint ?? '搜索插件名称、描述或作者...',
           prefixIcon: const Icon(Icons.search_rounded, size: 20),
           suffixIcon: _searchKeyword.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
-                  tooltip: '清空搜索',
+                  tooltip: l10n?.clearSearchTooltip ?? '清空搜索',
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchKeyword = '');
@@ -424,7 +439,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       child: Row(
         children: [
           FilterChip(
-            label: const Text('全部'),
+            label: Text(AppLocalizations.of(context)?.allFilter ?? '全部'),
             selected: _selectedCategory == null,
             onSelected: (_) => setState(() => _selectedCategory = null),
           ),
@@ -444,6 +459,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   }
 
   Widget _buildEmptyFilterState() {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         vertical: AppSpacing.xxxl,
@@ -451,8 +467,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
       ),
       child: AppEmptyState(
         icon: Icons.search_off_rounded,
-        title: '未找到匹配的插件',
-        message: '试试更换关键词，或清除当前分类筛选。',
+        title: l10n?.emptyFilterTitle ?? '未找到匹配的插件',
+        message: l10n?.emptyFilterMessage ?? '试试更换关键词，或清除当前分类筛选。',
         action: TextButton.icon(
           onPressed: () {
             _searchController.clear();
@@ -462,7 +478,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
             });
           },
           icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-          label: const Text('清除筛选条件'),
+          label: Text(l10n?.clearFilter ?? '清除筛选条件'),
         ),
       ),
     );
@@ -470,6 +486,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
 
   /// 安装进行中的页面级遮罩：阻断重复点击，并展示正在安装的插件名。
   Widget _buildBusyOverlay() {
+    final l10n = AppLocalizations.of(context);
     final name = _busyPlugins.length == 1 ? _busyPlugins.values.first : null;
     final scheme = Theme.of(context).colorScheme;
     return Positioned.fill(
@@ -495,7 +512,10 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                     const SizedBox(width: AppSpacing.lg),
                     Flexible(
                       child: Text(
-                        name == null ? '正在安装插件 …' : '正在下载并安装 $name …',
+                        name == null
+                            ? (l10n?.installingPlugin ?? '正在安装插件 …')
+                            : (l10n?.downloadingAndInstalling(name) ??
+                                '正在下载并安装 $name …'),
                       ),
                     ),
                   ],
@@ -513,6 +533,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     List<PluginStoreItem> allItems,
     List<PluginStoreItem> filteredItems,
   ) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final repoConfig = ref.watch(customPluginRepositoryProvider);
     final sourceLabel = repoConfig.summary;
@@ -540,7 +561,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
               const Spacer(),
               AppBadge(
                 label: _selectedCategory == null
-                    ? '全部分类'
+                    ? (l10n?.allCategories ?? '全部分类')
                     : pluginCategoryLabel(_selectedCategory!),
                 tone: _selectedCategory == null
                     ? AppBadgeTone.neutral
@@ -571,6 +592,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
   }
 
   Widget _buildItemCard(PluginStoreItem item) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final busy = _busyPlugins.containsKey(item.id);
@@ -648,8 +670,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                         Row(
                           children: [
                             if (updateAvailable) ...[
-                              const AppBadge(
-                                label: '可更新',
+                              AppBadge(
+                                label: l10n?.updateAvailableBadge ?? '可更新',
                                 tone: AppBadgeTone.warning,
                                 dense: true,
                               ),
@@ -657,7 +679,9 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
                             ],
                             Flexible(
                               child: Text(
-                                '本地已安装 ${item.installedVersion}',
+                                l10n?.localInstalledVersion(
+                                        item.installedVersion!) ??
+                                    '本地已安装 ${item.installedVersion}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelSmall?.copyWith(
@@ -753,6 +777,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     bool busy,
     bool updateAvailable,
   ) {
+    final l10n = AppLocalizations.of(context);
     if (busy) {
       return const SizedBox(
         width: 24,
@@ -762,7 +787,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     }
     if (!item.minAppVersionSatisfied) {
       return Text(
-        '版本不满足',
+        l10n?.versionNotSatisfied ?? '版本不满足',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.outline,
             ),
@@ -779,7 +804,7 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           ),
           const SizedBox(width: AppSpacing.xs),
           Text(
-            '已是最新',
+            l10n?.upToDate ?? '已是最新',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: context.appColors.success,
                   fontWeight: FontWeight.w600,
@@ -798,7 +823,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
         ),
       ),
       onPressed: () => _confirmAndInstall(item),
-      child: Text(updateAvailable ? '更新' : '安装'),
+      child: Text(
+          updateAvailable ? (l10n?.update ?? '更新') : (l10n?.install ?? '安装')),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
 import 'package:plugin_toolbox_ui/plugin_toolbox_ui.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 import 'plugin_manager_dialogs.dart';
 import 'ptx_import.dart';
@@ -17,6 +18,7 @@ class PluginManagerPage extends ConsumerWidget {
   const PluginManagerPage({super.key});
 
   Future<void> _pickAndInstall(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     try {
       // 批量导入: 允许一次选择多个 .ptx/.zip, 逐个安装, 单个失败不影响其余
       final result = await FilePicker.platform.pickFiles(
@@ -55,7 +57,8 @@ class PluginManagerPage extends ConsumerWidget {
           if (approved != true) {
             await PluginInstaller.uninstall(plugin.id);
             outcome.succeeded.remove('${plugin.name} v${plugin.version}');
-            outcome.failed.add('${plugin.name}: 用户取消安装未签名插件');
+            outcome.failed.add(l10n?.userCancelledUnsigned(plugin.name) ??
+                '${plugin.name}: 用户取消安装未签名插件');
             continue;
           }
         }
@@ -75,7 +78,9 @@ class PluginManagerPage extends ConsumerWidget {
             // 用户拒绝授权，清理沙箱目录并移至失败列表
             await PluginInstaller.uninstall(plugin.id);
             outcome.succeeded.remove('${plugin.name} v${plugin.version}');
-            outcome.failed.add('${plugin.name}: 用户拒绝授权敏感权限');
+            outcome.failed.add(
+                l10n?.userDeniedSensitivePermissions(plugin.name) ??
+                    '${plugin.name}: 用户拒绝授权敏感权限');
             continue;
           }
         }
@@ -135,8 +140,9 @@ class PluginManagerPage extends ConsumerWidget {
     WidgetRef ref,
     ToolPlugin plugin,
   ) async {
+    final l10n = AppLocalizations.of(context);
     if (!plugin.isDynamic) {
-      AppSnack.info(context, '内置插件无法删除');
+      AppSnack.info(context, l10n?.builtinPluginCannotDelete ?? '内置插件无法删除');
       return;
     }
 
@@ -353,6 +359,7 @@ class _PluginManagerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -426,7 +433,8 @@ class _PluginManagerTile extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            '版本: ${plugin.version}',
+                            l10n?.versionPrefix(plugin.version) ??
+                                '版本: ${plugin.version}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelSmall?.copyWith(
@@ -436,8 +444,8 @@ class _PluginManagerTile extends StatelessWidget {
                         ),
                         if (plugin.isDynamic) ...[
                           const SizedBox(width: AppSpacing.sm - 2),
-                          const AppBadge(
-                            label: '动态',
+                          AppBadge(
+                            label: l10n?.dynamicBadge ?? '动态',
                             tone: AppBadgeTone.primary,
                             dense: true,
                           ),

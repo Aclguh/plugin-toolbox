@@ -78,5 +78,365 @@
   "noAuditTrail": "No sensitive access records",
   "exportDiagnosticReport": "Export Diagnostic Report",
   "exportDiagnosticReportDesc": "Copy complete report including runtime status, audit trail, and persistent logs",
-  "diagnosticReportCopied": "Diagnostic report copied to clipboard"
+  "diagnosticReportCopied": "Diagnostic report copied to clipboard",
+  "refreshCatalogTooltip": "Refresh plugin catalog",
+  "storeSubtitle": "Browse catalog, verify permissions, and install with one tap",
+  "errorCatalogLoadFailed": "Failed to load plugin catalog. Please check network and retry.",
+  "retry": "Reload",
+  "emptyStoreTitle": "Remote plugin catalog is empty",
+  "emptyStoreMessage": "No plugins available currently. You can retry later or change repository in Settings.",
+  "storeSearchHint": "Search plugin name, description, or author...",
+  "clearSearchTooltip": "Clear search",
+  "allCategories": "All Categories",
+  "allFilter": "All",
+  "emptyFilterTitle": "No matching plugins found",
+  "emptyFilterMessage": "Try different keywords or clear the category filter.",
+  "clearFilter": "Clear filter",
+  "installingPlugin": "Installing plugin …",
+  "downloadingAndInstalling": "Downloading and installing {name} …",
+  "@downloadingAndInstalling": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "totalPluginCount": "{count} plugins total",
+  "@totalPluginCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filteredPluginCount": "{total} plugins total ({filtered} filtered)",
+  "@filteredPluginCount": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "filtered": {
+        "type": "int"
+      }
+    }
+  },
+  "storeSourceHeader": "Source: {source} · Version from plugin-source manifest",
+  "@storeSourceHeader": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "skippedIncompleteEntries": "{count} entries skipped due to incomplete metadata",
+  "@skippedIncompleteEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "updateAvailableBadge": "Update",
+  "localInstalledVersion": "Installed: {version}",
+  "@localInstalledVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "authorMeta": "Author: {author}",
+  "@authorMeta": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "volumeMeta": "Size: {size}",
+  "@volumeMeta": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionMeta": "Permissions: {permissions}",
+  "@permissionMeta": {
+    "placeholders": {
+      "permissions": {
+        "type": "String"
+      }
+    }
+  },
+  "categoryMeta": "Category: {category}",
+  "@categoryMeta": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "authorPrefix": "Author {author}",
+  "@authorPrefix": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "volumePrefix": "Size {size}",
+  "@volumePrefix": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionPrefix": "Permissions {permissions}",
+  "@permissionPrefix": {
+    "placeholders": {
+      "permissions": {
+        "type": "String"
+      }
+    }
+  },
+  "versionRequirement": "Requires host version {minVersion} or higher",
+  "@versionRequirement": {
+    "placeholders": {
+      "minVersion": {
+        "type": "String"
+      }
+    }
+  },
+  "versionNotSatisfied": "Incompatible",
+  "upToDate": "Up to date",
+  "none": "None",
+  "updatePluginTitle": "Update Plugin",
+  "installPluginTitle": "Install Plugin",
+  "sensitivePermissionsWarningTitle": "Sensitive Permissions Notice",
+  "upgradeVersionPrompt": "Will replace local {oldVersion} with {newVersion}",
+  "@upgradeVersionPrompt": {
+    "placeholders": {
+      "oldVersion": {
+        "type": "String"
+      },
+      "newVersion": {
+        "type": "String"
+      }
+    }
+  },
+  "pluginInstallSuccess": "{name} v{version} {action}{warnings}",
+  "@pluginInstallSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      },
+      "action": {
+        "type": "String"
+      },
+      "warnings": {
+        "type": "String"
+      }
+    }
+  },
+  "actionInstalled": "installed",
+  "actionUpdated": "updated",
+  "invalidPackageError": "{name}: Invalid package ({message})",
+  "@invalidPackageError": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "installFailedRetry": "{name}: Installation failed. Please retry later",
+  "@installFailedRetry": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "importPtxFab": "Import .ptx Plugin",
+  "managerSubtitleEmpty": "Import .ptx packages to expand toolbox capabilities",
+  "managerSubtitleCount": "{count} plugins · Long press card to uninstall",
+  "@managerSubtitleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "emptyManagerTitle": "No plugins yet. Tap button below to import",
+  "emptyManagerMessage": "Supports selecting multiple .ptx / .zip packages at once. They will be enabled automatically.",
+  "selectLocalFile": "Select local files",
+  "managerBannerTip": "Long press card to uninstall plugin, long press left handle to drag and reorder",
+  "dynamicBadge": "Dynamic",
+  "versionPrefix": "Version: {version}",
+  "@versionPrefix": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "importSuccessSnack": "Successfully imported {count} plugins",
+  "@importSuccessSnack": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "builtinPluginCannotDelete": "Built-in plugins cannot be uninstalled",
+  "pluginUninstalledSnack": "Plugin \"{name}\" uninstalled",
+  "@pluginUninstalledSnack": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "userCancelledUnsigned": "{name}: User cancelled installing unsigned plugin",
+  "@userCancelledUnsigned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "userDeniedSensitivePermissions": "{name}: User denied sensitive permissions",
+  "@userDeniedSensitivePermissions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errorInvalidPackage": "Invalid package: {message}",
+  "@errorInvalidPackage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "errorFileReadFailed": "Failed to read package file. Please verify file integrity and retry.",
+  "errorUnknownInstall": "Installation failed due to an unknown error. Please retry.",
+  "importSummaryTitle": "Import Summary",
+  "importSummarySuccess": "Succeeded ({count}):",
+  "@importSummarySuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importSummaryFailed": "Failed ({count}):",
+  "@importSummaryFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "installErrorTitle": "Installation Failed",
+  "ok": "OK",
+  "unsignedPluginWarningTitle": "Unsigned Plugin Security Warning",
+  "unsignedPluginWarningHeader": "Attempting to install a plugin without a developer digital signature.",
+  "unsignedPluginWarningBody": "This package does not contain a digital signature (plugin.sig). Origin and integrity cannot be verified. Do you want to continue?",
+  "unsignedPluginPluginLabel": "Plugin: {pluginName}{version}",
+  "@unsignedPluginPluginLabel": {
+    "placeholders": {
+      "pluginName": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "unsignedPluginFilePrefix": "File: {fileName}",
+  "@unsignedPluginFilePrefix": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "continueInstall": "Continue Install",
+  "sensitivePermissionConfirmTitle": "Sensitive Permission Confirmation",
+  "sensitivePermissionConfirmHeader": "Plugin \"{pluginName} v{version}\" requests the following sensitive permissions:",
+  "@sensitivePermissionConfirmHeader": {
+    "placeholders": {
+      "pluginName": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "sensitivePermissionConfirmExplanation": "Once granted, this plugin can access hardware or network resources. Please confirm if you trust this source.",
+  "denyAndCancel": "Deny & Cancel",
+  "agreeAndInstall": "Agree & Install",
+  "uninstallPluginTitle": "Uninstall Plugin",
+  "uninstallPluginConfirmBody": "Are you sure you want to uninstall plugin \"{name}\"?\nAll associated data will be removed.",
+  "@uninstallPluginConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sandboxQuota": "Sandbox Quota: {quota} MB",
+  "@sandboxQuota": {
+    "placeholders": {
+      "quota": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionManagement": "Permissions",
+  "noPermissionsDeclared": "This plugin does not declare any system permissions",
+  "sensitiveBadge": "Sensitive",
+  "exportPtxButton": "Export .ptx",
+  "done": "Done",
+  "exportDialogTitle": "Export Plugin Package",
+  "exportSuccess": "Plugin exported to: {path}",
+  "@exportSuccess": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "Export failed: {error}",
+  "@exportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pluginsAndRepo": "Plugins & Repository",
+  "pluginsAndRepoDesc": "Source configuration for plugin catalog, affecting available store plugins",
+  "customPluginRepo": "Custom Plugin Repository",
+  "pluginSecurityPolicy": "Plugin Security Policy",
+  "securityModeStrict": "Strict Security Mode",
+  "securityModeWarning": "Security Warning Mode (Default)",
+  "securityModeDeveloper": "Developer Mode",
+  "securityModeStrictSummary": "Strict Mode (Only allow verified signed plugins)",
+  "securityModeWarningSummary": "Warning Mode (Prompt warning for unsigned plugins, default)",
+  "securityModeDeveloperSummary": "Developer Mode (Allow all unsigned plugins)",
+  "securityModeStrictDesc": "Only allow plugins with valid Ed25519 digital signatures to prevent untrusted code",
+  "securityModeWarningDesc": "Prompt security confirmation for unsigned plugins, block corrupted or tampered packages",
+  "securityModeDeveloperDesc": "Allow all unsigned local packages, only block corrupted packages"
 }

@@ -487,6 +487,595 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已复制完整诊断报告至剪贴板'**
   String get diagnosticReportCopied;
+
+  /// No description provided for @refreshCatalogTooltip.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新插件目录'**
+  String get refreshCatalogTooltip;
+
+  /// No description provided for @storeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览目录、确认权限后一键安装'**
+  String get storeSubtitle;
+
+  /// No description provided for @errorCatalogLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件目录加载失败，请检查网络后重试'**
+  String get errorCatalogLoadFailed;
+
+  /// No description provided for @retry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新加载'**
+  String get retry;
+
+  /// No description provided for @emptyStoreTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'远端插件目录为空'**
+  String get emptyStoreTitle;
+
+  /// No description provided for @emptyStoreMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前插件仓库暂无可安装的插件，可稍后重试或在设置中切换仓库。'**
+  String get emptyStoreMessage;
+
+  /// No description provided for @storeSearchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索插件名称、描述或作者...'**
+  String get storeSearchHint;
+
+  /// No description provided for @clearSearchTooltip.
+  ///
+  /// In zh, this message translates to:
+  /// **'清空搜索'**
+  String get clearSearchTooltip;
+
+  /// No description provided for @allCategories.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部分类'**
+  String get allCategories;
+
+  /// No description provided for @allFilter.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get allFilter;
+
+  /// No description provided for @emptyFilterTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'未找到匹配的插件'**
+  String get emptyFilterTitle;
+
+  /// No description provided for @emptyFilterMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'试试更换关键词，或清除当前分类筛选。'**
+  String get emptyFilterMessage;
+
+  /// No description provided for @clearFilter.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除筛选条件'**
+  String get clearFilter;
+
+  /// No description provided for @installingPlugin.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在安装插件 …'**
+  String get installingPlugin;
+
+  /// No description provided for @downloadingAndInstalling.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载并安装 {name} …'**
+  String downloadingAndInstalling(String name);
+
+  /// No description provided for @totalPluginCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'共 {count} 个插件'**
+  String totalPluginCount(int count);
+
+  /// No description provided for @filteredPluginCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'共 {total} 个插件 (已筛选出 {filtered} 个)'**
+  String filteredPluginCount(int total, int filtered);
+
+  /// No description provided for @storeSourceHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'来源: {source} · 版本取自 plugin-source 清单'**
+  String storeSourceHeader(String source);
+
+  /// No description provided for @skippedIncompleteEntries.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个条目元数据不完整已跳过'**
+  String skippedIncompleteEntries(int count);
+
+  /// No description provided for @updateAvailableBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'可更新'**
+  String get updateAvailableBadge;
+
+  /// No description provided for @localInstalledVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'本地已安装 {version}'**
+  String localInstalledVersion(String version);
+
+  /// No description provided for @authorMeta.
+  ///
+  /// In zh, this message translates to:
+  /// **'作者: {author}'**
+  String authorMeta(String author);
+
+  /// No description provided for @volumeMeta.
+  ///
+  /// In zh, this message translates to:
+  /// **'体积: {size}'**
+  String volumeMeta(String size);
+
+  /// No description provided for @permissionMeta.
+  ///
+  /// In zh, this message translates to:
+  /// **'权限: {permissions}'**
+  String permissionMeta(String permissions);
+
+  /// No description provided for @categoryMeta.
+  ///
+  /// In zh, this message translates to:
+  /// **'分类: {category}'**
+  String categoryMeta(String category);
+
+  /// No description provided for @authorPrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'作者 {author}'**
+  String authorPrefix(String author);
+
+  /// No description provided for @volumePrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'体积 {size}'**
+  String volumePrefix(String size);
+
+  /// No description provided for @permissionPrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'权限 {permissions}'**
+  String permissionPrefix(String permissions);
+
+  /// No description provided for @versionRequirement.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要宿主版本 {minVersion} 及以上'**
+  String versionRequirement(String minVersion);
+
+  /// No description provided for @versionNotSatisfied.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本不满足'**
+  String get versionNotSatisfied;
+
+  /// No description provided for @upToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新'**
+  String get upToDate;
+
+  /// No description provided for @none.
+  ///
+  /// In zh, this message translates to:
+  /// **'无'**
+  String get none;
+
+  /// No description provided for @updatePluginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新插件'**
+  String get updatePluginTitle;
+
+  /// No description provided for @installPluginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装插件'**
+  String get installPluginTitle;
+
+  /// No description provided for @sensitivePermissionsWarningTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'敏感权限授权提醒'**
+  String get sensitivePermissionsWarningTitle;
+
+  /// No description provided for @upgradeVersionPrompt.
+  ///
+  /// In zh, this message translates to:
+  /// **'将把本地 {oldVersion} 覆盖为 {newVersion}'**
+  String upgradeVersionPrompt(String oldVersion, String newVersion);
+
+  /// No description provided for @pluginInstallSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name} v{version} {action}{warnings}'**
+  String pluginInstallSuccess(
+      String name, String version, String action, String warnings);
+
+  /// No description provided for @actionInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已安装'**
+  String get actionInstalled;
+
+  /// No description provided for @actionUpdated.
+  ///
+  /// In zh, this message translates to:
+  /// **'已更新'**
+  String get actionUpdated;
+
+  /// No description provided for @invalidPackageError.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}: 安装包无效 ({message})'**
+  String invalidPackageError(String name, String message);
+
+  /// No description provided for @installFailedRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}: 安装失败，请稍后重试'**
+  String installFailedRetry(String name);
+
+  /// No description provided for @importPtxFab.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入 .ptx 插件'**
+  String get importPtxFab;
+
+  /// No description provided for @managerSubtitleEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入 .ptx 插件包以扩展工具箱能力'**
+  String get managerSubtitleEmpty;
+
+  /// No description provided for @managerSubtitleCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个插件 · 长按卡片可卸载'**
+  String managerSubtitleCount(int count);
+
+  /// No description provided for @emptyManagerTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无插件，点击右下角按钮导入'**
+  String get emptyManagerTitle;
+
+  /// No description provided for @emptyManagerMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'支持一次选择多个 .ptx / .zip 安装包，安装完成后将自动启用。'**
+  String get emptyManagerMessage;
+
+  /// No description provided for @selectLocalFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'从本地选择文件'**
+  String get selectLocalFile;
+
+  /// No description provided for @managerBannerTip.
+  ///
+  /// In zh, this message translates to:
+  /// **'长按卡片可删除插件，长按左侧图标可拖动排序'**
+  String get managerBannerTip;
+
+  /// No description provided for @dynamicBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'动态'**
+  String get dynamicBadge;
+
+  /// No description provided for @versionPrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本: {version}'**
+  String versionPrefix(String version);
+
+  /// No description provided for @importSuccessSnack.
+  ///
+  /// In zh, this message translates to:
+  /// **'成功导入 {count} 个插件'**
+  String importSuccessSnack(int count);
+
+  /// No description provided for @builtinPluginCannotDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'内置插件无法删除'**
+  String get builtinPluginCannotDelete;
+
+  /// No description provided for @pluginUninstalledSnack.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件「{name}」已卸载'**
+  String pluginUninstalledSnack(String name);
+
+  /// No description provided for @userCancelledUnsigned.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}: 用户取消安装未签名插件'**
+  String userCancelledUnsigned(String name);
+
+  /// No description provided for @userDeniedSensitivePermissions.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}: 用户拒绝授权敏感权限'**
+  String userDeniedSensitivePermissions(String name);
+
+  /// No description provided for @errorInvalidPackage.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装包无效：{message}'**
+  String errorInvalidPackage(String message);
+
+  /// No description provided for @errorFileReadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装包文件读取失败，请确认文件完整后重试'**
+  String get errorFileReadFailed;
+
+  /// No description provided for @errorUnknownInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装失败，发生未知错误，请重试'**
+  String get errorUnknownInstall;
+
+  /// No description provided for @importSummaryTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入结果'**
+  String get importSummaryTitle;
+
+  /// No description provided for @importSummarySuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'成功 {count} 个:'**
+  String importSummarySuccess(int count);
+
+  /// No description provided for @importSummaryFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'失败 {count} 个:'**
+  String importSummaryFailed(int count);
+
+  /// No description provided for @installErrorTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装失败'**
+  String get installErrorTitle;
+
+  /// No description provided for @ok.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定'**
+  String get ok;
+
+  /// No description provided for @unsignedPluginWarningTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'未签名插件安全提示'**
+  String get unsignedPluginWarningTitle;
+
+  /// No description provided for @unsignedPluginWarningHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在尝试安装未经过开发者数字签名的插件。'**
+  String get unsignedPluginWarningHeader;
+
+  /// No description provided for @unsignedPluginWarningBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'该扩展包未包含开发者数字签名 (plugin.sig)，无法保障包体来源与完整性。确定要继续安装吗？'**
+  String get unsignedPluginWarningBody;
+
+  /// No description provided for @unsignedPluginPluginLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件: {pluginName}{version}'**
+  String unsignedPluginPluginLabel(String pluginName, String version);
+
+  /// No description provided for @unsignedPluginFilePrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件: {fileName}'**
+  String unsignedPluginFilePrefix(String fileName);
+
+  /// No description provided for @continueInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续安装'**
+  String get continueInstall;
+
+  /// No description provided for @sensitivePermissionConfirmTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'敏感权限授权确认'**
+  String get sensitivePermissionConfirmTitle;
+
+  /// No description provided for @sensitivePermissionConfirmHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件「{pluginName} v{version}」申请了以下敏感权限：'**
+  String sensitivePermissionConfirmHeader(String pluginName, String version);
+
+  /// No description provided for @sensitivePermissionConfirmExplanation.
+  ///
+  /// In zh, this message translates to:
+  /// **'授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。'**
+  String get sensitivePermissionConfirmExplanation;
+
+  /// No description provided for @denyAndCancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'拒绝并取消'**
+  String get denyAndCancel;
+
+  /// No description provided for @agreeAndInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'同意并安装'**
+  String get agreeAndInstall;
+
+  /// No description provided for @uninstallPluginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'卸载插件'**
+  String get uninstallPluginTitle;
+
+  /// No description provided for @uninstallPluginConfirmBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要卸载插件「{name}」吗？\n卸载后相关数据将被清除。'**
+  String uninstallPluginConfirmBody(String name);
+
+  /// No description provided for @sandboxQuota.
+  ///
+  /// In zh, this message translates to:
+  /// **'沙箱配额: {quota} MB'**
+  String sandboxQuota(int quota);
+
+  /// No description provided for @permissionManagement.
+  ///
+  /// In zh, this message translates to:
+  /// **'权限管理'**
+  String get permissionManagement;
+
+  /// No description provided for @noPermissionsDeclared.
+  ///
+  /// In zh, this message translates to:
+  /// **'该插件未声明任何系统权限'**
+  String get noPermissionsDeclared;
+
+  /// No description provided for @sensitiveBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'敏感'**
+  String get sensitiveBadge;
+
+  /// No description provided for @exportPtxButton.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出 .ptx'**
+  String get exportPtxButton;
+
+  /// No description provided for @done.
+  ///
+  /// In zh, this message translates to:
+  /// **'完成'**
+  String get done;
+
+  /// No description provided for @exportDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出插件安装包'**
+  String get exportDialogTitle;
+
+  /// No description provided for @exportSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件已导出至: {path}'**
+  String exportSuccess(String path);
+
+  /// No description provided for @exportFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出失败: {error}'**
+  String exportFailed(String error);
+
+  /// No description provided for @pluginsAndRepo.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件与仓库'**
+  String get pluginsAndRepo;
+
+  /// No description provided for @pluginsAndRepoDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件目录的来源配置，影响商店可安装的插件集合'**
+  String get pluginsAndRepoDesc;
+
+  /// No description provided for @customPluginRepo.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义插件仓库'**
+  String get customPluginRepo;
+
+  /// No description provided for @pluginSecurityPolicy.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件安全策略'**
+  String get pluginSecurityPolicy;
+
+  /// No description provided for @securityModeStrict.
+  ///
+  /// In zh, this message translates to:
+  /// **'严格安全模式'**
+  String get securityModeStrict;
+
+  /// No description provided for @securityModeWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'安全警示模式（默认）'**
+  String get securityModeWarning;
+
+  /// No description provided for @securityModeDeveloper.
+  ///
+  /// In zh, this message translates to:
+  /// **'开发者模式'**
+  String get securityModeDeveloper;
+
+  /// No description provided for @securityModeStrictSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'严格安全模式（仅允许安装受信任签名插件）'**
+  String get securityModeStrictSummary;
+
+  /// No description provided for @securityModeWarningSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'安全警示模式（未签名插件弹窗提醒，默认）'**
+  String get securityModeWarningSummary;
+
+  /// No description provided for @securityModeDeveloperSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'开发者模式（放行所有未签名插件）'**
+  String get securityModeDeveloperSummary;
+
+  /// No description provided for @securityModeStrictDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅允许安装包含合法 Ed25519 数字签名的插件，杜绝未知来源代码'**
+  String get securityModeStrictDesc;
+
+  /// No description provided for @securityModeWarningDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装未签名插件时弹出安全确认，拦截被篡改的安装包'**
+  String get securityModeWarningDesc;
+
+  /// No description provided for @securityModeDeveloperDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'放行所有本地开发与未签名插件，仅拦截被篡改的损坏包'**
+  String get securityModeDeveloperDesc;
 }
 
 class _AppLocalizationsDelegate

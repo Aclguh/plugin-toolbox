@@ -162,9 +162,10 @@ class SettingsPage extends ConsumerWidget {
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
+        final l10n = AppLocalizations.of(ctx);
         return AppDialog(
           icon: Icons.shield_outlined,
-          title: '插件安全策略',
+          title: l10n?.pluginSecurityPolicy ?? '插件安全策略',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -179,15 +180,22 @@ class SettingsPage extends ConsumerWidget {
                         : theme.colorScheme.onSurfaceVariant,
                   ),
                   title: Text(switch (mode) {
-                    PluginSecurityMode.warning => '安全警示模式（默认）',
-                    PluginSecurityMode.strict => '严格安全模式',
-                    PluginSecurityMode.developer => '开发者模式',
+                    PluginSecurityMode.warning =>
+                      l10n?.securityModeWarning ?? '安全警示模式（默认）',
+                    PluginSecurityMode.strict =>
+                      l10n?.securityModeStrict ?? '严格安全模式',
+                    PluginSecurityMode.developer =>
+                      l10n?.securityModeDeveloper ?? '开发者模式',
                   }),
                   subtitle: Text(switch (mode) {
-                    PluginSecurityMode.warning => '安装未签名插件时弹出安全确认，拦截被篡改的安装包',
-                    PluginSecurityMode.strict =>
-                      '仅允许安装包含合法 Ed25519 数字签名的插件，杜绝未知来源代码',
-                    PluginSecurityMode.developer => '放行所有本地开发与未签名插件，仅拦截被篡改的损坏包',
+                    PluginSecurityMode.warning =>
+                      l10n?.securityModeWarningDesc ??
+                          '安装未签名插件时弹出安全确认，拦截被篡改的安装包',
+                    PluginSecurityMode.strict => l10n?.securityModeStrictDesc ??
+                        '仅允许安装包含合法 Ed25519 数字签名的插件，杜绝未知来源代码',
+                    PluginSecurityMode.developer =>
+                      l10n?.securityModeDeveloperDesc ??
+                          '放行所有本地开发与未签名插件，仅拦截被篡改的损坏包',
                   }),
                   onTap: () {
                     ref.read(pluginSecurityModeProvider.notifier).setMode(mode);
@@ -199,7 +207,7 @@ class SettingsPage extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(l10n?.cancel ?? '取消'),
             ),
           ],
         );

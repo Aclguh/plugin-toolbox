@@ -78,5 +78,365 @@
   "noAuditTrail": "暂无敏感权限访问记录",
   "exportDiagnosticReport": "导出诊断报告",
   "exportDiagnosticReportDesc": "复制包含运行状态、权限审计与持久化日志的完整诊断报告",
-  "diagnosticReportCopied": "已复制完整诊断报告至剪贴板"
+  "diagnosticReportCopied": "已复制完整诊断报告至剪贴板",
+  "refreshCatalogTooltip": "刷新插件目录",
+  "storeSubtitle": "浏览目录、确认权限后一键安装",
+  "errorCatalogLoadFailed": "插件目录加载失败，请检查网络后重试",
+  "retry": "重新加载",
+  "emptyStoreTitle": "远端插件目录为空",
+  "emptyStoreMessage": "当前插件仓库暂无可安装的插件，可稍后重试或在设置中切换仓库。",
+  "storeSearchHint": "搜索插件名称、描述或作者...",
+  "clearSearchTooltip": "清空搜索",
+  "allCategories": "全部分类",
+  "allFilter": "全部",
+  "emptyFilterTitle": "未找到匹配的插件",
+  "emptyFilterMessage": "试试更换关键词，或清除当前分类筛选。",
+  "clearFilter": "清除筛选条件",
+  "installingPlugin": "正在安装插件 …",
+  "downloadingAndInstalling": "正在下载并安装 {name} …",
+  "@downloadingAndInstalling": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "totalPluginCount": "共 {count} 个插件",
+  "@totalPluginCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filteredPluginCount": "共 {total} 个插件 (已筛选出 {filtered} 个)",
+  "@filteredPluginCount": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "filtered": {
+        "type": "int"
+      }
+    }
+  },
+  "storeSourceHeader": "来源: {source} · 版本取自 plugin-source 清单",
+  "@storeSourceHeader": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "skippedIncompleteEntries": "{count} 个条目元数据不完整已跳过",
+  "@skippedIncompleteEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "updateAvailableBadge": "可更新",
+  "localInstalledVersion": "本地已安装 {version}",
+  "@localInstalledVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "authorMeta": "作者: {author}",
+  "@authorMeta": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "volumeMeta": "体积: {size}",
+  "@volumeMeta": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionMeta": "权限: {permissions}",
+  "@permissionMeta": {
+    "placeholders": {
+      "permissions": {
+        "type": "String"
+      }
+    }
+  },
+  "categoryMeta": "分类: {category}",
+  "@categoryMeta": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "authorPrefix": "作者 {author}",
+  "@authorPrefix": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "volumePrefix": "体积 {size}",
+  "@volumePrefix": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionPrefix": "权限 {permissions}",
+  "@permissionPrefix": {
+    "placeholders": {
+      "permissions": {
+        "type": "String"
+      }
+    }
+  },
+  "versionRequirement": "需要宿主版本 {minVersion} 及以上",
+  "@versionRequirement": {
+    "placeholders": {
+      "minVersion": {
+        "type": "String"
+      }
+    }
+  },
+  "versionNotSatisfied": "版本不满足",
+  "upToDate": "已是最新",
+  "none": "无",
+  "updatePluginTitle": "更新插件",
+  "installPluginTitle": "安装插件",
+  "sensitivePermissionsWarningTitle": "敏感权限授权提醒",
+  "upgradeVersionPrompt": "将把本地 {oldVersion} 覆盖为 {newVersion}",
+  "@upgradeVersionPrompt": {
+    "placeholders": {
+      "oldVersion": {
+        "type": "String"
+      },
+      "newVersion": {
+        "type": "String"
+      }
+    }
+  },
+  "pluginInstallSuccess": "{name} v{version} {action}{warnings}",
+  "@pluginInstallSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      },
+      "action": {
+        "type": "String"
+      },
+      "warnings": {
+        "type": "String"
+      }
+    }
+  },
+  "actionInstalled": "已安装",
+  "actionUpdated": "已更新",
+  "invalidPackageError": "{name}: 安装包无效 ({message})",
+  "@invalidPackageError": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "installFailedRetry": "{name}: 安装失败，请稍后重试",
+  "@installFailedRetry": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "importPtxFab": "导入 .ptx 插件",
+  "managerSubtitleEmpty": "导入 .ptx 插件包以扩展工具箱能力",
+  "managerSubtitleCount": "{count} 个插件 · 长按卡片可卸载",
+  "@managerSubtitleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "emptyManagerTitle": "暂无插件，点击右下角按钮导入",
+  "emptyManagerMessage": "支持一次选择多个 .ptx / .zip 安装包，安装完成后将自动启用。",
+  "selectLocalFile": "从本地选择文件",
+  "managerBannerTip": "长按卡片可删除插件，长按左侧图标可拖动排序",
+  "dynamicBadge": "动态",
+  "versionPrefix": "版本: {version}",
+  "@versionPrefix": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "importSuccessSnack": "成功导入 {count} 个插件",
+  "@importSuccessSnack": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "builtinPluginCannotDelete": "内置插件无法删除",
+  "pluginUninstalledSnack": "插件「{name}」已卸载",
+  "@pluginUninstalledSnack": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "userCancelledUnsigned": "{name}: 用户取消安装未签名插件",
+  "@userCancelledUnsigned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "userDeniedSensitivePermissions": "{name}: 用户拒绝授权敏感权限",
+  "@userDeniedSensitivePermissions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errorInvalidPackage": "安装包无效：{message}",
+  "@errorInvalidPackage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "errorFileReadFailed": "安装包文件读取失败，请确认文件完整后重试",
+  "errorUnknownInstall": "安装失败，发生未知错误，请重试",
+  "importSummaryTitle": "导入结果",
+  "importSummarySuccess": "成功 {count} 个:",
+  "@importSummarySuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importSummaryFailed": "失败 {count} 个:",
+  "@importSummaryFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "installErrorTitle": "安装失败",
+  "ok": "确定",
+  "unsignedPluginWarningTitle": "未签名插件安全提示",
+  "unsignedPluginWarningHeader": "正在尝试安装未经过开发者数字签名的插件。",
+  "unsignedPluginWarningBody": "该扩展包未包含开发者数字签名 (plugin.sig)，无法保障包体来源与完整性。确定要继续安装吗？",
+  "unsignedPluginPluginLabel": "插件: {pluginName}{version}",
+  "@unsignedPluginPluginLabel": {
+    "placeholders": {
+      "pluginName": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "unsignedPluginFilePrefix": "文件: {fileName}",
+  "@unsignedPluginFilePrefix": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "continueInstall": "继续安装",
+  "sensitivePermissionConfirmTitle": "敏感权限授权确认",
+  "sensitivePermissionConfirmHeader": "插件「{pluginName} v{version}」申请了以下敏感权限：",
+  "@sensitivePermissionConfirmHeader": {
+    "placeholders": {
+      "pluginName": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "sensitivePermissionConfirmExplanation": "授予后该插件可访问对应硬件或网络资源，请确认是否信任该来源。",
+  "denyAndCancel": "拒绝并取消",
+  "agreeAndInstall": "同意并安装",
+  "uninstallPluginTitle": "卸载插件",
+  "uninstallPluginConfirmBody": "确定要卸载插件「{name}」吗？\n卸载后相关数据将被清除。",
+  "@uninstallPluginConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sandboxQuota": "沙箱配额: {quota} MB",
+  "@sandboxQuota": {
+    "placeholders": {
+      "quota": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionManagement": "权限管理",
+  "noPermissionsDeclared": "该插件未声明任何系统权限",
+  "sensitiveBadge": "敏感",
+  "exportPtxButton": "导出 .ptx",
+  "done": "完成",
+  "exportDialogTitle": "导出插件安装包",
+  "exportSuccess": "插件已导出至: {path}",
+  "@exportSuccess": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "导出失败: {error}",
+  "@exportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pluginsAndRepo": "插件与仓库",
+  "pluginsAndRepoDesc": "插件目录的来源配置，影响商店可安装的插件集合",
+  "customPluginRepo": "自定义插件仓库",
+  "pluginSecurityPolicy": "插件安全策略",
+  "securityModeStrict": "严格安全模式",
+  "securityModeWarning": "安全警示模式（默认）",
+  "securityModeDeveloper": "开发者模式",
+  "securityModeStrictSummary": "严格安全模式（仅允许安装受信任签名插件）",
+  "securityModeWarningSummary": "安全警示模式（未签名插件弹窗提醒，默认）",
+  "securityModeDeveloperSummary": "开发者模式（放行所有未签名插件）",
+  "securityModeStrictDesc": "仅允许安装包含合法 Ed25519 数字签名的插件，杜绝未知来源代码",
+  "securityModeWarningDesc": "安装未签名插件时弹出安全确认，拦截被篡改的安装包",
+  "securityModeDeveloperDesc": "放行所有本地开发与未签名插件，仅拦截被篡改的损坏包"
 }
