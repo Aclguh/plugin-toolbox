@@ -395,7 +395,7 @@ class LuaEngine {
 
     _lazyModuleBinders['plugin'] = bindIpc;
     _lazyModuleBinders['ipc'] = bindIpc;
-    _lazyModuleBinders['i18n'] = () => I18nApi.bind(_ls, context);
+    _lazyModuleBinders['i18n'] = () => I18nApi.bind(_ls, context, delegate);
 
     // 注入底层按需绑定桥接函数
     _ls.pushDartFunction((ls) {

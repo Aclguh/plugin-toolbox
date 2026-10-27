@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show PlatformDispatcher;
+import '../delegates/domain_delegates.dart';
 
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -13,12 +13,17 @@ import 'sandbox_utils.dart';
 /// 允许插件在沙箱根目录下的 `locales/<lang>.json` 中定义翻译字典，
 /// 默认根据系统宿主环境的 Locale 自动加载，并支持参数动态插值与回退。
 class I18nApi {
-  static void bind(LuaState ls, PluginContext context) {
+  static void bind(LuaState ls, PluginContext context,
+      [LuaHostDelegate? delegate]) {
     ls.newTable();
 
     // 默认当前语言代码跟随系统 (如 "zh", "en")
-    String currentLocale =
-        PlatformDispatcher.instance.locale.languageCode.toLowerCase();
+    String currentLocale = (delegate?.getSystemLocale() ?? 'zh_CN')
+        .split('_')
+        .first
+        .split('-')
+        .first
+        .toLowerCase();
     const String defaultFallbackLocale = 'zh';
 
     final Map<String, Map<String, dynamic>> localeCache = {};

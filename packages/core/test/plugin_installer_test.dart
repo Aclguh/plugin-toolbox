@@ -702,7 +702,7 @@ void main() {
       expect(pluginV1.manifest.version, '1.0.0');
 
       // 2. 模拟运行期用户产生了持久化状态与业务文件
-      final sandboxDir = pluginV1.rootDir!;
+      final sandboxDir = pluginV1.rootDir;
       final storageFile = File('${sandboxDir.path}/storage.json');
       await storageFile.writeAsString('{"saved_key": "user_secret_data"}');
 

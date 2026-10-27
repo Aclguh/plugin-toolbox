@@ -264,6 +264,16 @@ abstract class LuaDeviceDelegate {
   /// 重置屏幕亮度为系统默认
   Future<bool> resetBrightness() async => false;
 
+  /// 获取设备物理屏幕指标：宽度、高度、设备像素比 (dpr)
+  ({int width, int height, double pixelRatio}) getScreenMetrics() =>
+      (width: 0, height: 0, pixelRatio: 1.0);
+
+  /// 获取系统区域语言标识 (如 "zh_CN")
+  String getSystemLocale() => 'zh_CN';
+
+  /// 获取系统主题亮度模式 ("dark" 或 "light")
+  String getSystemBrightness() => 'light';
+
   /// 获取由系统分享传入应用的初始数据
   Future<Map<String, dynamic>?> getInitialShare() async => null;
 
@@ -692,6 +702,18 @@ class CompositeLuaHostDelegate implements LuaHostDelegate {
   @override
   Future<bool> resetBrightness() async =>
       await deviceDelegate?.resetBrightness() ?? false;
+
+  @override
+  ({int width, int height, double pixelRatio}) getScreenMetrics() =>
+      deviceDelegate?.getScreenMetrics() ??
+      (width: 0, height: 0, pixelRatio: 1.0);
+
+  @override
+  String getSystemLocale() => deviceDelegate?.getSystemLocale() ?? 'zh_CN';
+
+  @override
+  String getSystemBrightness() =>
+      deviceDelegate?.getSystemBrightness() ?? 'light';
 
   @override
   Future<Map<String, dynamic>?> getInitialShare() async =>

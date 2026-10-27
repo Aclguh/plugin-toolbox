@@ -1,6 +1,5 @@
 import 'api_guard.dart';
 import 'dart:io';
-import 'dart:ui' show Brightness, FlutterView, PlatformDispatcher, Size;
 
 import 'package:lua_dardo/lua.dart';
 import 'package:plugin_toolbox_core/plugin_toolbox_core.dart';
@@ -65,39 +64,35 @@ class SystemApi {
 
     // system.locale()
     ls.pushDartFunction((ls) {
-      ls.pushString(PlatformDispatcher.instance.locale.toString());
+      ls.pushString(delegate?.getSystemLocale() ?? 'zh_CN');
       return 1;
     });
     ls.setField(-2, 'locale');
 
     // system.screenWidth() / system.screenHeight()
-    // 物理像素尺寸；桌面/测试等无可用视图场景降级为 0
+    // 物理像素尺寸；无可用视图场景降级为 0
     ls.pushDartFunction((ls) {
-      ls.pushInteger(_viewSize?.width.round() ?? 0);
+      ls.pushInteger(delegate?.getScreenMetrics().width ?? 0);
       return 1;
     });
     ls.setField(-2, 'screenWidth');
 
     ls.pushDartFunction((ls) {
-      ls.pushInteger(_viewSize?.height.round() ?? 0);
+      ls.pushInteger(delegate?.getScreenMetrics().height ?? 0);
       return 1;
     });
     ls.setField(-2, 'screenHeight');
 
     // system.pixelRatio()
     ls.pushDartFunction((ls) {
-      ls.pushNumber(_view?.devicePixelRatio ?? 0.0);
+      ls.pushNumber(delegate?.getScreenMetrics().pixelRatio ?? 1.0);
       return 1;
     });
     ls.setField(-2, 'pixelRatio');
 
     // system.brightness() -> 'dark' | 'light'
     ls.pushDartFunction((ls) {
-      ls.pushString(
-        PlatformDispatcher.instance.platformBrightness == Brightness.dark
-            ? 'dark'
-            : 'light',
-      );
+      ls.pushString(delegate?.getSystemBrightness() ?? 'dark');
       return 1;
     });
     ls.setField(-2, 'brightness');
@@ -308,15 +303,5 @@ class SystemApi {
     ls.setField(-2, 'setBrightness');
 
     ls.setGlobal('system');
-  }
-
-  static FlutterView? get _view => PlatformDispatcher.instance.implicitView;
-
-  static Size? get _viewSize {
-    final view = _view;
-    if (view == null) return null;
-    final size = view.physicalSize;
-    if (size.width <= 0 || size.height <= 0) return null;
-    return size;
   }
 }

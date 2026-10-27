@@ -53,6 +53,16 @@ class MockLuaHostDelegate implements LuaHostDelegate {
   Future<String?> getClipboardText() async => clipboardContent;
 
   @override
+  ({int width, int height, double pixelRatio}) getScreenMetrics() =>
+      (width: 1080, height: 2400, pixelRatio: 2.0);
+
+  @override
+  String getSystemLocale() => 'zh_CN';
+
+  @override
+  String getSystemBrightness() => 'light';
+
+  @override
   void hapticFeedback(String type) {
     haptics.add(type);
   }

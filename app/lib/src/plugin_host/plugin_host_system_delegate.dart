@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'plugin_native_bridge.dart';
 
 /// LuaHostDelegate 的系统能力域方法集：分享/链接、手电筒、传感器、
@@ -56,6 +57,24 @@ mixin PluginHostSystemDelegate {
   Future<double> getBrightness() => nativeBridge.getBrightness();
 
   Future<bool> resetBrightness() => nativeBridge.resetBrightness();
+
+  ({int width, int height, double pixelRatio}) getScreenMetrics() {
+    final view = PlatformDispatcher.instance.implicitView;
+    if (view == null) return (width: 0, height: 0, pixelRatio: 1.0);
+    final size = view.physicalSize;
+    return (
+      width: size.width.round(),
+      height: size.height.round(),
+      pixelRatio: view.devicePixelRatio,
+    );
+  }
+
+  String getSystemLocale() => PlatformDispatcher.instance.locale.toString();
+
+  String getSystemBrightness() =>
+      PlatformDispatcher.instance.platformBrightness == Brightness.dark
+          ? 'dark'
+          : 'light';
 
   // 同步电量读取没有低成本真实来源（未引入 battery_plus 等原生依赖），
   // 抛出让 Lua 绑定以脚本错误呈现；真实值请走带回调的异步链路
