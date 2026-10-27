@@ -58,13 +58,17 @@ class PluginStoreService {
     required PluginStoreSource source,
     Future<DynamicPlugin> Function(File file)? installer,
     Future<Directory> Function()? temporaryDirectoryProvider,
+    PluginSignatureVerifier? signatureVerifier,
   })  : _source = source,
         _installer = installer ?? PluginInstaller.installFromPtx,
+        _signatureVerifier = signatureVerifier,
         _temporaryDirectoryProvider =
             temporaryDirectoryProvider ?? _defaultTemporaryDirectory;
 
   final PluginStoreSource _source;
   final Future<DynamicPlugin> Function(File file) _installer;
+
+  final PluginSignatureVerifier? _signatureVerifier;
   final Future<Directory> Function() _temporaryDirectoryProvider;
 
   /// 远端插件目录（按 id 升序）
@@ -127,12 +131,28 @@ class PluginStoreService {
   Future<StoreInstallOutcome> install(PluginStoreEntry entry) async {
     final bytes = await _source.downloadPackage(entry);
 
+    if (_signatureVerifier != null) {
+      final contract = inspectPluginPackage(
+        bytes,
+        signatureVerifier: _signatureVerifier,
+      );
+      if (_signatureVerifier.requireSignature && !contract.hasValidSignature) {
+        throw PluginStoreException(
+          '严格安全策略拦截: 插件缺少合法的数字签名 (${contract.signatureResult?.message ?? '未签名'})',
+        );
+      }
+      if (contract.signatureResult?.isTampered == true) {
+        throw const PluginStoreException('安全策略拦截: 插件安装包签名失效或内容已被篡改');
+      }
+    }
+
     final directory = await _temporaryDirectoryProvider();
     final file = File('${directory.path}/${entry.id}.ptx');
     try {
       file.parent.createSync(recursive: true);
       file.writeAsBytesSync(bytes, flush: true);
       final plugin = await _installer(file);
+
       return StoreInstallOutcome(
         plugin: plugin,
         remoteVersion: entry.version,

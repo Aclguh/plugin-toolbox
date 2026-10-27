@@ -100,6 +100,65 @@ class InstallErrorDialog extends StatelessWidget {
   }
 }
 
+/// 未签名插件安装安全风险确认弹窗（返回 true 表示用户同意继续安装）
+class UnsignedPluginWarningDialog extends StatelessWidget {
+  final String pluginName;
+  final String? pluginVersion;
+  final String? packageFileName;
+
+  const UnsignedPluginWarningDialog({
+    super.key,
+    required this.pluginName,
+    this.pluginVersion,
+    this.packageFileName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final displayVersion = pluginVersion != null ? ' v$pluginVersion' : '';
+
+    return AppDialog(
+      icon: Icons.gpp_maybe_outlined,
+      iconColor: theme.colorScheme.error,
+      title: '未签名插件安全提示',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '正在尝试安装未经过开发者数字签名的插件。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '插件: $pluginName$displayVersion\n'
+            '${packageFileName != null ? '文件: $packageFileName\n' : ''}'
+            '该扩展包未包含开发者数字签名 (plugin.sig)，无法保障包体来源与完整性。确定要继续安装吗？',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          child: const Text('取消'),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        TextButton(
+          child: const Text('继续安装'),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+  }
+}
+
 /// 敏感权限授权确认弹窗（返回 true 表示用户同意安装）
 class SensitivePermissionConfirmDialog extends StatelessWidget {
   final String pluginName;

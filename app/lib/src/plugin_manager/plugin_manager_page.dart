@@ -27,12 +27,38 @@ class PluginManagerPage extends ConsumerWidget {
 
       final outcome = await importPtxFiles(
         files: result.files,
-        installer: PluginInstaller.installFromPtx,
+        installer: (file) => PluginInstaller.installFromPtx(
+          file,
+          signatureVerifier: PluginSignatureVerifier(
+            requireSignature: ref.read(pluginSecurityModeProvider) ==
+                PluginSecurityMode.strict,
+          ),
+        ),
       );
 
       final registry = ref.read(pluginRegistryProvider);
       final pluginsToRegister = <DynamicPlugin>[];
+      final securityMode = ref.read(pluginSecurityModeProvider);
       for (final plugin in outcome.installed) {
+        final isSigned = File('${plugin.rootDir.path}/plugin.sig').existsSync();
+        if (!isSigned &&
+            securityMode == PluginSecurityMode.warning &&
+            context.mounted) {
+          final approved = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => UnsignedPluginWarningDialog(
+              pluginName: plugin.name,
+              pluginVersion: plugin.version,
+            ),
+          );
+          if (approved != true) {
+            await PluginInstaller.uninstall(plugin.id);
+            outcome.succeeded.remove('${plugin.name} v${plugin.version}');
+            outcome.failed.add('${plugin.name}: 用户取消安装未签名插件');
+            continue;
+          }
+        }
         final sensitivePerms =
             plugin.manifest.permissions.where((p) => p.isSensitive).toList();
         if (sensitivePerms.isNotEmpty && context.mounted) {

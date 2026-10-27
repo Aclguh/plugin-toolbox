@@ -422,6 +422,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 点击关于项
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('版本 0.2.1'));
     await tester.pumpAndSettle();
 

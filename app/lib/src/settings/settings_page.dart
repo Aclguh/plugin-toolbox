@@ -49,6 +49,7 @@ class SettingsPage extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final useDynamicColor = ref.watch(dynamicColorEnabledProvider);
     final repoConfig = ref.watch(customPluginRepositoryProvider);
+    final securityMode = ref.watch(pluginSecurityModeProvider);
 
     return PluginPageScaffold(
       title: l10n?.settings ?? '设置',
@@ -111,6 +112,20 @@ class SettingsPage extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right, size: 20),
                 onTap: () => _showCustomRepoDialog(context, ref, repoConfig),
               ),
+              ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: const Text('插件安全策略'),
+                subtitle: Text(
+                  switch (securityMode) {
+                    PluginSecurityMode.strict => '严格安全模式（仅允许安装受信任签名插件）',
+                    PluginSecurityMode.developer => '开发者模式（放行所有未签名插件）',
+                    PluginSecurityMode.warning => '安全警示模式（未签名插件弹窗提醒，默认）',
+                  },
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () =>
+                    _showSecurityModeDialog(context, ref, securityMode),
+              ),
             ],
           ),
           AppSection(
@@ -135,6 +150,60 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showSecurityModeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    PluginSecurityMode currentMode,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AppDialog(
+          icon: Icons.shield_outlined,
+          title: '插件安全策略',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in PluginSecurityMode.values)
+                ListTile(
+                  leading: Icon(
+                    mode == currentMode
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: mode == currentMode
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(switch (mode) {
+                    PluginSecurityMode.warning => '安全警示模式（默认）',
+                    PluginSecurityMode.strict => '严格安全模式',
+                    PluginSecurityMode.developer => '开发者模式',
+                  }),
+                  subtitle: Text(switch (mode) {
+                    PluginSecurityMode.warning => '安装未签名插件时弹出安全确认，拦截被篡改的安装包',
+                    PluginSecurityMode.strict =>
+                      '仅允许安装包含合法 Ed25519 数字签名的插件，杜绝未知来源代码',
+                    PluginSecurityMode.developer => '放行所有本地开发与未签名插件，仅拦截被篡改的损坏包',
+                  }),
+                  onTap: () {
+                    ref.read(pluginSecurityModeProvider.notifier).setMode(mode);
+                    Navigator.pop(ctx);
+                  },
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+          ],
+        );
+      },
     );
   }
 

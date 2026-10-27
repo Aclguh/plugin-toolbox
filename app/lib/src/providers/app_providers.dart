@@ -260,6 +260,49 @@ final dynamicColorEnabledProvider =
   return DynamicColorNotifier(prefs);
 });
 
+/// 插件数字签名安全校验策略
+enum PluginSecurityMode {
+  /// 严格模式: 仅允许安装受信任开发者签名的插件
+  strict,
+
+  /// 警示模式 (默认): 对未签名插件进行安全警示并需用户明确确认，篡改包直接拦截
+  warning,
+
+  /// 开发者模式: 放行所有未签名插件
+  developer,
+}
+
+class PluginSecurityNotifier extends StateNotifier<PluginSecurityMode> {
+  PluginSecurityNotifier(SharedPreferences prefs)
+      : _prefs = prefs,
+        super(_load(prefs));
+
+  final SharedPreferences _prefs;
+  static const _key = 'plugin_security_mode';
+
+  static PluginSecurityMode _load(SharedPreferences prefs) {
+    final str = safeRead(prefs, _key, 'warning', prefs.getString);
+    return switch (str) {
+      'strict' => PluginSecurityMode.strict,
+      'developer' => PluginSecurityMode.developer,
+      _ => PluginSecurityMode.warning,
+    };
+  }
+
+  Future<void> setMode(PluginSecurityMode mode) async {
+    state = mode;
+    try {
+      await _prefs.setString(_key, mode.name);
+    } catch (_) {}
+  }
+}
+
+final pluginSecurityModeProvider =
+    StateNotifierProvider<PluginSecurityNotifier, PluginSecurityMode>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return PluginSecurityNotifier(prefs);
+});
+
 /// 应用启动时载入已安装的动态插件并进行初始化
 final appInitFutureProvider = FutureProvider<void>((ref) async {
   // 0. 注入沙箱路径提供者，消除 core 包对 platform channel 的隐式耦合

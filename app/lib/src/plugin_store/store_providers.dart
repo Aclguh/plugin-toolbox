@@ -164,7 +164,13 @@ final pluginStoreServiceProvider = Provider<PluginStoreService>((ref) {
         SharedPreferencesKeyValueStore(ref.watch(sharedPreferencesProvider)),
   );
   ref.onDispose(client.close);
-  return PluginStoreService(source: client);
+  final securityMode = ref.watch(pluginSecurityModeProvider);
+  return PluginStoreService(
+    source: client,
+    signatureVerifier: PluginSignatureVerifier(
+      requireSignature: securityMode == PluginSecurityMode.strict,
+    ),
+  );
 });
 
 /// 商店目录拉取结果。以 FutureProvider 承载，便于下拉/按钮刷新时 invalidate 重取。
