@@ -11,10 +11,20 @@ class Ed25519 {
   static final BigInt _i =
       _modExp(BigInt.two, (_p - BigInt.one) ~/ BigInt.from(4), _p);
 
+  static final BigInt _two = BigInt.two;
+  static final BigInt _twoD = (BigInt.two * _d) % _p;
+
   static final List<BigInt> _b = [
     _xrecover(BigInt.from(4) * _inv(BigInt.from(5)) % _p),
     BigInt.from(4) * _inv(BigInt.from(5)) % _p,
   ];
+
+  static final _ExtPoint _baseExt = _ExtPoint.fromAffine(_b[0], _b[1], _p);
+
+  static BigInt _mod(BigInt val) {
+    final r = val % _p;
+    return r < BigInt.zero ? r + _p : r;
+  }
 
   static BigInt _inv(BigInt x) {
     return _modExp(x, _p - BigInt.two, _p);
@@ -42,24 +52,53 @@ class Ed25519 {
     return x;
   }
 
-  static List<BigInt> _edwardsAdd(List<BigInt> p1, List<BigInt> p2) {
-    final x1 = p1[0], y1 = p1[1];
-    final x2 = p2[0], y2 = p2[1];
-    final x3 =
-        (x1 * y2 + x2 * y1) * _inv(BigInt.one + _d * x1 * x2 * y1 * y2) % _p;
-    final y3 =
-        (y1 * y2 + x1 * x2) * _inv(BigInt.one - _d * x1 * x2 * y1 * y2) % _p;
-    return [x3, y3];
+  static _ExtPoint _extAdd(_ExtPoint p1, _ExtPoint p2) {
+    final a = _mod((p1.y - p1.x) * (p2.y - p2.x));
+    final b = _mod((p1.y + p1.x) * (p2.y + p2.x));
+    final c = _mod(_twoD * p1.t * p2.t);
+    final d = _mod(_two * p1.z * p2.z);
+    final e = _mod(b - a);
+    final f = _mod(d - c);
+    final g = _mod(d + c);
+    final h = _mod(b + a);
+    return _ExtPoint(
+      _mod(e * f),
+      _mod(g * h),
+      _mod(f * g),
+      _mod(e * h),
+    );
   }
 
-  static List<BigInt> _scalarMult(List<BigInt> p, BigInt e) {
-    if (e == BigInt.zero) return [BigInt.zero, BigInt.one];
-    var q = _scalarMult(p, e ~/ BigInt.two);
-    q = _edwardsAdd(q, q);
-    if (e.isOdd) {
-      q = _edwardsAdd(q, p);
+  static _ExtPoint _extDouble(_ExtPoint p1) {
+    final a = _mod(p1.x * p1.x);
+    final b = _mod(p1.y * p1.y);
+    final c = _mod(_two * p1.z * p1.z);
+    final d = _mod(-a);
+    final sum = p1.x + p1.y;
+    final e = _mod(sum * sum - a - b);
+    final g = _mod(d + b);
+    final f = _mod(g - c);
+    final h = _mod(d - b);
+    return _ExtPoint(
+      _mod(e * f),
+      _mod(g * h),
+      _mod(f * g),
+      _mod(e * h),
+    );
+  }
+
+  static _ExtPoint _extScalarMult(_ExtPoint p, BigInt e) {
+    var res = _ExtPoint.identity;
+    var current = p;
+    var scalar = e;
+    while (scalar > BigInt.zero) {
+      if (scalar.isOdd) {
+        res = _extAdd(res, current);
+      }
+      current = _extDouble(current);
+      scalar = scalar ~/ BigInt.two;
     }
-    return q;
+    return res;
   }
 
   static List<int> _encodePoint(List<BigInt> p) {
@@ -131,7 +170,7 @@ class Ed25519 {
     aBytes[31] &= 127;
     aBytes[31] |= 64;
     final a = _decodeInt(aBytes);
-    final aPoint = _scalarMult(_b, a);
+    final aPoint = _extScalarMult(_baseExt, a).toAffine(_p, _inv);
     return _encodePoint(aPoint);
   }
 
@@ -143,13 +182,13 @@ class Ed25519 {
     aBytes[31] &= 127;
     aBytes[31] |= 64;
     final a = _decodeInt(aBytes);
-    final aPoint = _scalarMult(_b, a);
+    final aPoint = _extScalarMult(_baseExt, a).toAffine(_p, _inv);
     final aEncoded = _encodePoint(aPoint);
 
     final rMsg = <int>[...h.sublist(32, 64), ...message];
     final rHash = sha512.convert(rMsg).bytes;
     final r = _decodeInt(rHash) % _q;
-    final rPoint = _scalarMult(_b, r);
+    final rPoint = _extScalarMult(_baseExt, r).toAffine(_p, _inv);
     final rEncoded = _encodePoint(rPoint);
 
     final kMsg = <int>[...rEncoded, ...aEncoded, ...message];
@@ -181,9 +220,11 @@ class Ed25519 {
     final kHash = sha512.convert(kMsg).bytes;
     final k = _decodeInt(kHash) % _q;
 
-    final sbPoint = _scalarMult(_b, s);
-    final kaPoint = _scalarMult(aPoint, k);
-    final rkaPoint = _edwardsAdd(rPoint, kaPoint);
+    final sbPoint = _extScalarMult(_baseExt, s).toAffine(_p, _inv);
+    final aPointExt = _ExtPoint.fromAffine(aPoint[0], aPoint[1], _p);
+    final kaPointExt = _extScalarMult(aPointExt, k);
+    final rPointExt = _ExtPoint.fromAffine(rPoint[0], rPoint[1], _p);
+    final rkaPoint = _extAdd(rPointExt, kaPointExt).toAffine(_p, _inv);
 
     final p1 = _encodePoint(sbPoint);
     final p2 = _encodePoint(rkaPoint);
@@ -213,5 +254,33 @@ class Ed25519 {
       bytes.add(int.parse(clean.substring(i, i + 2), radix: 16));
     }
     return bytes;
+  }
+}
+
+/// 扩展 Edwards 坐标表示点 (X : Y : Z : T)，满足 x = X/Z, y = Y/Z, T = X*Y/Z
+class _ExtPoint {
+  final BigInt x;
+  final BigInt y;
+  final BigInt z;
+  final BigInt t;
+
+  const _ExtPoint(this.x, this.y, this.z, this.t);
+
+  static final identity =
+      _ExtPoint(BigInt.zero, BigInt.one, BigInt.one, BigInt.zero);
+
+  factory _ExtPoint.fromAffine(BigInt ax, BigInt ay, BigInt p) {
+    final xMod = ax % p;
+    final yMod = ay % p;
+    return _ExtPoint(xMod, yMod, BigInt.one, (xMod * yMod) % p);
+  }
+
+  List<BigInt> toAffine(BigInt p, BigInt Function(BigInt) inv) {
+    final zInv = inv(z);
+    final ax = (x * zInv) % p;
+    final ay = (y * zInv) % p;
+    final rAx = ax < BigInt.zero ? ax + p : ax;
+    final rAy = ay < BigInt.zero ? ay + p : ay;
+    return [rAx, rAy];
   }
 }
