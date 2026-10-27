@@ -1066,4 +1066,124 @@ void main() {
 
     expect(find.text('完成'), findsOneWidget);
   });
+  testWidgets('PluginManagerPage 与 DynamicPluginHostPage 多状态及容错降级综合测试',
+      (tester) async {
+    final container = await createContainer();
+    final registry = container.read(pluginRegistryProvider);
+
+    // 1. 空状态测试
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: PluginManagerPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('暂无插件，点击右下角按钮导入'), findsOneWidget);
+    expect(find.text('从本地选择文件'), findsOneWidget);
+
+    // 2. 注册 2 个动态插件进行多状态、启禁用与重排测试
+    final tempA = Directory.systemTemp.createTempSync('dyn_a_');
+    final tempB = Directory.systemTemp.createTempSync('dyn_b_');
+    addTearDown(() {
+      try {
+        tempA.deleteSync(recursive: true);
+      } catch (_) {}
+      try {
+        tempB.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    final pluginA = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'p_alpha',
+        name: '插件 Alpha',
+        version: '1.0.0',
+        description: 'Alpha 插件说明',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.encoding,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      ),
+      rootDir: tempA,
+    );
+    final pluginB = DynamicPlugin(
+      manifest: const PluginManifest(
+        id: 'p_beta',
+        name: '插件 Beta',
+        version: '2.0.0',
+        description: 'Beta 插件说明',
+        author: 'Tester',
+        type: 'lua',
+        category: PluginCategory.generator,
+        permissions: [],
+        entry: 'main.lua',
+        ui: 'ui.json',
+      ),
+      rootDir: tempB,
+    );
+
+    registry.register(pluginA);
+    registry.register(pluginB);
+    container.read(pluginRegistryProvider.notifier).refresh();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: PluginManagerPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('插件 Alpha'), findsOneWidget);
+    expect(find.text('插件 Beta'), findsOneWidget);
+
+    // 测试 Switch 启禁用切换
+    final switches = find.byType(Switch);
+    expect(switches, findsNWidgets(2));
+    expect(registry.isEnabled('p_alpha'), isTrue);
+
+    await tester.tap(switches.first);
+    await tester.pumpAndSettle();
+    expect(registry.isEnabled('p_alpha'), isFalse);
+
+    await tester.tap(switches.first);
+    await tester.pumpAndSettle();
+    expect(registry.isEnabled('p_alpha'), isTrue);
+
+    // 3. 测试拖拽重排 reorder
+    await container.read(pluginRegistryProvider.notifier).reorder(0, 1);
+    await tester.pumpAndSettle();
+    expect(container.read(allPluginListProvider).first.id, 'p_beta');
+
+    // 4. DynamicPluginHostPage 错误态降级与重试按钮
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: DynamicPluginHostPage(plugin: pluginA),
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+
+    // 缺失 UI 文件，降级展示 ErrorView
+    expect(find.textContaining('插件运行错误'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+    await tester.tap(find.text('重试'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('插件运行错误'), findsOneWidget);
+  });
 }

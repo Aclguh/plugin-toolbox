@@ -581,5 +581,66 @@ void main() {
 
       netEng.close();
     });
+    test('SocketApi: TCP 连接异常与超时回调 onError 被正确触发', () async {
+      final netCtx = PluginContext(
+        pluginId: 'net_err_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEng = LuaEngine(context: netCtx, delegate: delegate);
+
+      // 连接到一个不可达的端口，触发 onError
+      netEng.loadAndExecute('''
+        local id = socket.tcpConnect("127.0.0.1", 59999, {
+          timeout = 50,
+          onError = function(sockId, err)
+            state.set("tcp_error_id", sockId)
+            state.set("tcp_error_msg", err)
+          end
+        })
+        state.set("tcp_initiated_id", id)
+      ''');
+
+      expect(delegate.getState('tcp_initiated_id'), isNotNull);
+
+      await _waitFor(() => delegate.getState('tcp_error_id') != null);
+      expect(delegate.getState('tcp_error_id'),
+          delegate.getState('tcp_initiated_id'));
+      expect(delegate.getState('tcp_error_msg'), isNotNull);
+
+      netEng.close();
+    });
+
+    test('WebSocketApi: 错误地址与异常握手时 onError 回调正确触发', () async {
+      final netCtx = PluginContext(
+        pluginId: 'ws_err_plugin',
+        storage: InMemoryPluginStorage(),
+        eventBus: EventBusImpl(),
+        logger: Logger(),
+        grantedPermissions: {PluginPermission.network},
+      );
+      final netEng = LuaEngine(context: netCtx, delegate: delegate);
+
+      netEng.loadAndExecute('''
+        local id = websocket.connect("ws://127.0.0.1:59998", {
+          onError = function(wsId, err)
+            state.set("ws_error_id", wsId)
+            state.set("ws_error_msg", err)
+          end
+        })
+        state.set("ws_initiated_id", id)
+      ''');
+
+      expect(delegate.getState('ws_initiated_id'), isNotNull);
+
+      await _waitFor(() => delegate.getState('ws_error_id') != null);
+      expect(delegate.getState('ws_error_id'),
+          delegate.getState('ws_initiated_id'));
+      expect(delegate.getState('ws_error_msg'), isNotNull);
+
+      netEng.close();
+    });
   });
 }
