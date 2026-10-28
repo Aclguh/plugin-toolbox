@@ -185,8 +185,4 @@ class BarcodeHandler(private val activity: Activity) : FeatureHandler {
             photoDestFile = null
         }
     }
-
-    override fun onDestroy() {
-        ioExecutor.shutdown()
-    }
 }
