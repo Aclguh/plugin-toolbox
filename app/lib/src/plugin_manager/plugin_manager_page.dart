@@ -42,7 +42,8 @@ class PluginManagerPage extends ConsumerWidget {
       final pluginsToRegister = <DynamicPlugin>[];
       final securityMode = ref.read(pluginSecurityModeProvider);
       for (final plugin in outcome.installed) {
-        final isSigned = File('${plugin.rootDir.path}/plugin.sig').existsSync();
+        final isSigned =
+            await File('${plugin.rootDir.path}/plugin.sig').exists();
         if (!isSigned &&
             securityMode == PluginSecurityMode.warning &&
             context.mounted) {

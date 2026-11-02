@@ -149,6 +149,7 @@ class PluginStoreService {
     final directory = await _temporaryDirectoryProvider();
     final file = File('${directory.path}/${entry.id}.ptx');
     try {
+      // 写入临时安装包：保持同步刷盘以确保后续解压与测试环境立即读取到完整包数据
       file.parent.createSync(recursive: true);
       file.writeAsBytesSync(bytes, flush: true);
       final plugin = await _installer(file);

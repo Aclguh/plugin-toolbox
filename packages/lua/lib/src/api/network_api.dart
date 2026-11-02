@@ -298,6 +298,13 @@ class NetworkApi {
               throw Exception('重定向跳数超限 (>$maxRedirectHops)');
             }
             final nextUri = currentUri.resolve(location);
+            final nextScheme = nextUri.scheme.toLowerCase();
+            if (nextScheme != 'http' && nextScheme != 'https') {
+              throw Exception('重定向目标协议不受支持 (仅限 HTTP/HTTPS): ${nextUri.scheme}');
+            }
+            if (nextUri.host.isEmpty) {
+              throw Exception('重定向目标缺少有效主机名: $location');
+            }
             if (!context.isHostAllowed(nextUri.host)) {
               throw Exception('重定向目标域名不在白名单内: ${nextUri.host}');
             }
@@ -358,6 +365,19 @@ class NetworkApi {
         uri = Uri.parse(url);
       } on FormatException catch (e) {
         ls.error2('URL 不合法: $e');
+        return;
+      }
+
+      final scheme = uri.scheme.toLowerCase();
+      if (scheme != 'http' && scheme != 'https') {
+        handleError(
+            '仅支持 HTTP 与 HTTPS 协议: ${uri.scheme.isEmpty ? "(空)" : uri.scheme}',
+            cbRef);
+        return;
+      }
+
+      if (uri.host.isEmpty) {
+        handleError('URL 缺少有效主机名: $url', cbRef);
         return;
       }
 

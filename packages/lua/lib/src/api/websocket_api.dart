@@ -95,6 +95,26 @@ class WebSocketApi {
         return 0;
       }
 
+      final scheme = uri.scheme.toLowerCase();
+      if (scheme != 'ws' && scheme != 'wss') {
+        if (onErrorRef != null) {
+          callbacks.invoke(onErrorRef, [
+            '',
+            '仅支持 WS 与 WSS 协议: ${uri.scheme.isEmpty ? "(空)" : uri.scheme}'
+          ]);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
+      if (uri.host.isEmpty) {
+        if (onErrorRef != null) {
+          callbacks.invoke(onErrorRef, ['', 'WebSocket URL 缺少有效主机名: $url']);
+        }
+        ls.pushString('');
+        return 1;
+      }
+
       if (!context.isHostAllowed(uri.host)) {
         if (onErrorRef != null) {
           callbacks.invoke(onErrorRef, ['', '域名不在白名单内: ${uri.host}']);

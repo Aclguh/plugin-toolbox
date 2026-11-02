@@ -571,4 +571,54 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get securityModeDeveloperDesc => '放行所有本地开发与未签名插件，仅拦截被篡改的损坏包';
+
+  @override
+  String totalPluginsCount(int count) {
+    return '共 $count 个插件';
+  }
+
+  @override
+  String filteredPluginsCount(int total, int filtered) {
+    return '共 $total 个插件 (已筛选出 $filtered 个)';
+  }
+
+  @override
+  String authorLabel(String author) {
+    return '作者 $author';
+  }
+
+  @override
+  String sizeLabel(String size) {
+    return '体积 $size';
+  }
+
+  @override
+  String permissionsLabel(String permissions) {
+    return '权限 $permissions';
+  }
+
+  @override
+  String get noPermissions => '无';
+
+  @override
+  String minAppVersionRequired(String version) {
+    return '需要宿主版本 $version 及以上';
+  }
+
+  @override
+  String get categoryLabel => '分类';
+
+  @override
+  String get authorHeader => '作者';
+
+  @override
+  String get sizeHeader => '体积';
+
+  @override
+  String get permissionsHeader => '权限';
+
+  @override
+  String overwriteLocalVersion(String localVersion, String newVersion) {
+    return '将把本地 $localVersion 覆盖为 $newVersion';
+  }
 }

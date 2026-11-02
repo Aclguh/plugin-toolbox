@@ -1,3 +1,5 @@
+import 'package:plugin_toolbox/src/plugin_store/plugin_store_card.dart';
+import 'package:plugin_toolbox/src/plugin_store/store_install_confirm_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -393,5 +395,49 @@ void main() {
 
     expect(find.text('Base64 编解码'), findsOneWidget);
     expect(find.text('哈希计算工具'), findsOneWidget);
+  });
+
+  testWidgets('PluginStoreCard 与 StoreInstallConfirmDialog 独立渲染测试',
+      (WidgetTester tester) async {
+    bool tapped = false;
+    final item = PluginStoreItem(
+      entry: storeEntry(
+        id: 'test_card',
+        name: '独立测试卡片',
+        description: '测试卡片描述',
+      ),
+      state: PluginStoreInstallState.notInstalled,
+      minAppVersionSatisfied: true,
+      installedVersion: null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PluginStoreCard(
+            item: item,
+            isBusy: false,
+            onAction: () => tapped = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('独立测试卡片'), findsOneWidget);
+    expect(find.text('版本 1.1.0 · 编解码'), findsOneWidget);
+    await tester.tap(find.text('安装'));
+    expect(tapped, isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreInstallConfirmDialog(item: item),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('独立测试卡片 v1.1.0'), findsOneWidget);
+    expect(find.text('安装插件'), findsOneWidget);
   });
 }

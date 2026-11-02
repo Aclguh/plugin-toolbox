@@ -130,6 +130,7 @@
   },
   "skippedIncompleteEntries": "{count} entries skipped due to incomplete metadata",
   "@skippedIncompleteEntries": {
+    "description": "Notice for skipped items in store",
     "placeholders": {
       "count": {
         "type": "int"
@@ -438,5 +439,94 @@
   "securityModeDeveloperSummary": "Developer Mode (Allow all unsigned plugins)",
   "securityModeStrictDesc": "Only allow plugins with valid Ed25519 digital signatures to prevent untrusted code",
   "securityModeWarningDesc": "Prompt security confirmation for unsigned plugins, block corrupted or tampered packages",
-  "securityModeDeveloperDesc": "Allow all unsigned local packages, only block corrupted packages"
+  "securityModeDeveloperDesc": "Allow all unsigned local packages, only block corrupted packages",
+  "totalPluginsCount": "{count} plugins in total",
+  "@totalPluginsCount": {
+    "description": "Total plugins count label in store",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filteredPluginsCount": "{filtered} of {total} plugins filtered",
+  "@filteredPluginsCount": {
+    "description": "Filtered plugins count label in store",
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "filtered": {
+        "type": "int"
+      }
+    }
+  },
+  "authorLabel": "Author: {author}",
+  "@authorLabel": {
+    "description": "Author tag label",
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "sizeLabel": "Size: {size}",
+  "@sizeLabel": {
+    "description": "Package size tag label",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionsLabel": "Permissions: {permissions}",
+  "@permissionsLabel": {
+    "description": "Permissions tag label",
+    "placeholders": {
+      "permissions": {
+        "type": "String"
+      }
+    }
+  },
+  "noPermissions": "None",
+  "@noPermissions": {
+    "description": "No permissions fallback"
+  },
+  "minAppVersionRequired": "Requires host app version {version} or higher",
+  "@minAppVersionRequired": {
+    "description": "Host app version requirement warning",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "categoryLabel": "Category",
+  "@categoryLabel": {
+    "description": "Category field label"
+  },
+  "authorHeader": "Author",
+  "@authorHeader": {
+    "description": "Author field label"
+  },
+  "sizeHeader": "Size",
+  "@sizeHeader": {
+    "description": "Size field label"
+  },
+  "permissionsHeader": "Permissions",
+  "@permissionsHeader": {
+    "description": "Permissions field label"
+  },
+  "overwriteLocalVersion": "Local version {localVersion} will be updated to {newVersion}",
+  "@overwriteLocalVersion": {
+    "description": "Warning message when updating installed plugin",
+    "placeholders": {
+      "localVersion": {
+        "type": "String"
+      },
+      "newVersion": {
+        "type": "String"
+      }
+    }
+  }
 }

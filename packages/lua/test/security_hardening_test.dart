@@ -460,6 +460,33 @@ void main() {
       expect(delegate.getState('p_ok'), true);
       expect(delegate.getState('p_body'), 'ok-body');
     });
+
+    test('非 HTTP/HTTPS 协议与非法 Scheme 被安全拦截', () async {
+      engine.loadAndExecute('''
+        network.get("file:///etc/passwd", function(res)
+          state.set("f_ok", res.ok)
+          state.set("f_err", res.error)
+        end)
+        network.get("data:text/html,test", function(res)
+          state.set("d_ok", res.ok)
+          state.set("d_err", res.error)
+        end)
+      ''');
+
+      for (var i = 0; i < 40; i++) {
+        if (delegate.getState('f_ok') != null &&
+            delegate.getState('d_ok') != null) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+      expect(delegate.getState('f_ok'), false);
+      expect(delegate.getState('f_err') as String,
+          contains('仅支持 HTTP 与 HTTPS 协议'));
+      expect(delegate.getState('d_ok'), false);
+      expect(delegate.getState('d_err') as String,
+          contains('仅支持 HTTP 与 HTTPS 协议'));
+    });
   });
 
   group('database 沙箱挂载与权限门控', () {
