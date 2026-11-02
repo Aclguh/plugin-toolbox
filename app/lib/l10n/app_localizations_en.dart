@@ -598,4 +598,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get securityModeDeveloperDesc =>
       'Allow all unsigned local packages, only block corrupted packages';
+
+  @override
+  String totalPluginsCount(int count) {
+    return '$count plugins in total';
+  }
+
+  @override
+  String filteredPluginsCount(int total, int filtered) {
+    return '$filtered of $total plugins filtered';
+  }
+
+  @override
+  String authorLabel(String author) {
+    return 'Author: $author';
+  }
+
+  @override
+  String sizeLabel(String size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String permissionsLabel(String permissions) {
+    return 'Permissions: $permissions';
+  }
+
+  @override
+  String get noPermissions => 'None';
+
+  @override
+  String minAppVersionRequired(String version) {
+    return 'Requires host app version $version or higher';
+  }
+
+  @override
+  String get categoryLabel => 'Category';
+
+  @override
+  String get authorHeader => 'Author';
+
+  @override
+  String get sizeHeader => 'Size';
+
+  @override
+  String get permissionsHeader => 'Permissions';
+
+  @override
+  String overwriteLocalVersion(String localVersion, String newVersion) {
+    return 'Local version $localVersion will be updated to $newVersion';
+  }
 }

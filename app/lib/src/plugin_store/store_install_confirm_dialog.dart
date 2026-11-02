@@ -74,16 +74,19 @@ class StoreInstallConfirmDialog extends StatelessWidget {
                   children: [
                     _dialogMetaLine(
                       context,
-                      '分类: ${pluginCategoryLabel(item.entry.category)}',
-                    ),
-                    _dialogMetaLine(context, '作者: ${item.entry.author}'),
-                    _dialogMetaLine(
-                      context,
-                      '体积: ${item.entry.packageSizeLabel}',
+                      '${l10n?.categoryLabel ?? '分类'}: ${pluginCategoryLabel(item.entry.category)}',
                     ),
                     _dialogMetaLine(
                       context,
-                      '权限: ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
+                      '${l10n?.authorHeader ?? '作者'}: ${item.entry.author}',
+                    ),
+                    _dialogMetaLine(
+                      context,
+                      '${l10n?.sizeHeader ?? '体积'}: ${item.entry.packageSizeLabel}',
+                    ),
+                    _dialogMetaLine(
+                      context,
+                      '${l10n?.permissionsHeader ?? '权限'}: ${item.entry.permissions.isEmpty ? (l10n?.noPermissions ?? '无') : item.entry.permissions.map(pluginPermissionLabel).join('、')}',
                     ),
                   ],
                 ),
@@ -104,7 +107,9 @@ class StoreInstallConfirmDialog extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               isUpdate
-                  ? '将把本地 ${item.installedVersion} 覆盖为 ${item.version}'
+                  ? (l10n?.overwriteLocalVersion(
+                          item.installedVersion!, item.version) ??
+                      '将把本地 ${item.installedVersion} 覆盖为 ${item.version}')
                   : l10n?.localInstalledVersion(item.installedVersion!) ??
                       '本地已安装 ${item.installedVersion}',
               style: theme.textTheme.bodySmall?.copyWith(

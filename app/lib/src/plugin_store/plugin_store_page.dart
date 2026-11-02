@@ -423,8 +423,10 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
     final repoConfig = ref.watch(customPluginRepositoryProvider);
     final sourceLabel = repoConfig.summary;
     final countLabel = filteredItems.length == allItems.length
-        ? '共 ${allItems.length} 个插件'
-        : '共 ${allItems.length} 个插件 (已筛选出 ${filteredItems.length} 个)';
+        ? (l10n?.totalPluginsCount(allItems.length) ??
+            '共 ${allItems.length} 个插件')
+        : (l10n?.filteredPluginsCount(allItems.length, filteredItems.length) ??
+            '共 ${allItems.length} 个插件 (已筛选出 ${filteredItems.length} 个)');
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -457,7 +459,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            '来源: $sourceLabel · 版本取自 plugin-source 清单',
+            l10n?.storeSourceHeader(sourceLabel) ??
+                '来源: $sourceLabel · 版本取自 plugin-source 清单',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -465,7 +468,8 @@ class _PluginStorePageState extends ConsumerState<PluginStorePage> {
           if (catalog.skipped.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xxs),
             Text(
-              '${catalog.skipped.length} 个条目元数据不完整已跳过',
+              l10n?.skippedIncompleteEntries(catalog.skipped.length) ??
+                  '${catalog.skipped.length} 个条目元数据不完整已跳过',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

@@ -596,7 +596,7 @@ abstract class AppLocalizations {
   /// **'来源: {source} · 版本取自 plugin-source 清单'**
   String storeSourceHeader(String source);
 
-  /// No description provided for @skippedIncompleteEntries.
+  /// Notice for skipped items in store
   ///
   /// In zh, this message translates to:
   /// **'{count} 个条目元数据不完整已跳过'**
@@ -1076,6 +1076,78 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'放行所有本地开发与未签名插件，仅拦截被篡改的损坏包'**
   String get securityModeDeveloperDesc;
+
+  /// Total plugins count label in store
+  ///
+  /// In zh, this message translates to:
+  /// **'共 {count} 个插件'**
+  String totalPluginsCount(int count);
+
+  /// Filtered plugins count label in store
+  ///
+  /// In zh, this message translates to:
+  /// **'共 {total} 个插件 (已筛选出 {filtered} 个)'**
+  String filteredPluginsCount(int total, int filtered);
+
+  /// Author tag label
+  ///
+  /// In zh, this message translates to:
+  /// **'作者 {author}'**
+  String authorLabel(String author);
+
+  /// Package size tag label
+  ///
+  /// In zh, this message translates to:
+  /// **'体积 {size}'**
+  String sizeLabel(String size);
+
+  /// Permissions tag label
+  ///
+  /// In zh, this message translates to:
+  /// **'权限 {permissions}'**
+  String permissionsLabel(String permissions);
+
+  /// No permissions fallback
+  ///
+  /// In zh, this message translates to:
+  /// **'无'**
+  String get noPermissions;
+
+  /// Host app version requirement warning
+  ///
+  /// In zh, this message translates to:
+  /// **'需要宿主版本 {version} 及以上'**
+  String minAppVersionRequired(String version);
+
+  /// Category field label
+  ///
+  /// In zh, this message translates to:
+  /// **'分类'**
+  String get categoryLabel;
+
+  /// Author field label
+  ///
+  /// In zh, this message translates to:
+  /// **'作者'**
+  String get authorHeader;
+
+  /// Size field label
+  ///
+  /// In zh, this message translates to:
+  /// **'体积'**
+  String get sizeHeader;
+
+  /// Permissions field label
+  ///
+  /// In zh, this message translates to:
+  /// **'权限'**
+  String get permissionsHeader;
+
+  /// Warning message when updating installed plugin
+  ///
+  /// In zh, this message translates to:
+  /// **'将把本地 {localVersion} 覆盖为 {newVersion}'**
+  String overwriteLocalVersion(String localVersion, String newVersion);
 }
 
 class _AppLocalizationsDelegate

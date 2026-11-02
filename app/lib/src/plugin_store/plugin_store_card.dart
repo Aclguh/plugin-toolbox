@@ -143,17 +143,24 @@ class PluginStoreCard extends StatelessWidget {
                 _metaItem(
                   context,
                   Icons.person_outline_rounded,
-                  '作者 ${item.entry.author}',
+                  l10n?.authorLabel(item.entry.author) ??
+                      '作者 ${item.entry.author}',
                 ),
                 _metaItem(
                   context,
                   Icons.inventory_2_outlined,
-                  '体积 ${item.entry.packageSizeLabel}',
+                  l10n?.sizeLabel(item.entry.packageSizeLabel) ??
+                      '体积 ${item.entry.packageSizeLabel}',
                 ),
                 _metaItem(
                   context,
                   Icons.key_outlined,
-                  '权限 ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('/')}',
+                  l10n?.permissionsLabel(item.entry.permissions.isEmpty
+                          ? (l10n.noPermissions)
+                          : item.entry.permissions
+                              .map(pluginPermissionLabel)
+                              .join('/')) ??
+                      '权限 ${item.entry.permissions.isEmpty ? '无' : item.entry.permissions.map(pluginPermissionLabel).join('/')}',
                 ),
               ],
             ),
@@ -161,7 +168,9 @@ class PluginStoreCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               AppBanner(
                 tone: AppBannerTone.warning,
-                message: '需要宿主版本 ${item.entry.minAppVersion} 及以上',
+                message: l10n?.minAppVersionRequired(
+                        item.entry.minAppVersion ?? '') ??
+                    '需要宿主版本 ${item.entry.minAppVersion} 及以上',
               ),
             ],
           ],
